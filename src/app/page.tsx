@@ -1,7 +1,9 @@
 "use client";
-import React from "react";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import TopbarTienda from "./tienda/componentes/TopbarTienda"; // Importa el Topbar
+import ContactModal from "~/components/ContactModal";
+import { Button } from "~/components/ui/button";
 
 const productosDestacados = [
 	{
@@ -57,6 +59,8 @@ const productosDestacados = [
 
 export default function Home() {
 	const router = useRouter();
+	const [modalOpen, setModalOpen] = useState(false);
+
 	return (
 		<div className="min-h-screen bg-[#007973]">
 			<TopbarTienda /> {/* Renderiza el Topbar aquí */}
@@ -229,6 +233,10 @@ export default function Home() {
 					</div>
 				</div>
 			</section>
+			<Button onClick={() => setModalOpen(true)} className="fixed bottom-8 right-8 z-50 bg-[#007973] text-white">
+				Contáctanos
+			</Button>
+			<ContactModal open={modalOpen} onOpenChange={setModalOpen} />
 		</div>
 	);
 }
