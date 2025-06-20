@@ -1,0 +1,80 @@
+"use client";
+import { useEffect, useState } from "react";
+import { Card } from "~/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~/components/ui/table";
+import { Button } from "~/components/ui/button";
+import { CreateUserModal } from "~/components/CreateUserModal";
+
+export default function AdminUsuariosPage() {
+  const [usuarios, setUsuarios] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [modalOpen, setModalOpen] = useState(false);
+
+  const fetchUsuarios = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/usuarios");
+      const data = await res.json();
+      setUsuarios(Array.isArray(data.usuarios) ? data.usuarios : []);
+    } catch (error) {
+      setUsuarios([]);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchUsuarios();
+  }, []);
+
+  return (
+    <div className="min-h-screen p-10 bg-gray-50">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">Usuarios Registrados</h1>
+        <Button onClick={() => setModalOpen(true)}>Agregar usuario</Button>
+      </div>
+      <CreateUserModal open={modalOpen} onOpenChange={setModalOpen} onUserCreated={fetchUsuarios} />
+      <Card>
+        <div className="p-4">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Nombre</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Clerk ID</TableHead>
+                <TableHead>Fecha de registro</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-center py-8">
+                    Cargando usuarios...
+                  </TableCell>
+                </TableRow>
+              ) : usuarios.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-center py-8">
+                    No hay usuarios registrados.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                usuarios.map((usuario) => (
+                  <TableRow key={usuario.id || usuario.email}>
+                    <TableCell>{usuario.nombre || "-"}</TableCell>
+                    <TableCell>{usuario.email || "-"}</TableCell>
+                    <TableCell>{usuario.clerk_id || "-"}</TableCell>
+                    <TableCell>
+                      {usuario.creado_en && typeof usuario.creado_en === "string"
+                        ? usuario.creado_en.slice(0, 19).replace("T", " ")
+                        : "-"}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </Card>
+    </div>
+  );
+}

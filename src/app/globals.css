@@ -1,0 +1,5 @@
+/* ...existing code... */
+[class^="cl-internal"], [class*=" cl-internal"] {
+  display: none !important;
+}
+/* ...existing code... */
