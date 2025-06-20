@@ -165,7 +165,7 @@ export default function Home() {
 						Productos Destacados
 					</h2>
 					<p className="text-xl text-gray-600">
-						Descubre nuestros productos más populares y mejor valorados
+						Descubre nuestros productos más populares y valorados
 					</p>
 				</div>
 				{/* Carrusel de productos fluido con borde */}
