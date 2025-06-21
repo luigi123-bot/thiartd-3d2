@@ -3,23 +3,43 @@ import { useState, useEffect } from "react";
 import { Button } from "~/components/ui/button";
 import CreateProductModal from "~/app/tienda/productos/CreateProductModal";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { createClient } from "@supabase/supabase-js";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "~/components/ui/dialog";
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "TU_SUPABASE_URL";
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "TU_SUPABASE_ANON_KEY";
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 export default function AdminProductosPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [productos, setProductos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [editProduct, setEditProduct] = useState<any | null>(null);
+  const [deleteProduct, setDeleteProduct] = useState<any | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchProductos = async () => {
     setLoading(true);
-    const res = await fetch("/api/productos");
-    const data = await res.json();
-    setProductos(Array.isArray(data.productos) ? data.productos : []);
+    const { data, error } = await supabase
+      .from("productos")
+      .select("*")
+      .order("id", { ascending: false });
+    setProductos(Array.isArray(data) ? data : []);
     setLoading(false);
   };
 
   useEffect(() => {
     fetchProductos();
   }, []);
+
+  const handleDelete = async () => {
+    if (!deleteProduct) return;
+    setDeleting(true);
+    await supabase.from("productos").delete().eq("id", deleteProduct.id);
+    setDeleting(false);
+    setDeleteProduct(null);
+    fetchProductos();
+  };
 
   return (
     <div className="p-10">
@@ -28,10 +48,26 @@ export default function AdminProductosPage() {
         <Button onClick={() => setModalOpen(true)}>Crear producto</Button>
       </div>
       <CreateProductModal
-        open={modalOpen}
-        onOpenChange={setModalOpen}
+        open={modalOpen || !!editProduct}
+        onOpenChange={(open: boolean) => {
+          setModalOpen(open);
+          if (!open) setEditProduct(null);
+        }}
         onProductCreated={fetchProductos}
+        product={editProduct}
       />
+      <Dialog open={!!deleteProduct} onOpenChange={v => { if (!v) setDeleteProduct(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>¿Eliminar producto?</DialogTitle>
+          </DialogHeader>
+          <div>¿Estás seguro de que deseas eliminar <b>{deleteProduct?.nombre}</b>?</div>
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setDeleteProduct(null)} disabled={deleting}>Cancelar</Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={deleting}>{deleting ? "Eliminando..." : "Eliminar"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       {loading ? (
         <div className="text-center py-8">Cargando productos...</div>
       ) : productos.length === 0 ? (
@@ -65,6 +101,14 @@ export default function AdminProductosPage() {
                 </div>
                 <div className="font-bold text-lg text-[#007973]">
                   ${producto.precio}
+                </div>
+                <div className="flex gap-2 mt-4">
+                  <Button size="sm" variant="outline" onClick={() => setEditProduct(producto)}>
+                    Editar
+                  </Button>
+                  <Button size="sm" variant="destructive" onClick={() => setDeleteProduct(producto)}>
+                    Eliminar
+                  </Button>
                 </div>
               </CardContent>
             </Card>

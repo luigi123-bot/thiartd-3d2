@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "~/components/ui/dialog";
 import { Input } from "~/components/ui/input";
 import { Button } from "~/components/ui/button";
@@ -17,10 +17,11 @@ const categorias = [
 
 const tamanos = ["Pequeño", "Mediano", "Grande", "Personalizado"];
 
-export default function CreateProductModal({ open, onOpenChange, onProductCreated }: {
+export default function CreateProductModal({ open, onOpenChange, onProductCreated, product }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onProductCreated?: () => void;
+  product?: any;
 }) {
   const [form, setForm] = useState({
     nombre: "",
@@ -34,20 +35,20 @@ export default function CreateProductModal({ open, onOpenChange, onProductCreate
   });
   const [loading, setLoading] = useState(false);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    const res = await fetch("/api/productos", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
-    });
-    setLoading(false);
-    if (res.ok) {
+  // Sincronizar form con product si existe
+  useEffect(() => {
+    if (product) {
+      setForm({
+        nombre: product.nombre || "",
+        precio: product.precio || 0,
+        descripcion: product.descripcion || "",
+        tamano: product.tamano || tamanos[0],
+        categoria: product.categoria || categorias[0],
+        stock: product.stock || 0,
+        detalles: product.detalles || "",
+        destacado: product.destacado || false,
+      });
+    } else {
       setForm({
         nombre: "",
         precio: 0,
@@ -58,6 +59,34 @@ export default function CreateProductModal({ open, onOpenChange, onProductCreate
         detalles: "",
         destacado: false,
       });
+    }
+  }, [product, open]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    let res;
+    if (product && product.id) {
+      // Editar producto
+      res = await fetch(`/api/productos/${product.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+    } else {
+      // Crear producto
+      res = await fetch("/api/productos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+    }
+    setLoading(false);
+    if (res.ok) {
       onOpenChange(false);
       onProductCreated?.();
     } else {
@@ -71,7 +100,7 @@ export default function CreateProductModal({ open, onOpenChange, onProductCreate
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Añadir nuevo producto</DialogTitle>
+          <DialogTitle>{product ? "Editar producto" : "Añadir nuevo producto"}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4 mt-2">
           <Input
@@ -135,7 +164,7 @@ export default function CreateProductModal({ open, onOpenChange, onProductCreate
             onChange={handleChange}
           />
           <Button type="submit" className="w-full" disabled={loading}>
-            Guardar producto
+            {product ? "Actualizar producto" : "Guardar producto"}
           </Button>
         </form>
       </DialogContent>
