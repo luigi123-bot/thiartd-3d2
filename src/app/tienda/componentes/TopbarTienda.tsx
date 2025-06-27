@@ -32,7 +32,7 @@ export default function TopbarTienda() {
       {/* Menú navegación */}
       <div className="hidden md:flex gap-6 ml-10">
         <Link
-          href="/tienda"
+          href="/"
           className="text-white hover:text-gray-100 font-medium"
         >
           Inicio

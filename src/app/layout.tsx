@@ -8,6 +8,8 @@ import "~/styles/globals.css";
 import { ToastProvider } from "~/components/ui/use-toast";
 import SyncUser from "../components/SyncUser";
 import Footer from "~/components/Footer";
+import { UiProvider } from "~/components/providers/UiProvider";
+import ClientChatWidgetWrapper from "~/components/ClientChatWidgetWrapper"; // Importa directamente
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -38,8 +40,11 @@ export default function RootLayout({
         <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
           <SyncUser />
           <ToastProvider>
-            {children}
-            <Footer />
+            <UiProvider>
+              {children}
+              <Footer />
+              <ClientChatWidgetWrapper />
+            </UiProvider>
           </ToastProvider>
         </body>
       </html>

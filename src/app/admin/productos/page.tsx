@@ -5,18 +5,24 @@ import CreateProductModal from "~/app/tienda/productos/CreateProductModal";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { createClient } from "@supabase/supabase-js";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "~/components/ui/dialog";
+import Loader from "~/components/providers/UiProvider";
+import { useUser } from "@clerk/nextjs";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "TU_SUPABASE_URL";
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "TU_SUPABASE_ANON_KEY";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 export default function AdminProductosPage() {
+  const { user, isLoaded } = useUser();
   const [modalOpen, setModalOpen] = useState(false);
   const [productos, setProductos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [editProduct, setEditProduct] = useState<any | null>(null);
   const [deleteProduct, setDeleteProduct] = useState<any | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  // Validación de rol
+  const isAdmin = user?.publicMetadata?.role === "admin";
 
   const fetchProductos = async () => {
     setLoading(true);
@@ -29,8 +35,8 @@ export default function AdminProductosPage() {
   };
 
   useEffect(() => {
-    fetchProductos();
-  }, []);
+    if (isAdmin) fetchProductos();
+  }, [isAdmin]);
 
   const handleDelete = async () => {
     if (!deleteProduct) return;
@@ -40,6 +46,26 @@ export default function AdminProductosPage() {
     setDeleteProduct(null);
     fetchProductos();
   };
+
+  // Esta función ya no recibe argumentos
+  const handleProductCreated = async () => {
+    await fetchProductos();
+    // Si quieres notificar, deberías obtener el producto creado desde el modal o recargarlo aquí
+    // await supabase.from("notificaciones").insert([...]);
+  };
+
+  if (!isLoaded) {
+    return <Loader />;
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh]">
+        <div className="text-2xl font-bold mb-2">Acceso denegado</div>
+        <div className="text-gray-500">No tienes permisos para ver esta página.</div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-10">
@@ -53,7 +79,7 @@ export default function AdminProductosPage() {
           setModalOpen(open);
           if (!open) setEditProduct(null);
         }}
-        onProductCreated={fetchProductos}
+        onProductCreated={handleProductCreated} // Ahora sin argumentos
         product={editProduct}
       />
       <Dialog open={!!deleteProduct} onOpenChange={v => { if (!v) setDeleteProduct(null); }}>
@@ -69,7 +95,7 @@ export default function AdminProductosPage() {
         </DialogContent>
       </Dialog>
       {loading ? (
-        <div className="text-center py-8">Cargando productos...</div>
+        <Loader />
       ) : productos.length === 0 ? (
         <div className="text-center py-8 text-gray-500">
           No hay productos registrados.
@@ -118,3 +144,4 @@ export default function AdminProductosPage() {
     </div>
   );
 }
+  
