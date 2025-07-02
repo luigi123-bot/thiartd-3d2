@@ -15,7 +15,17 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    type ProductoBody = {
+      nombre: string;
+      precio: number;
+      descripcion: string;
+      tamano: string;
+      categoria: string;
+      stock: number;
+      detalles?: string;
+      destacado?: boolean;
+    };
+    const body = (await req.json()) as ProductoBody;
     // Ajusta los campos según tu tabla productos
     const { nombre, precio, descripcion, tamano, categoria, stock, detalles, destacado } = body;
     if (!nombre || precio === undefined || !descripcion || !tamano || !categoria || stock === undefined) {
@@ -27,7 +37,20 @@ export async function POST(req: Request) {
     // Log para depuración
     console.log("Insertando producto:", { nombre, precio, descripcion, tamano, categoria, stock, detalles, destacado });
 
-    const { data, error } = await supabase
+    interface Producto {
+      id?: number;
+      nombre: string;
+      precio: number;
+      descripcion: string;
+      tamano: string;
+      categoria: string;
+      stock: number;
+      detalles?: string;
+      destacado?: boolean;
+      // Agrega aquí otros campos si existen en la tabla
+    }
+
+    const insertResult = await supabase
       .from("productos")
       .insert([{
         nombre,
@@ -41,6 +64,9 @@ export async function POST(req: Request) {
       }])
       .select()
       .single();
+
+    const data = insertResult.data as Producto;
+    const error = insertResult.error;
 
     if (error) {
       console.error("Error Supabase:", error.message);

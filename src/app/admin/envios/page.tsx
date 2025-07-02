@@ -3,16 +3,15 @@ import React, { useState, useEffect, useMemo } from "react";
 import { createClient } from '@supabase/supabase-js';
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "~/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader,DialogFooter } from "~/components/ui/dialog";
 import { Card } from "~/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
+import { Tabs, TabsContent } from "~/components/ui/tabs";
 import { Badge } from "~/components/ui/badge";
 import {
   FiTruck,
   FiCheckCircle,
   FiClock,
   FiPackage,
-  FiPlus,
   FiSearch,
   FiChevronRight,
   FiCalendar,
@@ -21,8 +20,8 @@ import {
 } from "react-icons/fi";
 import clsx from "clsx";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "TU_SUPABASE_URL";
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "TU_SUPABASE_ANON_KEY";
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "TU_SUPABASE_URL";
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "TU_SUPABASE_ANON_KEY";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 const ESTADOS = [
@@ -42,6 +41,15 @@ function getEstadoNeumor(estado: string) {
   return found ? found.neumor : "shadow-gray-100";
 }
 
+interface Envio {
+  id: number;
+  nombre_cliente: string;
+  direccion: string;
+  fecha_envio: string;
+  estado: string;
+  dia_entrega?: string;
+}
+
 export default function AdminEnviosPage() {
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({
@@ -51,8 +59,9 @@ export default function AdminEnviosPage() {
     estado: "En proceso",
     dia_entrega: ""
   });
-  const [envios, setEnvios] = useState<any[]>([]);
-  const [selectedEnvio, setSelectedEnvio] = useState<any | null>(null);
+
+  const [envios, setEnvios] = useState<Envio[]>([]);
+  const [selectedEnvio, setSelectedEnvio] = useState<Envio | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [tab, setTab] = useState("todos");
   const [filtro, setFiltro] = useState("");
@@ -87,7 +96,7 @@ export default function AdminEnviosPage() {
   };
 
   useEffect(() => {
-    fetchEnvios();
+    void fetchEnvios();
   }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -110,11 +119,11 @@ export default function AdminEnviosPage() {
     } else {
       setShowModal(false);
       setForm({ nombre_cliente: '', direccion: '', fecha_envio: '', estado: 'En proceso', dia_entrega: '' });
-      fetchEnvios();
+      void fetchEnvios();
     }
   };
 
-  const handleRowClick = (envio: any) => {
+  const handleRowClick = (envio: Envio) => {
     setSelectedEnvio(envio);
     setShowDetailModal(true);
   };
@@ -138,7 +147,6 @@ export default function AdminEnviosPage() {
         );
 
   // Animación suave para tarjetas
-  const cardAnim = "transition-all duration-300 hover:scale-[1.025] hover:shadow-xl";
 
   return (
     <div className="min-h-screen p-0 md:p-8 bg-gradient-to-br from-[#f6f8fc] via-[#f3f4fa] to-[#e9eaf7] font-[Inter,sans-serif]">
@@ -239,7 +247,7 @@ export default function AdminEnviosPage() {
             )}
             {searchFocus && filtro && autocomplete.length > 0 && (
               <div className="absolute left-0 right-0 top-12 bg-white rounded-xl shadow-lg z-10 neumorph-autocomplete animate-fade-in">
-                {autocomplete.map((e, idx) => (
+                {autocomplete.map((e) => (
                   <div
                     key={e.id}
                     className="px-4 py-2 hover:bg-[#f0f4f8] cursor-pointer flex items-center gap-2"
@@ -495,7 +503,7 @@ export default function AdminEnviosPage() {
 }
 
 // Tarjeta de envío con neumorfismo y animación
-function EnvioCard({ envio, onClick }: { envio: any; onClick: () => void }) {
+function EnvioCard({ envio, onClick }: { envio: Envio; onClick: () => void }) {
   return (
     <Card
       className={clsx(
@@ -576,7 +584,7 @@ function StatCard({
         "flex flex-col items-center justify-center rounded-2xl",
         "px-6 py-4 min-w-[170px] max-w-xs w-full",
         "shadow-md backdrop-blur-md",
-        bg || "bg-white/80",
+        bg ?? "bg-white/80",
         "transition-all duration-200 hover:scale-105 hover:shadow-lg",
         "cursor-pointer"
       )}
@@ -587,7 +595,7 @@ function StatCard({
       <div
         className={clsx(
           "flex items-center justify-center rounded-full mb-2",
-          iconBg || "bg-gray-100",
+          iconBg ?? "bg-gray-100",
           "w-12 h-12 shadow-sm"
         )}
       >

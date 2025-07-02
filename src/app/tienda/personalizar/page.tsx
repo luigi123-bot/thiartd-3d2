@@ -51,8 +51,8 @@ const FAQS = [
   },
 ];
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "TU_SUPABASE_URL";
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "TU_SUPABASE_ANON_KEY";
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "TU_SUPABASE_URL";
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "TU_SUPABASE_ANON_KEY";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 export default function PersonalizarPage() {
@@ -69,28 +69,63 @@ export default function PersonalizarPage() {
   const [loading, setLoading] = useState(false);
   const [showPago, setShowPago] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
-  const [mensajes, setMensajes] = useState<any[]>([]);
+  type Mensaje = {
+    id?: string | number;
+    conversacion_id: string;
+    usuario_id?: string;
+    remitente: string;
+    texto: string;
+    hora: string;
+    created_at?: string;
+  };
+  const [mensajes, setMensajes] = useState<Mensaje[]>([]);
   const [nuevoMensaje, setNuevoMensaje] = useState("");
   const [convId, setConvId] = useState<string | null>(null);
 
   // Crear o buscar conversación para el usuario
   useEffect(() => {
     if (!user) return;
-    (async () => {
-      let { data: conv } = await supabase
-        .from("conversaciones")
-        .select("*")
-        .eq("usuario_id", user.id)
-        .single();
-      if (!conv) {
-        const { data: nueva } = await supabase
+    void (async () => {
+      type Conversacion = { id: string; usuario_id: string; cliente_nombre: string };
+      let conv: Conversacion | null = null;
+      try {
+        const convResult = await supabase
           .from("conversaciones")
-          .insert([{ usuario_id: user.id, cliente_nombre: user.fullName || user.username || user.emailAddresses?.[0]?.emailAddress || "Invitado" }])
-          .select()
+          .select("*")
+          .eq("usuario_id", user.id)
           .single();
-        conv = nueva;
+        const convData: Conversacion | null = convResult.data as Conversacion | null;
+        const convError = convResult.error;
+        if (convError) {
+          // handle error if needed
+        }
+        conv = convData;
+        if (!conv) {
+          const nuevaResult = await supabase
+            .from("conversaciones")
+            .insert([
+              {
+                usuario_id: user.id,
+                cliente_nombre:
+                  user.fullName ??
+                  user.username ??
+                  user.emailAddresses?.[0]?.emailAddress ??
+                  "Invitado",
+              },
+            ])
+            .select()
+            .single();
+          if (nuevaResult.error) {
+            // handle error if needed
+          }
+          conv = nuevaResult.data as Conversacion | null;
+        }
+        if (conv?.id) {
+          setConvId(conv.id);
+        }
+      } catch{
+        // handle unexpected errors
       }
-      setConvId(conv.id);
     })();
   }, [user]);
 
@@ -113,13 +148,13 @@ export default function PersonalizarPage() {
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "mensajes", filter: `conversacion_id=eq.${convId}` },
         (payload) => {
-          setMensajes((prev) => [...prev, payload.new]);
+          setMensajes((prev) => [...prev, payload.new as Mensaje]);
         }
       )
       .subscribe();
     return () => {
       ignore = true;
-      supabase.removeChannel(channel);
+      void supabase.removeChannel(channel);
     };
   }, [convId]);
 
@@ -130,8 +165,8 @@ export default function PersonalizarPage() {
     let referenciaUrl = "";
     if (img) {
       const fileExt = img.name.split(".").pop();
-      const fileName = `referencia-${user?.id || "anon"}-${Date.now()}.${fileExt}`;
-      const { data, error } = await supabase.storage
+      const fileName = `referencia-${user?.id ?? "anon"}-${Date.now()}.${fileExt}`;
+      const { error } = await supabase.storage
         .from("referencias")
         .upload(fileName, img);
       if (!error) {
@@ -139,25 +174,25 @@ export default function PersonalizarPage() {
       }
     }
     // Guarda la solicitud de personalización (en tabla temporal)
-    const { data: persData, error: persError } = await supabase.from("personalizaciones").insert([
+    const persResult = await supabase.from("personalizaciones").insert([
       {
-        usuario_id: user?.id || null,
-        nombre: user?.fullName || "",
-        email: user?.emailAddresses?.[0]?.emailAddress || "",
+        usuario_id: user?.id ?? null,
+        nombre: user?.fullName ?? "",
+        email: user?.emailAddresses?.[0]?.emailAddress ?? "",
         tamano: size,
         material,
         color,
         acabado,
         presupuesto,
         plazo,
-        descripcion: (document.querySelector("textarea") as HTMLTextAreaElement)?.value || "",
+        descripcion: (document.querySelector("textarea"))?.value ?? "",
         referencia_url: referenciaUrl,
         estado: "pendiente_pago",
         created_at: new Date().toISOString(),
       },
     ]).select().single();
     setLoading(false);
-    if (!persError && persData) {
+    if (!persResult.error && persResult.data) {
       setShowPago(true); // Abre modal de pago
     } else {
       setMensaje("Error al enviar la solicitud.");
@@ -168,7 +203,7 @@ export default function PersonalizarPage() {
   const handlePagar = async () => {
     setLoading(true);
     // Busca la última personalización pendiente de este usuario
-    const { data: pers } = await supabase
+    const persResult = await supabase
       .from("personalizaciones")
       .select("*")
       .eq("usuario_id", user?.id)
@@ -176,6 +211,25 @@ export default function PersonalizarPage() {
       .order("created_at", { ascending: false })
       .limit(1)
       .single();
+
+    type Personalizacion = {
+      id: string;
+      usuario_id: string;
+      nombre: string;
+      email: string;
+      tamano: string;
+      material: string;
+      color: string;
+      acabado: string;
+      presupuesto: string;
+      plazo: string;
+      descripcion: string;
+      referencia_url: string;
+      estado: string;
+      created_at: string;
+      titulo?: string;
+    };
+    const pers = persResult.data as Personalizacion | null;
 
     if (!pers) {
       setMensaje("No se encontró la personalización.");
@@ -185,9 +239,9 @@ export default function PersonalizarPage() {
     }
 
     // Crea el producto personalizado
-    const { data: prod } = await supabase.from("productos").insert([
+    const prodResult = await supabase.from("productos").insert([
       {
-        nombre: pers.titulo || "Producto Personalizado",
+        nombre: pers.titulo ?? "Producto Personalizado",
         descripcion: pers.descripcion,
         categoria: "Personalizado",
         precio: 0,
@@ -197,6 +251,8 @@ export default function PersonalizarPage() {
         created_at: new Date().toISOString(),
       },
     ]).select().single();
+
+    const prod: { id: string } | null = prodResult.data as { id: string } | null;
 
     // Crea el pedido pendiente
     if (prod) {
@@ -354,7 +410,7 @@ export default function PersonalizarPage() {
                 type="file"
                 accept="image/*"
                 className="rounded-lg"
-                onChange={e => setImg(e.target.files?.[0] || null)}
+                onChange={e => setImg(e.target.files?.[0] ?? null)}
               />
             </div>
 

@@ -56,25 +56,5 @@ export const revalidate = 0; // Desactivar la caché para esta página
 export const fetchCache = "force-no-store"; // Desactivar la caché de Next.js para esta página
 export const runtime = "edge"; // Ejecutar en el edge para mejor rendimiento
 export const preferredRegion = "auto"; // Usar la región más cercana automáticamente
-export const tags = ["nextjs", "react", "typescript", "tailwindcss"]; // Etiquetas para la página
+// export const tags = ["nextjs", "react", "typescript", "tailwindcss"]; // Etiquetas para la página
 export const dynamicParams = false; // Desactivar los parámetros dinámicos para esta página
-export const fetchCacheKey = "root-layout"; // Clave de caché para esta página
-export const revalidateTag = "root-layout"; // Etiqueta de revalidación para esta página
-export const fetchCacheOptions = {
-  maxAge: 0, // Desactivar la caché para esta página
-  staleWhileRevalidate: 0, // Desactivar la revalidación en segundo plano
-  swr: false, // Desactivar la revalidación en segundo plano  
-  cache: "no-store", // Desactivar la caché de Next.js para esta página
-  next: {
-    revalidate: 0, // Desactivar la revalidación de Next.js para esta página
-    tags: ["root-layout"], // Etiquetas de revalidación para esta página
-  },
-  headers: {
-    "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
-    "Pragma": "no-cache",
-    "Expires": "0",
-  },
-  cookies: {
-    "next-auth.session-token": {}, // Desactivar la caché de sesión de Next.js para esta página
-  },
-};

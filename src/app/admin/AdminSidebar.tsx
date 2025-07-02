@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import {
   FiBox,
   FiUsers,
@@ -14,14 +15,15 @@ export default function AdminSidebar() {
   return (
     <aside className="w-64 min-h-screen bg-[#007973] text-white flex flex-col justify-between shadow-lg">
       <div>
-        <div className="flex items-center gap-3 px-6 py-6 border-b border-[#00a19a]">
-          <img
-            src="/IG%20Foto%20de%20Perfil.png"
-            alt="Logo Thiart3D"
-            className="h-10 w-10 rounded-full object-cover shadow-lg"
-          />
-          <span className="font-extrabold text-2xl">Thiart3D</span>
-        </div>
+        <Image
+          src="/IG%20Foto%20de%20Perfil.png"
+          alt="Logo Thiart3D"
+          width={40}
+          height={40}
+          className="h-10 w-10 rounded-full object-cover shadow-lg"
+          priority
+        />
+        <span className="font-extrabold text-2xl">Thiart3D</span>
         <nav className="flex flex-col gap-2 mt-8 px-4">
           <Link
             href="/admin/productos"

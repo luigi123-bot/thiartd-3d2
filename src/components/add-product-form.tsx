@@ -19,7 +19,7 @@ export interface ProductFormValues {
 
 interface AddProductFormProps {
   open: boolean;
-  onOpenChange: (open: boolean) => void;
+  onOpenChangeAction: (open: boolean) => void;
   onSuccess?: (values: ProductFormValues) => Promise<void>;
   onSubmit?: (values: ProductFormValues) => void;
   initialValues?: ProductFormValues;
@@ -28,7 +28,7 @@ interface AddProductFormProps {
 
 export function AddProductForm({
   open,
-  onOpenChange,
+  onOpenChangeAction,
   onSuccess,
   onSubmit,
   initialValues,
@@ -81,11 +81,11 @@ export function AddProductForm({
       onSubmit(form);
     }
     setLoading(false);
-    onOpenChange(false);
+    onOpenChangeAction(false);
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChangeAction}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{isEditing ? "Editar producto" : "Agregar producto"}</DialogTitle>

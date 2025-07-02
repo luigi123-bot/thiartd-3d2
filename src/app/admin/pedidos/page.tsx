@@ -19,7 +19,25 @@ import {
 import { cn } from "~/lib/utils";
 
 // Simulación de pedidos
-const pedidos = [
+type Producto = {
+  nombre: string;
+  precio: number;
+};
+
+type Pedido = {
+  id: number;
+  cliente: string;
+  direccion: string;
+  metodoEnvio: string;
+  estado: string;
+  total: number;
+  productos: Producto[];
+  impuestos: number;
+  logistica: number;
+  codigoUnico: string;
+};
+
+const pedidos: Pedido[] = [
   {
     id: 1,
     cliente: "Juan Pérez",
@@ -57,7 +75,7 @@ const estadoColor = {
 };
 
 export default function PedidosPage() {
-  const [selectedPedido, setSelectedPedido] = useState<any | null>(null);
+  const [selectedPedido, setSelectedPedido] = useState<(typeof pedidos)[number] | null>(null);
   const [showDetail, setShowDetail] = useState(false);
 
   return (
@@ -133,7 +151,7 @@ export default function PedidosPage() {
               <div><b>Estado:</b> {selectedPedido.estado}</div>
               <div><b>Productos:</b></div>
               <ul className="ml-4 list-disc">
-                {selectedPedido.productos.map((p: any, i: number) => (
+                {selectedPedido.productos.map((p: Producto, i: number) => (
                   <li key={i}>{p.nombre} - ${p.precio.toLocaleString()}</li>
                 ))}
               </ul>

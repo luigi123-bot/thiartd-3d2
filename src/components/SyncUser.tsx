@@ -7,7 +7,7 @@ export default function SyncUser() {
 
   useEffect(() => {
     if (isSignedIn) {
-      fetch("/api/sync-user", { method: "POST" });
+      void fetch("/api/sync-user", { method: "POST" });
     }
   }, [isSignedIn]);
 

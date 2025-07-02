@@ -8,22 +8,54 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import Image from "next/image";
 import { useToast } from "~/components/ui/use-toast";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "TU_SUPABASE_URL";
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "TU_SUPABASE_ANON_KEY";
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "TU_SUPABASE_URL";
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "TU_SUPABASE_ANON_KEY";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 export default function AdminMensajesPage() {
-	const [convs, setConvs] = useState<any[]>([]);
+	interface Conversation {
+		id: number;
+		cliente_nombre: string;
+		cliente_email: string;
+		cliente_avatar_url?: string;
+		// Add other fields as needed
+	}
+
+	const [convs, setConvs] = useState<Conversation[]>([]);
 	const [convId, setConvId] = useState<number | null>(null);
-	const [mensajes, setMensajes] = useState<any[]>([]);
+	interface Mensaje {
+		id: number;
+		conversacion_id: number;
+		remitente: string;
+		texto: string;
+		hora: string;
+		leido_cliente: boolean;
+		created_at: string;
+	}
+
+	const [mensajes, setMensajes] = useState<Mensaje[]>([]);
 	const [msg, setMsg] = useState("");
 	const [busqueda, setBusqueda] = useState("");
 	const [loading, setLoading] = useState(true);
-	const [modalUser, setModalUser] = useState<any | null>(null);
-	const [pedidos, setPedidos] = useState<any[]>([]);
+	interface ModalUser {
+		cliente_id: number;
+		cliente_nombre: string;
+		cliente_email: string;
+		cliente_avatar_url?: string;
+	}
+
+	const [modalUser, setModalUser] = useState<ModalUser | null>(null);
+	interface Pedido {
+		id: number;
+		estado: string;
+		created_at: string;
+		// Add other fields as needed
+	}
+
+	const [pedidos, setPedidos] = useState<Pedido[]>([]);
 	const [loadingPedidos, setLoadingPedidos] = useState(false);
 	const [isTyping, setIsTyping] = useState(false);
-	const [typingUsers, setTypingUsers] = useState<string[]>([]);
+	const [typingUsers] = useState<string[]>([]);
 	const [nuevosIds, setNuevosIds] = useState<number[]>([]);
 	const chatRef = useRef<HTMLDivElement>(null);
 	const { toast } = useToast();
@@ -39,7 +71,7 @@ export default function AdminMensajesPage() {
 			setConvs(Array.isArray(data) ? data : []);
 			setLoading(false);
 		}
-		fetchConvs();
+		void fetchConvs();
 	}, []);
 
 	// Cargar mensajes de la conversación seleccionada y suscripción realtime
@@ -56,7 +88,7 @@ export default function AdminMensajesPage() {
 			if (!ignore) setMensajes(Array.isArray(data) ? data : []);
 			setLoading(false);
 		};
-		fetchMensajes();
+		void fetchMensajes();
 
 		const channel = supabase
 			.channel("mensajes-admin")
@@ -65,24 +97,25 @@ export default function AdminMensajesPage() {
 				{ event: "INSERT", schema: "public", table: "mensajes", filter: `conversacion_id=eq.${convId}` },
 				(payload) => {
 					setMensajes((prev) => {
-						if (prev.some((m) => m.id === payload.new.id)) return prev;
+						const newMessage = payload.new as Mensaje;
+						if (prev.some((m) => m.id === newMessage.id)) return prev;
 						// Si el mensaje es de cliente, marca como nuevo y muestra notificación
-						if (payload.new.remitente !== "admin") {
-							setNuevosIds((ids) => [...ids, payload.new.id]);
+						if (newMessage.remitente !== "admin") {
+							setNuevosIds((ids) => [...ids, newMessage.id]);
 							toast({
 								title: "Nuevo mensaje",
-								description: payload.new.texto?.length > 40 ? payload.new.texto.slice(0, 40) + "..." : payload.new.texto,
+								description: newMessage.texto?.length > 40 ? newMessage.texto.slice(0, 40) + "..." : newMessage.texto,
 								variant: "default",
 							});
 						}
-						return [...prev, payload.new];
+						return [...prev, newMessage];
 					});
 				}
 			)
 			.subscribe();
 		return () => {
 			ignore = true;
-			supabase.removeChannel(channel);
+			void supabase.removeChannel(channel);
 		};
 	}, [convId, toast]);
 
@@ -113,12 +146,12 @@ export default function AdminMensajesPage() {
 	const convSeleccionada = convs.find((c) => c.id === convId);
 
 	// Helper para obtener la imagen de perfil Clerk (si la guardas en la conversación)
-	const getProfileImage = (conv: any) =>
-		conv.cliente_avatar_url ||
-		"https://ui-avatars.com/api/?name=User&background=cccccc&color=666666&size=80";
+	const getProfileImage = (user: Conversation | ModalUser) =>
+			user.cliente_avatar_url ??
+			"https://ui-avatars.com/api/?name=User&background=cccccc&color=666666&size=80";
 
 	// Resumen de pedidos
-	const resumenPedidos = (pedidos: any[]) => {
+	const resumenPedidos = (pedidos: Pedido[]) => {
 		const total = pedidos.length;
 		const enEnvio = pedidos.filter((p) => p.estado === "en_envio").length;
 		const pendientes = pedidos.filter((p) => p.estado === "pendiente").length;
@@ -131,7 +164,7 @@ export default function AdminMensajesPage() {
 		if (!convId) return;
 		if (!isTyping) {
 			setIsTyping(true);
-			supabase.channel("typing").send({
+			void supabase.channel("typing").send({
 				type: "broadcast",
 				event: "typing",
 				payload: { conversacion_id: convId, user: "admin", typing: true },
@@ -140,7 +173,7 @@ export default function AdminMensajesPage() {
 		// Detener typing después de 2s sin escribir
 		setTimeout(() => {
 			setIsTyping(false);
-			supabase.channel("typing").send({
+			void supabase.channel("typing").send({
 				type: "broadcast",
 				event: "typing",
 				payload: { conversacion_id: convId, user: "admin", typing: false },
@@ -148,7 +181,7 @@ export default function AdminMensajesPage() {
 		}, 2000);
 	};
 
-	const renderEstado = (m: any) => {
+	const renderEstado = (m: Mensaje) => {
 		if (m.remitente === "admin") {
 			if (m.leido_cliente) {
 				return <MdDoneAll className="inline ml-1 text-blue-500" title="Leído" />;
@@ -194,7 +227,12 @@ export default function AdminMensajesPage() {
 										className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-400 font-bold text-lg overflow-hidden cursor-pointer border"
 										onClick={(e) => {
 											e.stopPropagation();
-											setModalUser(conv);
+											setModalUser({
+												cliente_id: conv.id,
+												cliente_nombre: conv.cliente_nombre,
+												cliente_email: conv.cliente_email,
+												cliente_avatar_url: conv.cliente_avatar_url,
+											});
 										}}
 										title="Ver perfil y pedidos"
 									>
@@ -227,7 +265,18 @@ export default function AdminMensajesPage() {
 							<div className="flex items-center gap-3 mb-4 flex-shrink-0">
 								<div
 									className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center text-gray-400 font-bold text-xl overflow-hidden cursor-pointer border"
-									onClick={() => setModalUser(convSeleccionada)}
+									onClick={() =>
+										setModalUser(
+											convSeleccionada
+												? {
+														cliente_id: convSeleccionada.id,
+														cliente_nombre: convSeleccionada.cliente_nombre,
+														cliente_email: convSeleccionada.cliente_email,
+														cliente_avatar_url: convSeleccionada.cliente_avatar_url,
+												  }
+												: null
+										)
+									}
 									title="Ver perfil y pedidos"
 								>
 									<Image
@@ -370,8 +419,8 @@ export default function AdminMensajesPage() {
 						<DialogTitle>
 							<div className="flex items-center gap-3">
 								<Image
-									src={getProfileImage(modalUser || {})}
-									alt={modalUser?.cliente_nombre || ""}
+									src={modalUser ? getProfileImage(modalUser) : "https://ui-avatars.com/api/?name=User&background=cccccc&color=666666&size=80"}
+									alt={modalUser?.cliente_nombre ?? ""}
 									width={48}
 									height={48}
 									className="object-cover w-12 h-12 rounded-full"

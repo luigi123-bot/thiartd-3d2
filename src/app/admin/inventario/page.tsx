@@ -7,8 +7,8 @@ import CreateProductModal from "~/app/tienda/productos/CreateProductModal";
 import AjustarInventarioModal from "./AjustarInventarioModal";
 import { FiSettings } from "react-icons/fi";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "TU_SUPABASE_URL";
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "TU_SUPABASE_ANON_KEY";
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "TU_SUPABASE_URL";
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "TU_SUPABASE_ANON_KEY";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 const categorias = ["Todas las categorías", "Moderno", "Abstracto"];
@@ -18,15 +18,31 @@ export default function AdminInventarioPage() {
 	const [categoria, setCategoria] = useState("Todas las categorías");
 	const [estado, setEstado] = useState("Todos");
 	const [busqueda, setBusqueda] = useState("");
-	const [productos, setProductos] = useState<any[]>([]);
+	interface Producto {
+		id: number;
+		nombre: string;
+		categoria: string;
+		stock: number;
+		precio: number;
+	}
+
+	const [productos, setProductos] = useState<Producto[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [modalOpen, setModalOpen] = useState(false);
-	const [ajustarProducto, setAjustarProducto] = useState<any | null>(null);
+	interface AjustarProducto {
+		id: number;
+		nombre: string;
+		categoria: string;
+		stock: number;
+		precio: number;
+	}
+
+	const [ajustarProducto, setAjustarProducto] = useState<AjustarProducto | null>(null);
 	const [ajustando, setAjustando] = useState(false);
 
 	const fetchProductos = async () => {
 		setLoading(true);
-		const { data, error } = await supabase
+		const { data } = await supabase
 			.from("productos")
 			.select("*")
 			.order("id", { ascending: false });
@@ -35,7 +51,7 @@ export default function AdminInventarioPage() {
 	};
 
 	useEffect(() => {
-		fetchProductos();
+		void fetchProductos();
 	}, []);
 
 	const handleRevalidate = async () => {
@@ -47,7 +63,6 @@ export default function AdminInventarioPage() {
 	const handleAjuste = async ({
 		tipo,
 		cantidad,
-		razon,
 		precio,
 	}: {
 		tipo: string;
@@ -67,7 +82,7 @@ export default function AdminInventarioPage() {
 			.eq("id", ajustarProducto.id);
 		setAjustando(false);
 		setAjustarProducto(null);
-		fetchProductos();
+		 void fetchProductos();
 	};
 
 	// Filtros
@@ -110,7 +125,7 @@ export default function AdminInventarioPage() {
 			{/* Modal para crear producto */}
 			<CreateProductModal
 				open={modalOpen}
-				onOpenChange={(open: boolean) => setModalOpen(open)}
+				onOpenChangeAction={(open: boolean) => setModalOpen(open)}
 				onProductCreated={fetchProductos}
 			/>
 			{/* Resumen */}
@@ -212,13 +227,19 @@ export default function AdminInventarioPage() {
 					))}
 				</div>
 			)}
-			<AjustarInventarioModal
-				open={!!ajustarProducto}
-				onOpenChange={(open) => setAjustarProducto(open ? ajustarProducto : null)}
-				producto={ajustarProducto}
-				onAjuste={handleAjuste}
-				loading={ajustando}
-			/>
+			{ajustarProducto && (
+				<AjustarInventarioModal
+					open={!!ajustarProducto}
+					onOpenChange={(open) => setAjustarProducto(open ? ajustarProducto : null)}
+					producto={{
+						nombre: ajustarProducto.nombre,
+						stock: ajustarProducto.stock,
+						precio: ajustarProducto.precio,
+					}}
+					onAjuste={handleAjuste}
+					loading={ajustando}
+				/>
+			)}
 		</div>
 	);
 }

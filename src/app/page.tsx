@@ -1,6 +1,7 @@
 "use client";
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import TopbarTienda from "./tienda/componentes/TopbarTienda"; // Importa el Topbar
 import ContactModal from "~/components/ContactModal";
 import { Button } from "~/components/ui/button";
@@ -182,13 +183,16 @@ export default function Home() {
 							{[...productosDestacados, ...productosDestacados].map((prod, i) => (
 								<div
 									key={i}
-									className="bg-white rounded-xl shadow w-80 flex-shrink-0 border border-[#b2dfdb]"
+									className="bg-white rounded-xl shadow w-80 flex-shrink-0 border border-[#b2dfdb] relative flex flex-col"
 								>
-									<div className="relative h-72 flex items-center justify-center">
-										<img
+									<div>
+										<Image
 											src="/Logo%20Thiart%20Tiktok.png"
 											alt="Logo producto"
+											width={128}
+											height={128}
 											className="w-32 h-32 object-contain"
+											priority
 										/>
 										{prod.destacado && (
 											<span className="absolute top-4 right-4 bg-[#007973] text-white text-xs px-3 py-1 rounded-full font-semibold">
@@ -236,7 +240,7 @@ export default function Home() {
 			<Button onClick={() => setModalOpen(true)} className="fixed bottom-8 right-8 z-50 bg-[#007973] text-white">
 				Contáctanos
 			</Button>
-			<ContactModal open={modalOpen} onOpenChange={setModalOpen} />
+			<ContactModal open={modalOpen} onOpenChangeAction={setModalOpen} />
 		</div>
 	);
 }

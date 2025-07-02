@@ -5,14 +5,26 @@ import { createClient } from "@supabase/supabase-js";
 import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "TU_SUPABASE_URL";
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "TU_SUPABASE_ANON_KEY";
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "TU_SUPABASE_URL";
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "TU_SUPABASE_ANON_KEY";
 const supabase = createClient(supabaseUrl, supabaseKey);
+
+type Notificacion = {
+  id: string | number;
+  usuario_id: string;
+  leido: boolean;
+  created_at?: string;
+  tipo?: string;
+  mensaje?: string;
+  pedido_id?: string | number;
+  conversacion_id?: string | number;
+  producto_id?: string | number;
+};
 
 export default function NotificacionesUsuario() {
   const { user } = useUser();
   const router = useRouter();
-  const [notis, setNotis] = useState<any[]>([]);
+  const [notis, setNotis] = useState<Notificacion[]>([]);
   const [open, setOpen] = useState(false);
   const [showToast, setShowToast] = useState(false);
 
@@ -28,9 +40,9 @@ export default function NotificacionesUsuario() {
         .eq("usuario_id", user.id)
         .eq("leido", false)
         .order("created_at", { ascending: false });
-      if (isMounted) setNotis(data || []);
+      if (isMounted) setNotis(data ?? []);
     }
-    fetchNotis();
+    void fetchNotis();
 
     // Suscripción realtime
     const channel = supabase
@@ -38,8 +50,8 @@ export default function NotificacionesUsuario() {
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "notificaciones", filter: `usuario_id=eq.${user?.id}` },
-        (payload) => {
-          fetchNotis();
+        (_payload) => {
+          void fetchNotis();
           setShowToast(true);
           setTimeout(() => setShowToast(false), 3500);
         }
@@ -48,14 +60,14 @@ export default function NotificacionesUsuario() {
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "notificaciones", filter: `usuario_id=eq.${user?.id}` },
         () => {
-          fetchNotis();
+          void fetchNotis();
         }
       )
       .subscribe();
 
     return () => {
       isMounted = false;
-      supabase.removeChannel(channel);
+      void supabase.removeChannel(channel);
     };
   }, [user]);
 
@@ -68,7 +80,7 @@ export default function NotificacionesUsuario() {
   }, [open, notis]);
 
   // Ir a detalle según tipo de notificación
-  const handleGoTo = (noti: any) => {
+  const handleGoTo = (noti: Notificacion) => {
     setOpen(false);
     if (noti.pedido_id) router.push(`/usuario/pedidos/${noti.pedido_id}`);
     else if (noti.conversacion_id) router.push(`/usuario/chat?conv=${noti.conversacion_id}`);
@@ -102,7 +114,7 @@ export default function NotificacionesUsuario() {
                     onClick={() => handleGoTo(n)}
                   >
                     <span className="font-semibold text-green-700">{n.tipo === "pedido" ? "Pedido" : n.tipo === "mensaje" ? "Mensaje" : "Notificación"}:</span>{" "}
-                    {n.mensaje?.length > 40 ? n.mensaje.slice(0, 40) + "..." : n.mensaje}
+                    {n.mensaje && n.mensaje.length > 40 ? n.mensaje.slice(0, 40) + "..." : n.mensaje}
                   </button>
                   <span className="text-xs text-gray-400">
                     {n.created_at ? new Date(n.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : ""}

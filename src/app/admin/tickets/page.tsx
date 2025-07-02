@@ -1,12 +1,12 @@
 "use client";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Card } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { createClient } from "@supabase/supabase-js";
 import { FiCheckCircle, FiAlertTriangle, FiClock, FiXCircle, FiMail } from "react-icons/fi";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "TU_SUPABASE_URL";
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "TU_SUPABASE_ANON_KEY";
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "TU_SUPABASE_URL";
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "TU_SUPABASE_ANON_KEY";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 const ESTADOS = [
@@ -23,14 +23,24 @@ const CATEGORIAS = [
 ];
 
 export default function AdminTicketsPage() {
-  const [tickets, setTickets] = useState<any[]>([]);
+  interface Ticket {
+    id: number;
+    titulo: string;
+    descripcion: string;
+    categoria: string;
+    estado: string;
+    created_at: string;
+    imagen_url?: string;
+  }
+
+  const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
-  const [estadoFiltro, setEstadoFiltro] = useState<string | "">("");
-  const [categoriaFiltro, setCategoriaFiltro] = useState<string | "">("");
-  const [modalTicket, setModalTicket] = useState<any | null>(null);
+  const [estadoFiltro, setEstadoFiltro] = useState<string>("");
+  const [categoriaFiltro, setCategoriaFiltro] = useState<string>("");
+  const [modalTicket, setModalTicket] = useState<Record<string, unknown> | null>(null);
 
   // Cargar tickets
-  const fetchTickets = async () => {
+  const fetchTickets = React.useCallback(async () => {
     setLoading(true);
     // Solo selecciona los campos que existen en tu tabla
     let query = supabase
@@ -47,16 +57,16 @@ export default function AdminTicketsPage() {
       setTickets(Array.isArray(data) ? data : []);
     }
     setLoading(false);
-  };
+  }, [estadoFiltro, categoriaFiltro]);
 
   useEffect(() => {
-    fetchTickets();
-  }, [estadoFiltro, categoriaFiltro]);
+    void fetchTickets();
+  }, [fetchTickets]);
 
   // Cambiar estado del ticket
   const cambiarEstado = async (id: number, nuevoEstado: string) => {
     await supabase.from("tickets").update({ estado: nuevoEstado }).eq("id", id);
-    fetchTickets();
+    void fetchTickets();
   };
 
   // Estadísticas para burbujas
@@ -158,8 +168,8 @@ export default function AdminTicketsPage() {
                     <td className="py-2 px-2">{t.titulo}</td>
                     <td className="py-2 px-2">{t.categoria}</td>
                     <td className="py-2 px-2">
-                      <span className={`inline-block px-2 py-1 rounded-full text-xs font-semibold ${ESTADOS.find(e => e.value === t.estado)?.color || "bg-gray-200"}`}>
-                        {ESTADOS.find(e => e.value === t.estado)?.label || t.estado}
+                      <span className={`inline-block px-2 py-1 rounded-full text-xs font-semibold ${ESTADOS.find(e => e.value === t.estado)?.color ?? "bg-gray-200"}`}>
+                        {ESTADOS.find(e => e.value === t.estado)?.label ?? t.estado}
                       </span>
                     </td>
                     <td className="py-2 px-2">{t.created_at ? new Date(t.created_at).toLocaleString() : ""}</td>
@@ -193,7 +203,16 @@ export default function AdminTicketsPage() {
 }
 
 // Modal para crear ticket
-function TicketModal({ open, onOpenChange, onTicketCreated }: { open: boolean, onOpenChange: (v: boolean) => void, onTicketCreated: () => void }) {
+function TicketModal({ onOpenChange, onTicketCreated }: { open: boolean, onOpenChange: (v: boolean) => void, onTicketCreated: () => void }) {
+  interface Ticket {
+    id: number;
+    titulo: string;
+    descripcion: string;
+    categoria: string;
+    estado: string;
+    created_at: string;
+    imagen_url?: string;
+  }
   const [form, setForm] = useState({ titulo: "", descripcion: "", categoria: CATEGORIAS[0] });
   const [loading, setLoading] = useState(false);
 
@@ -214,7 +233,7 @@ function TicketModal({ open, onOpenChange, onTicketCreated }: { open: boolean, o
     console.log("Intentando guardar ticket en Supabase:", ticketData);
 
     try {
-      const { data, error } = await supabase.from("tickets").insert([ticketData]).select().single();
+      const { data, error }: { data: Ticket | null; error: { message: string; details?: string; hint?: string } | null } = await supabase.from("tickets").insert([ticketData]).select().single();
       console.log("Respuesta de Supabase:", { data, error });
       setLoading(false);
       if (!error && data) {
@@ -227,11 +246,13 @@ function TicketModal({ open, onOpenChange, onTicketCreated }: { open: boolean, o
             subject: "Nuevo Ticket de Soporte",
             text: `Se ha creado un nuevo ticket:\n\nTítulo: ${form.titulo}\nCategoría: ${form.categoria}\nDescripción: ${form.descripcion}`,
           }),
+        }).catch((error) => {
+          console.error("Error al enviar el correo al admin:", error);
         });
         onOpenChange(false);
         onTicketCreated();
       } else {
-        alert("Error al guardar el ticket: " + (error?.message || "Error desconocido"));
+        alert("Error al guardar el ticket: " + (error?.message ?? "Error desconocido"));
       }
     } catch (err) {
       setLoading(false);

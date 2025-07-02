@@ -2,6 +2,7 @@ import { FaFacebookF, FaInstagram, FaWhatsapp } from "react-icons/fa";
 import { FiMail, FiPhone, FiMapPin } from "react-icons/fi";
 import { Input } from "~/components/ui/input";
 import { Button } from "~/components/ui/button";
+import Link from "next/link";
 
 export default function Footer() {
   return (
@@ -48,9 +49,9 @@ export default function Footer() {
           <div className="font-bold mb-2">Enlaces rápidos</div>
           <ul className="space-y-1">
             <li>
-              <a href="/" className="hover:underline">
+              <Link href="/" className="hover:underline">
                 Inicio
-              </a>
+              </Link>
             </li>
             <li>
               <a

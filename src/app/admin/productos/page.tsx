@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import { Button } from "~/components/ui/button";
 import CreateProductModal from "~/app/tienda/productos/CreateProductModal";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
@@ -8,17 +9,27 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import Loader from "~/components/providers/UiProvider";
 import { useUser } from "@clerk/nextjs";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "TU_SUPABASE_URL";
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "TU_SUPABASE_ANON_KEY";
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "TU_SUPABASE_URL";
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "TU_SUPABASE_ANON_KEY";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 export default function AdminProductosPage() {
   const { user, isLoaded } = useUser();
   const [modalOpen, setModalOpen] = useState(false);
-  const [productos, setProductos] = useState<any[]>([]);
+  interface Producto {
+    id: number;
+    nombre: string;
+    descripcion: string;
+    categoria: string;
+    tamano: string;
+    stock: number;
+    precio: number;
+  }
+
+  const [productos, setProductos] = useState<Producto[]>([]);
   const [loading, setLoading] = useState(true);
-  const [editProduct, setEditProduct] = useState<any | null>(null);
-  const [deleteProduct, setDeleteProduct] = useState<any | null>(null);
+  const [editProduct, setEditProduct] = useState<Producto | null>(null);
+  const [deleteProduct, setDeleteProduct] = useState<Producto | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   // Validación de rol
@@ -26,7 +37,7 @@ export default function AdminProductosPage() {
 
   const fetchProductos = async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    const { data} = await supabase
       .from("productos")
       .select("*")
       .order("id", { ascending: false });
@@ -35,7 +46,7 @@ export default function AdminProductosPage() {
   };
 
   useEffect(() => {
-    if (isAdmin) fetchProductos();
+    if (isAdmin) void fetchProductos();
   }, [isAdmin]);
 
   const handleDelete = async () => {
@@ -44,7 +55,7 @@ export default function AdminProductosPage() {
     await supabase.from("productos").delete().eq("id", deleteProduct.id);
     setDeleting(false);
     setDeleteProduct(null);
-    fetchProductos();
+    void fetchProductos();
   };
 
   // Esta función ya no recibe argumentos
@@ -75,12 +86,20 @@ export default function AdminProductosPage() {
       </div>
       <CreateProductModal
         open={modalOpen || !!editProduct}
-        onOpenChange={(open: boolean) => {
+        onOpenChangeAction={(open: boolean) => {
           setModalOpen(open);
           if (!open) setEditProduct(null);
         }}
         onProductCreated={handleProductCreated} // Ahora sin argumentos
-        product={editProduct}
+        product={
+          editProduct
+            ? {
+                ...editProduct,
+                detalles: "", // O asigna el valor real si lo tienes
+                destacado: false, // O asigna el valor real si lo tienes
+              }
+            : undefined
+        }
       />
       <Dialog open={!!deleteProduct} onOpenChange={v => { if (!v) setDeleteProduct(null); }}>
         <DialogContent>
@@ -105,14 +124,14 @@ export default function AdminProductosPage() {
           {productos.map((producto) => (
             <Card key={producto.id}>
               <CardHeader>
-                <div className="flex items-center gap-3">
-                  <img
-                    src="/Logo%20Thiart%20Tiktok.png"
-                    alt="Logo producto"
-                    className="h-12 w-12 rounded object-cover border"
-                  />
-                  <CardTitle>{producto.nombre}</CardTitle>
-                </div>
+                <Image
+                  src="/Logo%20Thiart%20Tiktok.png"
+                  alt="Logo producto"
+                  width={48}
+                  height={48}
+                  className="h-12 w-12 rounded object-cover border"
+                />
+                <CardTitle>{producto.nombre}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="mb-2 text-gray-700">{producto.descripcion}</div>

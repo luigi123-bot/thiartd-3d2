@@ -7,11 +7,11 @@ import { useToast } from "~/components/ui/use-toast";
 
 interface CreateUserModalProps {
   open: boolean;
-  onOpenChange: (open: boolean) => void;
+  onOpenChangeAction: (open: boolean) => void;
   onUserCreated?: () => void;
 }
 
-export function CreateUserModal({ open, onOpenChange, onUserCreated }: CreateUserModalProps) {
+export function CreateUserModal({ open, onOpenChangeAction, onUserCreated }: CreateUserModalProps) {
   const { toast } = useToast();
   const [form, setForm] = useState({
     nombre: "",
@@ -50,9 +50,9 @@ export function CreateUserModal({ open, onOpenChange, onUserCreated }: CreateUse
         body: JSON.stringify(form),
       });
 
-      let data;
+      let data: { error?: string } = {};
       try {
-        data = await res.json();
+        data = (await res.json()) as { error?: string };
       } catch {
         data = {};
       }
@@ -63,23 +63,23 @@ export function CreateUserModal({ open, onOpenChange, onUserCreated }: CreateUse
         toast({ title: "Usuario creado", description: "El usuario fue creado correctamente." });
         setForm({ nombre: "", email: "", password: "" });
         setErrors({});
-        onOpenChange(false);
+        onOpenChangeAction(false);
         onUserCreated?.();
       } else {
         toast({
           title: "Error",
-          description: data.error || "No se pudo crear el usuario.",
+          description: data.error ?? "No se pudo crear el usuario.",
           variant: "destructive",
         });
       }
-    } catch (error) {
+    } catch {
       setLoading(false);
       toast({ title: "Error", description: "Error de red o inesperado.", variant: "destructive" });
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChangeAction}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Crear usuario</DialogTitle>

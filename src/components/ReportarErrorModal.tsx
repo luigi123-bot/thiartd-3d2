@@ -5,19 +5,19 @@ import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "TU_SUPABASE_URL";
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "TU_SUPABASE_ANON_KEY";
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "TU_SUPABASE_URL";
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "TU_SUPABASE_ANON_KEY";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 const CATEGORIAS = ["Error", "Sugerencia", "Consulta", "Otro"];
 
 export default function ReportarErrorModal({
   open,
-  onOpenChange,
+  onOpenChangeAction,
   clienteId,
 }: {
   open: boolean;
-  onOpenChange: (v: boolean) => void;
+  onOpenChangeAction: (v: boolean) => void;
   clienteId: string;
 }) {
   const [form, setForm] = useState({
@@ -64,12 +64,12 @@ export default function ReportarErrorModal({
       },
     ]);
     setLoading(false);
-    onOpenChange(false);
+    onOpenChangeAction(false);
     setForm({ titulo: "", descripcion: "", categoria: CATEGORIAS[0], imagen: null });
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChangeAction}>
       <DialogContent className="z-[10001]">
         <DialogHeader>
           <DialogTitle>Reportar un problema</DialogTitle>
@@ -114,7 +114,7 @@ export default function ReportarErrorModal({
             onChange={handleChange}
           />
           <DialogFooter>
-            <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="secondary" onClick={() => onOpenChangeAction(false)}>
               Cancelar
             </Button>
             <Button type="submit" disabled={loading}>

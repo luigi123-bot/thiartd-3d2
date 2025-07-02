@@ -5,7 +5,7 @@ import { Input } from "~/components/ui/input";
 import { Textarea } from "~/components/ui/textarea";
 import { Button } from "~/components/ui/button";
 
-export default function ContactModal({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+export default function ContactModal({ open, onOpenChangeAction }: { open: boolean; onOpenChangeAction: (open: boolean) => void }) {
   const [form, setForm] = useState({ nombre: "", email: "", mensaje: "" });
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -33,7 +33,7 @@ export default function ContactModal({ open, onOpenChange }: { open: boolean; on
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChangeAction}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Contáctanos</DialogTitle>

@@ -7,8 +7,8 @@ import { FiBell, FiMessageCircle } from "react-icons/fi";
 import { createClient } from "@supabase/supabase-js";
 import { useRouter } from "next/navigation";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "TU_SUPABASE_URL";
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "TU_SUPABASE_ANON_KEY";
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "TU_SUPABASE_URL";
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "TU_SUPABASE_ANON_KEY";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 function Notificaciones() {
@@ -16,9 +16,13 @@ function Notificaciones() {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    (async () => {
-      const { data } = await supabase.from("productos").select("id,stock").lte("stock", 5).gt("stock", 0);
-      setBajoStock(data?.length || 0);
+    void (async () => {
+      try {
+        const { data } = await supabase.from("productos").select("id,stock").lte("stock", 5).gt("stock", 0);
+        setBajoStock(data?.length ?? 0);
+      } catch (error) {
+        console.error("Error fetching bajo stock data:", error);
+      }
     })();
   }, []);
 
@@ -52,8 +56,15 @@ function Notificaciones() {
   );
 }
 
+interface MensajePendiente {
+  id: number;
+  conversacion_id: number;
+  texto: string;
+  created_at: string;
+}
+
 function NotificacionesMensajes() {
-  const [pendientes, setPendientes] = useState<any[]>([]);
+  const [pendientes, setPendientes] = useState<MensajePendiente[]>([]);
   const [open, setOpen] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const router = useRouter();
@@ -68,9 +79,9 @@ function NotificacionesMensajes() {
         .eq("leido_admin", false)
         .eq("remitente", "cliente")
         .order("created_at", { ascending: false });
-      if (isMounted) setPendientes(data || []);
+      if (isMounted) setPendientes(data ?? []);
     }
-    fetchPendientes();
+    void fetchPendientes();
 
     // Suscripción realtime
     const channel = supabase
@@ -78,8 +89,8 @@ function NotificacionesMensajes() {
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "mensajes", filter: "leido_admin=eq.false,remitente=eq.cliente" },
-        (payload) => {
-          fetchPendientes();
+        () => {
+          void fetchPendientes();
           setShowToast(true);
           setTimeout(() => setShowToast(false), 3500);
         }
@@ -88,14 +99,14 @@ function NotificacionesMensajes() {
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "mensajes", filter: "leido_admin=eq.true" },
         () => {
-          fetchPendientes();
+          void fetchPendientes();
         }
       )
       .subscribe();
 
     return () => {
       isMounted = false;
-      supabase.removeChannel(channel);
+      void supabase.removeChannel(channel);
     };
   }, []);
 
@@ -202,7 +213,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   // Guardar el rol en Clerk si no existe (solo ejemplo, ajusta según tu lógica real)
   useEffect(() => {
     if (isLoaded && user && !user.publicMetadata?.role) {
-      user.update({ unsafeMetadata: { ...user.unsafeMetadata, role: "user" } });
+      void user.update({ unsafeMetadata: { ...user.unsafeMetadata, role: "user" } });
     }
   }, [isLoaded, user]);
 

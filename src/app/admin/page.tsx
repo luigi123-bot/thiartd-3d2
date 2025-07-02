@@ -7,72 +7,110 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, LineChart, Line
 } from "recharts";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "TU_SUPABASE_URL";
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "TU_SUPABASE_ANON_KEY";
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "TU_SUPABASE_URL";
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "TU_SUPABASE_ANON_KEY";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 const COLORS = ["#00a19a", "#007973", "#fbbf24", "#ef4444", "#6366f1", "#10b981"];
 
+interface Resumen {
+  ingresos: number;
+  egresos: number;
+  utilidad: number;
+  pedidos: number;
+  productos: number;
+  usuarios: number;
+  mensajes: number;
+  notificaciones: number;
+}
+
 export default function AdminDashboardPage() {
-  const [resumen, setResumen] = useState<any>({});
-  const [ventasPorMes, setVentasPorMes] = useState<any[]>([]);
-  const [productosPorCategoria, setProductosPorCategoria] = useState<any[]>([]);
-  const [usuariosPorMes, setUsuariosPorMes] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [resumen, setResumen] = useState<Resumen>({
+    ingresos: 0,
+    egresos: 0,
+    utilidad: 0,
+    pedidos: 0,
+    productos: 0,
+    usuarios: 0,
+    mensajes: 0,
+    notificaciones: 0,
+  });
+  interface VentaPorMes {
+    mes: string;
+    total: number;
+  }
+  const [ventasPorMes, setVentasPorMes] = useState<VentaPorMes[]>([]);
+  interface ProductoPorCategoria {
+    categoria: string;
+    value: number;
+  }
+  const [productosPorCategoria, setProductosPorCategoria] = useState<ProductoPorCategoria[]>([]);
+  interface UsuarioPorMes {
+    mes: string;
+    value: number;
+  }
+  const [usuariosPorMes, setUsuariosPorMes] = useState<UsuarioPorMes[]>([]);
+  // const [loading, setLoading] = useState(true);
 
   // Cargar métricas
   useEffect(() => {
     async function fetchData() {
-      setLoading(true);
+      // setLoading(true);
 
       // Total ingresos y egresos (ejemplo: suma de pedidos y egresos)
-      const { data: pedidos } = await supabase.from("pedidos").select("total, estado, created_at");
+      const { data: pedidos } = await supabase
+        .from("pedidos")
+        .select("total, estado, created_at") as { data: { total: number; estado: string; created_at: string }[] | null };
       const { data: egresos } = await supabase.from("egresos").select("monto, created_at");
-      const { data: productos } = await supabase.from("productos").select("id, categoria");
-      const { data: usuarios } = await supabase.from("usuarios").select("id, creado_en");
+      const { data: productos } = await supabase
+        .from("productos")
+        .select("id, categoria") as { data: { id: number; categoria: string }[] | null };
+      const { data: usuarios } = await supabase
+        .from("usuarios")
+        .select("id, creado_en") as { data: { id: number; creado_en: string }[] | null };
       const { data: mensajes } = await supabase.from("mensajes").select("id");
       const { data: notificaciones } = await supabase.from("notificaciones").select("id");
 
       // Resumen
-      const ingresos = (pedidos || []).reduce((acc, p) => acc + (Number(p.total) || 0), 0);
-      const egresosTotal = (egresos || []).reduce((acc, e) => acc + (Number(e.monto) || 0), 0);
+      const ingresos = (pedidos ?? []).reduce((acc, p) => acc + (Number(p.total) ?? 0), 0);
+      const egresosTotal = (egresos ?? []).reduce((acc, e) => acc + (Number(e.monto) ?? 0), 0);
       setResumen({
         ingresos,
         egresos: egresosTotal,
         utilidad: ingresos - egresosTotal,
-        pedidos: pedidos?.length || 0,
-        productos: productos?.length || 0,
-        usuarios: usuarios?.length || 0,
-        mensajes: mensajes?.length || 0,
-        notificaciones: notificaciones?.length || 0,
+        pedidos: pedidos?.length ?? 0,
+        productos: productos?.length ?? 0,
+        usuarios: usuarios?.length ?? 0,
+        mensajes: mensajes?.length ?? 0,
+        notificaciones: notificaciones?.length ?? 0,
       });
 
       // Ventas por mes
       const ventasMes: Record<string, number> = {};
-      (pedidos || []).forEach((p) => {
-        const mes = p.created_at?.slice(0, 7) || "Sin fecha";
-        ventasMes[mes] = (ventasMes[mes] || 0) + (Number(p.total) || 0);
+      (pedidos ?? []).forEach((p) => {
+        const mes = typeof p.created_at === "string" ? p.created_at.slice(0, 7) : "Sin fecha";
+        ventasMes[mes] = (ventasMes[mes] ?? 0) + (Number(p.total) ?? 0);
       });
       setVentasPorMes(Object.entries(ventasMes).map(([mes, total]) => ({ mes, total })));
 
       // Productos por categoría
       const cat: Record<string, number> = {};
-      (productos || []).forEach((p) => {
-        cat[p.categoria] = (cat[p.categoria] || 0) + 1;
+      (productos ?? []).forEach((p) => {
+        cat[p.categoria] = (cat[p.categoria] ?? 0) + 1;
       });
       setProductosPorCategoria(Object.entries(cat).map(([categoria, value]) => ({ categoria, value })));
 
       // Usuarios por mes
       const usuariosMes: Record<string, number> = {};
-      (usuarios || []).forEach((u) => {
-        const mes = u.creado_en?.slice(0, 7) || "Sin fecha";
-        usuariosMes[mes] = (usuariosMes[mes] || 0) + 1;
+      (usuarios ?? []).forEach((u) => {
+        const mes = u.creado_en?.slice(0, 7) ?? "Sin fecha";
+        usuariosMes[mes] = (usuariosMes[mes] ?? 0) + 1;
       });
       setUsuariosPorMes(Object.entries(usuariosMes).map(([mes, value]) => ({ mes, value })));
 
-      setLoading(false);
+      // setLoading(false);
     }
-    fetchData();
+    void fetchData();
   }, []);
 
   // Exportar informe CSV

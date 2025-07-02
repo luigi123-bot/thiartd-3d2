@@ -12,7 +12,7 @@ export default function AjustarInventarioModal({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  producto: any;
+  producto: { nombre: string; stock: number; precio: number };
   onAjuste: (ajuste: { tipo: string; cantidad: number; razon: string; precio: number }) => void;
   loading: boolean;
 }) {

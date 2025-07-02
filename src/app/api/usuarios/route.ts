@@ -11,7 +11,7 @@ export async function GET(req: Request) {
   const authHeader = req.headers.get("authorization");
   let supabase = createClient(supabaseUrl, supabaseKey);
 
-  if (authHeader && authHeader.startsWith("Bearer ")) {
+  if (authHeader?.startsWith("Bearer ")) {
     const jwt = authHeader.replace("Bearer ", "");
     supabase = createClient(supabaseUrl, supabaseKey, {
       global: {
@@ -34,7 +34,7 @@ export async function POST(req: Request) {
   const svix_timestamp = req.headers.get("svix-timestamp");
   const svix_signature = req.headers.get("svix-signature");
 
-  let supabase = createClient(supabaseUrl, supabaseKey);
+  const supabase = createClient(supabaseUrl, supabaseKey);
 
   if (svix_id && svix_timestamp && svix_signature && CLERK_WEBHOOK_SECRET) {
     // --- Webhook Clerk ---
@@ -56,25 +56,33 @@ export async function POST(req: Request) {
           { status: 400 }
         );
       }
+      interface Usuario {
+        id?: number;
+        clerk_id: string;
+        email: string;
+        nombre: string;
+        password?: string | null;
+      }
       const { data, error } = await supabase
         .from("usuarios")
         .upsert([{ clerk_id, email, nombre }], { onConflict: "clerk_id" })
         .select()
-        .single();
+        .single<Usuario>();
       if (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });
       }
       return NextResponse.json({ usuario: data });
-    } catch (error) {
+    } catch {
       return NextResponse.json({ error: "Unauthorized request" }, { status: 401 });
     }
   } else {
     // --- POST normal desde el frontend ---
-    let body;
+    type UsuarioBody = { nombre: string; email: string; password: string };
+    let body: UsuarioBody;
     try {
-      body = await req.json();
+      body = await req.json() as UsuarioBody;
       console.log("Body recibido en POST /api/usuarios:", body);
-    } catch (err) {
+    } catch {
       return NextResponse.json({ error: "Request body inválido" }, { status: 400 });
     }
     const { nombre, email, password } = body;
@@ -84,11 +92,20 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
-    const { data, error } = await supabase
+    interface Usuario {
+      id?: number;
+      clerk_id: string | null;
+      email: string;
+      nombre: string;
+      password?: string | null;
+    }
+    const result = await supabase
       .from("usuarios")
       .insert([{ nombre, email, password, clerk_id: null }])
       .select()
-      .single();
+      .single<Usuario>();
+    const data = result.data;
+    const error = result.error;
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }

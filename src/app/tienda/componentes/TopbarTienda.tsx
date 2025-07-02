@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import Image from "next/image";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { IoIosNotifications } from "react-icons/io";
@@ -19,10 +20,12 @@ export default function TopbarTienda() {
   return (
     <nav className="w-full border-b shadow-sm px-6 py-3 flex items-center justify-between sticky top-0 z-50 bg-[#00a19a]">
       {/* Logo Thiart3D */}
-      <Link href="/" className="flex items-center">
-        <img
+      <Link href="/">
+        <Image
           src="/IG%20Foto%20de%20Perfil.png"
           alt="Logo Thiart3D"
+          width={40}
+          height={40}
           className="h-10 w-10 rounded-full object-cover shadow-lg"
         />
         <span className="ml-3 font-extrabold text-2xl text-white hidden md:inline">

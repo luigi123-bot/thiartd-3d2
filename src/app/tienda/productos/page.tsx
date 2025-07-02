@@ -5,6 +5,7 @@ import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { ShoppingCart } from "lucide-react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import CreateProductModal from "./CreateProductModal";
 
 const categorias = [
@@ -23,8 +24,20 @@ const rangosPrecio = [
 
 const tamanos = ["Pequeño", "Mediano", "Grande"]; // Define aquí los tamaños disponibles
 
+type Product = {
+  id: string;
+  nombre: string;
+  desc: string;
+  categoria: string;
+  tamano: string;
+  precio: number;
+  destacado: boolean;
+  stock: number;
+  // agrega aquí otros campos si tu producto tiene más propiedades
+};
+
 export default function ProductosTiendaPage() {
-  const [productos, setProductos] = useState<any[]>([]);
+  const [productos, setProductos] = useState<Product[]>([]);
   const [filtros, setFiltros] = useState({
     categoria: [] as string[],
     tamano: [] as string[],
@@ -41,16 +54,16 @@ export default function ProductosTiendaPage() {
     setLoading(true);
     try {
       const res = await fetch("/api/productos");
-      const data = await res.json();
+      const data = (await res.json()) as { productos: Product[] };
       setProductos(Array.isArray(data.productos) ? data.productos : []);
-    } catch (error) {
+    } catch {
       setProductos([]);
     }
     setLoading(false);
   };
 
   useEffect(() => {
-    fetchProductos();
+    void fetchProductos();
   }, []);
 
   // Filtros
@@ -106,10 +119,10 @@ export default function ProductosTiendaPage() {
           Añadir nuevo producto
         </Button>
       </div>
-      <CreateProductModal open={modalOpen} onOpenChange={setModalOpen} onProductCreated={fetchProductos} />
+      <CreateProductModal open={modalOpen} onOpenChangeAction={setModalOpen} onProductCreated={fetchProductos} />
       {/* Breadcrumb */}
-      <div className="flex gap-2 text-gray-500 mb-8">
-        <a href="/" className="hover:text-black">Inicio</a>
+      <div className="flex items-center gap-2 mb-4">
+        <Link href="/" className="hover:text-black">Inicio</Link>
         <span>/</span>
         <span className="font-medium text-black">Productos</span>
       </div>

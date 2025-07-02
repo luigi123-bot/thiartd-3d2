@@ -1,30 +1,40 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Card } from "~/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~/components/ui/table";
 import { Button } from "~/components/ui/button";
 import { CreateUserModal } from "~/components/CreateUserModal";
 
 export default function AdminUsuariosPage() {
-  const [usuarios, setUsuarios] = useState<any[]>([]);
+  interface Usuario {
+    id?: string;
+    nombre?: string;
+    email?: string;
+    clerk_id?: string;
+    creado_en?: string;
+  }
+
+  const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
 
-  const fetchUsuarios = async () => {
+  // removed duplicate import of useCallback
+
+  const fetchUsuarios = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch("/api/usuarios");
-      const data = await res.json();
+      const data = (await res.json()) as { usuarios?: Usuario[] };
       setUsuarios(Array.isArray(data.usuarios) ? data.usuarios : []);
-    } catch (error) {
+    } catch {
       setUsuarios([]);
     }
     setLoading(false);
-  };
+  }, []);
 
   useEffect(() => {
-    fetchUsuarios();
-  }, []);
+    void fetchUsuarios();
+  }, [fetchUsuarios]);
 
   return (
     <div className="min-h-screen p-10 bg-gray-50">
@@ -32,7 +42,11 @@ export default function AdminUsuariosPage() {
         <h1 className="text-2xl font-bold">Usuarios Registrados</h1>
         <Button onClick={() => setModalOpen(true)}>Agregar usuario</Button>
       </div>
-      <CreateUserModal open={modalOpen} onOpenChange={setModalOpen} onUserCreated={fetchUsuarios} />
+      <CreateUserModal
+        open={modalOpen}
+        onOpenChangeAction={setModalOpen}
+        onUserCreated={fetchUsuarios}
+      />
       <Card>
         <div className="p-4">
           <Table>
@@ -59,10 +73,10 @@ export default function AdminUsuariosPage() {
                 </TableRow>
               ) : (
                 usuarios.map((usuario) => (
-                  <TableRow key={usuario.id || usuario.email}>
-                    <TableCell>{usuario.nombre || "-"}</TableCell>
-                    <TableCell>{usuario.email || "-"}</TableCell>
-                    <TableCell>{usuario.clerk_id || "-"}</TableCell>
+                  <TableRow key={usuario.id ?? usuario.email}>
+                    <TableCell>{usuario.nombre ?? "-"}</TableCell>
+                    <TableCell>{usuario.email ?? "-"}</TableCell>
+                    <TableCell>{usuario.clerk_id ?? "-"}</TableCell>
                     <TableCell>
                       {usuario.creado_en && typeof usuario.creado_en === "string"
                         ? usuario.creado_en.slice(0, 19).replace("T", " ")

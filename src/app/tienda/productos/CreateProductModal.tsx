@@ -17,11 +17,23 @@ const categorias = [
 
 const tamanos = ["Pequeño", "Mediano", "Grande", "Personalizado"];
 
-export default function CreateProductModal({ open, onOpenChange, onProductCreated, product }: {
+interface Product {
+  id?: string | number;
+  nombre: string;
+  precio: number;
+  descripcion: string;
+  tamano: string;
+  categoria: string;
+  stock: number;
+  detalles: string;
+  destacado: boolean;
+}
+
+export default function CreateProductModal({ open, onOpenChangeAction, onProductCreated, product }: {
   open: boolean;
-  onOpenChange: (open: boolean) => void;
+  onOpenChangeAction: (open: boolean) => void;
   onProductCreated?: () => void;
-  product?: any;
+  product?: Product;
 }) {
   const [form, setForm] = useState({
     nombre: "",
@@ -70,7 +82,7 @@ export default function CreateProductModal({ open, onOpenChange, onProductCreate
     e.preventDefault();
     setLoading(true);
     let res;
-    if (product && product.id) {
+    if (product?.id) {
       // Editar producto
       res = await fetch(`/api/productos/${product.id}`, {
         method: "PUT",
@@ -87,17 +99,17 @@ export default function CreateProductModal({ open, onOpenChange, onProductCreate
     }
     setLoading(false);
     if (res.ok) {
-      onOpenChange(false);
+      onOpenChangeAction(false);
       onProductCreated?.();
     } else {
-      const data = await res.json();
+      const data = (await res.json()) as { error?: string };
       console.error("Error al guardar producto:", data.error);
-      alert("Error al guardar producto: " + (data.error || "Error desconocido"));
+      alert("Error al guardar producto: " + (data.error ?? "Error desconocido"));
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChangeAction}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{product ? "Editar producto" : "Añadir nuevo producto"}</DialogTitle>

@@ -2,16 +2,12 @@
 import { useState, useEffect, useRef } from "react";
 import { FiMessageCircle, FiSend, FiX, FiClock } from "react-icons/fi";
 import { createClient } from "@supabase/supabase-js";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "~/components/ui/dialog";
-import { Button } from "~/components/ui/button";
-import { Input } from "~/components/ui/input";
 import ReportarErrorModal from "./ReportarErrorModal";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "TU_SUPABASE_URL";
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "TU_SUPABASE_ANON_KEY";
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "TU_SUPABASE_URL";
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "TU_SUPABASE_ANON_KEY";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-const CATEGORIAS = ["Error", "Sugerencia", "Consulta", "Otro"];
 
 export default function ChatWidget({
   clienteId,
@@ -23,40 +19,51 @@ export default function ChatWidget({
   clienteEmail: string;
 }) {
   const [open, setOpen] = useState(false);
-  const [mensajes, setMensajes] = useState<any[]>([]);
+  type Mensaje = {
+    id: number;
+    conversacion_id: number;
+    remitente: string;
+    texto: string;
+    hora: string;
+    created_at?: string;
+  };
+  const [mensajes, setMensajes] = useState<Mensaje[]>([]);
   const [msg, setMsg] = useState("");
   const [convId, setConvId] = useState<number | null>(null);
   const [hasNew, setHasNew] = useState(false);
   const [showHistorial, setShowHistorial] = useState(false);
-  const [convs, setConvs] = useState<any[]>([]);
+  type Conv = {
+    id: number;
+    cliente_id: string;
+    cliente_nombre: string;
+    cliente_email: string;
+    created_at: string;
+    // Add other fields as needed based on your "conversaciones" table
+  };
+  const [convs, setConvs] = useState<Conv[]>([]);
   const [ticketModal, setTicketModal] = useState(false);
-  const [ticketForm, setTicketForm] = useState({
-    descripcion: "",
-    categoria: CATEGORIAS[0],
-    imagen: null as File | null,
-  });
-  const [ticketLoading, setTicketLoading] = useState(false);
   const chatRef = useRef<HTMLDivElement>(null);
 
   // Buscar o crear conversación principal (actual)
   useEffect(() => {
     async function getOrCreateConv() {
-      let { data: conv } = await supabase
+      const { data: conv } = await supabase
         .from("conversaciones")
         .select("*")
         .eq("cliente_id", clienteId)
-        .single();
-      if (!conv) {
+        .single<Conv>();
+      let conversation = conv;
+      if (!conversation) {
         const { data: nueva } = await supabase
           .from("conversaciones")
           .insert([{ cliente_id: clienteId, cliente_nombre: clienteNombre, cliente_email: clienteEmail }])
           .select()
-          .single();
-        conv = nueva;
+          .single<Conv>();
+        conversation = nueva;
       }
-      setConvId(conv.id);
+      if (conversation) setConvId(conversation.id);
     }
-    if (clienteId) getOrCreateConv();
+    if (clienteId) void getOrCreateConv();
   }, [clienteId, clienteNombre, clienteEmail]);
 
   // Cargar historial de conversaciones del usuario
@@ -109,7 +116,7 @@ export default function ChatWidget({
 
     return () => {
       ignore = true;
-      supabase.removeChannel(channel);
+      void supabase.removeChannel(channel);
     };
   }, [convId, open]);
 
@@ -126,14 +133,18 @@ export default function ChatWidget({
     e.preventDefault();
     if (!msg.trim() || !convId) return;
     // Insertar mensaje
-    const { data: mensajeInsertado } = await supabase.from("mensajes").insert([
-      {
-        conversacion_id: convId,
-        remitente: "cliente",
-        texto: msg,
-        hora: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      },
-    ]).select().single();
+    const { data: mensajeInsertado } = await supabase
+      .from("mensajes")
+      .insert([
+        {
+          conversacion_id: convId,
+          remitente: "cliente",
+          texto: msg,
+          hora: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        },
+      ])
+      .select()
+      .single<Mensaje>();
     setMsg("");
     // Crear notificación para el admin
     if (mensajeInsertado) {
@@ -154,42 +165,6 @@ export default function ChatWidget({
   };
 
   // Subir ticket (imagen, descripción, categoría)
-  const handleTicketChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    if (e.target.name === "imagen" && e.target instanceof HTMLInputElement && e.target.files) {
-      setTicketForm({ ...ticketForm, imagen: e.target.files[0] ?? null });
-    } else {
-      setTicketForm({ ...ticketForm, [e.target.name]: e.target.value });
-    }
-  };
-
-  const handleTicketSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setTicketLoading(true);
-    let imagen_url = "";
-    if (ticketForm.imagen) {
-      const fileExt = ticketForm.imagen.name.split(".").pop();
-      const fileName = `ticket-${clienteId}-${Date.now()}.${fileExt}`;
-      const { data, error } = await supabase.storage
-        .from("tickets")
-        .upload(fileName, ticketForm.imagen);
-      if (!error) {
-        imagen_url = supabase.storage.from("tickets").getPublicUrl(fileName).data.publicUrl;
-      }
-    }
-    await supabase.from("tickets").insert([
-      {
-        usuario_id: clienteId,
-        descripcion: ticketForm.descripcion,
-        categoria: ticketForm.categoria,
-        imagen_url,
-        estado: "abierto",
-        created_at: new Date().toISOString(),
-      },
-    ]);
-    setTicketLoading(false);
-    setTicketModal(false);
-    setTicketForm({ descripcion: "", categoria: CATEGORIAS[0], imagen: null });
-  };
 
   return (
     <div className="fixed bottom-6 right-6 z-[9999] flex flex-col items-end gap-3">
@@ -206,7 +181,7 @@ export default function ChatWidget({
       {/* Modal de reportar error */}
       <ReportarErrorModal
         open={ticketModal}
-        onOpenChange={setTicketModal}
+        onOpenChangeAction={setTicketModal}
         clienteId={clienteId}
       />
       {/* Botón para abrir el chat */}
