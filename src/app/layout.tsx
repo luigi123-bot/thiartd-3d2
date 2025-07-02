@@ -28,7 +28,7 @@ export const metadata: Metadata = {
   creator: "Thiart3D",
   publisher: "Thiart3D",
   description: "Descubre productos 3D únicos y personalizados. Arte tridimensional para todos los gustos y espacios.",
-  icons: [{ rel: "icon", url: "/IG%20Foto%20de%20Perfil.png" }],
+  icons: [{ rel: "icon", url: "./favicon" }],
 };
 
 export default function RootLayout({
