@@ -1,5 +1,5 @@
 "use client";
-import AdminSidebar from "./AdminSidebar";
+import AdminSidebar from "./topbaradmin";
 import React, { Suspense, useEffect, useState } from "react";
 import Loader from "~/components/providers/UiProvider";
 import { UserButton, useUser } from "@clerk/nextjs";

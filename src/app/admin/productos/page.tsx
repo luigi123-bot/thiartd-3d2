@@ -10,6 +10,7 @@ import { useUser } from "@clerk/nextjs";
 import { Package, Star, AlertTriangle, Layers, ChevronDown, Search, Filter, BadgeDollarSign } from "lucide-react";
 import clsx from "clsx";
 import { createClient } from "@supabase/supabase-js";
+import { ProductDetailModal } from "../../../components/ProductDetailModal";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "TU_SUPABASE_URL";
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "TU_SUPABASE_ANON_KEY";
@@ -367,45 +368,12 @@ export default function AdminProductosPage() {
           </DialogContent>
         </Dialog>
         {/* Modal ver más */}
-        <Dialog open={!!modalDetalle} onOpenChange={v => { if (!v) setModalDetalle(null); }}>
-          <DialogContent className="max-w-xl">
-            <DialogHeader>
-              <DialogTitle>
-                <div className="flex items-center gap-2">
-                  <span>{modalDetalle?.nombre}</span>
-                  {modalDetalle?.destacado && <Star className="w-5 h-5 text-yellow-400" />}
-                </div>
-              </DialogTitle>
-            </DialogHeader>
-            <div className="flex flex-col md:flex-row gap-4">
-              <Image
-                src="/Logo%20Thiart%20Tiktok.png"
-                alt="Logo producto"
-                width={160}
-                height={160}
-                className="object-cover w-40 h-40 rounded-xl shadow"
-              />
-              <div className="flex-1">
-                <div className="mb-2 text-gray-500">{modalDetalle?.descripcion}</div>
-                <div className="flex flex-wrap gap-2 mb-2">
-                  <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">{modalDetalle?.categoria}</span>
-                  <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700">{modalDetalle?.tamano}</span>
-                  {modalDetalle?.stock === 0 && (
-                    <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-600">Sin stock</span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2 mt-2">
-                  <span className={`px-3 py-1 rounded-full text-xs font-bold ${getStockColor(modalDetalle?.stock ?? 0)}`}>
-                    Stock: {modalDetalle?.stock}
-                  </span>
-                  <span className="flex items-center gap-1 font-bold text-lg text-[#00a19a]">
-                    <BadgeDollarSign className="w-5 h-5" /> ${modalDetalle?.precio}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <ProductDetailModal
+          open={!!modalDetalle}
+          onOpenChange={v => { if (!v) setModalDetalle(null); }}
+          producto={modalDetalle}
+          getStockColor={getStockColor}
+        />
         {/* Animaciones */}
         <style jsx global>{`
           .animate-fade-in {
@@ -414,6 +382,13 @@ export default function AdminProductosPage() {
           @keyframes fadeInCard {
             from { opacity: 0; transform: translateY(24px);}
             to { opacity: 1; transform: translateY(0);}
+          }
+          .animate-fadeIn {
+            animation: fadeInModal 0.4s cubic-bezier(.4,0,.2,1);
+          }
+          @keyframes fadeInModal {
+            from { opacity: 0; transform: translateY(32px) scale(0.98);}
+            to { opacity: 1; transform: translateY(0) scale(1);}
           }
         `}</style>
       </main>
