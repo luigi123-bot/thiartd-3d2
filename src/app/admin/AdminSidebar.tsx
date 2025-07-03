@@ -9,85 +9,132 @@ import {
   FiMessageCircle,
   FiHome,
   FiAlertCircle,
+  FiBell,
+  FiUser,
+  FiMenu,
+  FiX,
 } from "react-icons/fi";
+import { useState } from "react";
+import { usePathname } from "next/navigation";
 
-export default function AdminSidebar() {
+const MENU = [
+  { href: "/admin/productos", label: "Productos", icon: FiBox },
+  { href: "/admin/usuarios", label: "Usuarios", icon: FiUsers },
+  { href: "/admin/inventario", label: "Inventario", icon: FiLayers },
+  { href: "/admin/envios", label: "Envíos", icon: FiTruck },
+  { href: "/admin/pedidos", label: "Pedidos", icon: FiShoppingCart },
+  { href: "/admin/tickets", label: "Tickets", icon: FiAlertCircle },
+  { href: "/admin/mensajes", label: "Mensajes", icon: FiMessageCircle },
+];
+
+export default function AdminTopbar() {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const pathname = usePathname();
+
   return (
-    <aside className="w-64 min-h-screen bg-[#007973] text-white flex flex-col justify-between shadow-lg">
-      <div>
-        <Image
-          src="/IG%20Foto%20de%20Perfil.png"
-          alt="Logo Thiart3D"
-          width={40}
-          height={40}
-          className="h-10 w-10 rounded-full object-cover shadow-lg"
-          priority
-        />
-        <span className="font-extrabold text-2xl">Thiart3D</span>
-        <nav className="flex flex-col gap-2 mt-8 px-4">
-          <Link
-            href="/admin/productos"
-            className="flex items-center gap-2 py-2 px-4 rounded hover:bg-[#00a19a] font-medium"
-          >
-            <FiBox className="text-lg" />
-            Productos
-          </Link>
-          <Link
-            href="/admin/usuarios"
-            className="flex items-center gap-2 py-2 px-4 rounded hover:bg-[#00a19a] font-medium"
-          >
-            <FiUsers className="text-lg" />
-            Usuarios
-          </Link>
-          <Link
-            href="/admin/inventario"
-            className="flex items-center gap-2 py-2 px-4 rounded hover:bg-[#00a19a] font-medium"
-          >
-            <FiLayers className="text-lg" />
-            Inventario
-          </Link>
-          <Link
-            href="/admin/envios"
-            className="flex items-center gap-2 py-2 px-4 rounded hover:bg-[#00a19a] font-medium"
-          >
-            <FiTruck className="text-lg" />
-            Envíos
-          </Link>
-          <Link
-            href="/admin/pedidos"
-            className="flex items-center gap-2 py-2 px-4 rounded hover:bg-[#00a19a] font-medium"
-          >
-            <FiShoppingCart className="text-lg" />
-            Pedidos
-          </Link>
-          <Link
-            href="/admin/tickets"
-            className="flex items-center gap-2 py-2 px-4 rounded hover:bg-[#00a19a] font-medium"
-          >
-            <FiAlertCircle className="text-lg" />
-            Tickets
-          </Link>
-          <Link
-            href="/admin/mensajes"
-            className="flex items-center gap-2 py-2 px-4 rounded hover:bg-[#00a19a] font-medium"
-          >
-            <FiMessageCircle className="text-lg" />
-            Mensajes
-          </Link>
-        </nav>
-        <div className="mt-8 px-4">
-          <Link
-            href="/"
-            className="flex items-center justify-center gap-2 w-full text-center bg-white text-[#007973] font-bold py-2 rounded hover:bg-[#e0f2f1] transition"
-          >
-            <FiHome className="text-lg" />
-            Ir a la Tienda
-          </Link>
+    <>
+      <header className="fixed top-0 left-0 w-full z-50 bg-white shadow-md">
+        <div className="flex items-center justify-between px-6 py-3">
+          {/* Logo y nombre */}
+          <div className="flex items-center gap-3">
+            <Image
+              src="/IG%20Foto%20de%20Perfil.png"
+              alt="Logo Thiart3D"
+              width={36}
+              height={36}
+              className="h-9 w-9 rounded-full object-cover shadow"
+              priority
+            />
+            <span className="font-extrabold text-xl text-gray-800">
+              Thiart3D Admin
+            </span>
+          </div>
+          {/* Menú horizontal */}
+          <nav className="hidden lg:flex gap-4 items-center ml-8">
+            {MENU.map(({ href, label, icon: Icon }) => (
+              <Link
+                key={href}
+                href={href}
+                className={`flex items-center gap-2 px-3 py-2 rounded font-semibold text-gray-800 hover:bg-slate-100 transition-all ${
+                  pathname === href ? "bg-slate-100 text-[#00a19a]" : ""
+                }`}
+              >
+                <Icon className="w-5 h-5" />
+                {label}
+              </Link>
+            ))}
+            <Link
+              href="/"
+              className="flex items-center gap-2 px-4 py-2 rounded font-bold bg-[#00a19a] text-white hover:bg-[#00968e] transition"
+            >
+              <FiHome className="w-5 h-5" />
+              Ir a la tienda
+            </Link>
+          </nav>
+          {/* Accesos rápidos */}
+          <div className="flex items-center gap-4 ml-4">
+            <button
+              className="relative p-2 rounded-full hover:bg-slate-100 transition"
+              aria-label="Notificaciones"
+            >
+              <FiBell className="w-5 h-5 text-gray-700" />
+              {/* <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" /> */}
+            </button>
+            <button
+              className="p-2 rounded-full hover:bg-slate-100 transition"
+              aria-label="Perfil"
+            >
+              <FiUser className="w-5 h-5 text-gray-700" />
+            </button>
+            {/* Menú hamburguesa */}
+            <button
+              className="lg:hidden p-2 rounded hover:bg-slate-100 transition"
+              aria-label="Abrir menú"
+              onClick={() => setMenuOpen((v) => !v)}
+            >
+              {menuOpen ? (
+                <FiX className="w-7 h-7" />
+              ) : (
+                <FiMenu className="w-7 h-7" />
+              )}
+            </button>
+          </div>
         </div>
-      </div>
-      <footer className="px-6 py-4 border-t border-[#00a19a] text-xs text-center bg-[#00665f]">
-        © {new Date().getFullYear()} Thiart3D. Todos los derechos reservados.
-      </footer>
-    </aside>
+        {/* Menú móvil */}
+        <nav
+          className={`lg:hidden bg-white shadow transition-all duration-300 ${
+            menuOpen
+              ? "max-h-[600px] opacity-100"
+              : "max-h-0 opacity-0 pointer-events-none"
+          } overflow-hidden`}
+        >
+          <div className="flex flex-col gap-1 px-6 pb-4 pt-2">
+            {MENU.map(({ href, label, icon: Icon }) => (
+              <Link
+                key={href}
+                href={href}
+                className={`flex items-center gap-2 px-3 py-2 rounded font-semibold text-gray-800 hover:bg-slate-100 transition-all ${
+                  pathname === href ? "bg-slate-100 text-[#00a19a]" : ""
+                }`}
+                onClick={() => setMenuOpen(false)}
+              >
+                <Icon className="w-5 h-5" />
+                {label}
+              </Link>
+            ))}
+            <Link
+              href="/"
+              className="flex items-center gap-2 px-4 py-2 rounded font-bold bg-[#00a19a] text-white hover:bg-[#00968e] transition mt-2"
+              onClick={() => setMenuOpen(false)}
+            >
+              <FiHome className="w-5 h-5" />
+              Ir a la tienda
+            </Link>
+          </div>
+        </nav>
+      </header>
+      {/* Espacio para el header */}
+      <div className="pt-[64px] lg:pt-[60px]" />
+    </>
   );
 }
