@@ -1,62 +1,11 @@
 "use client";
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import TopbarTienda from "./tienda/componentes/TopbarTienda"; // Importa el Topbar
 import ContactModal from "~/components/ContactModal";
 import { Button } from "~/components/ui/button";
+import ProductosCarrusel from "~/components/ProductosCarrusel";
 
-const productosDestacados = [
-	{
-		nombre: "Escultura Geométrica",
-		desc: "Figura abstracta con formas geométricas entrelazadas",
-		categoria: "Pequeño",
-		precio: 29.99,
-		destacado: true,
-	},
-	{
-		nombre: "Busto Decorativo",
-		desc: "Busto decorativo inspirado en el arte clásico",
-		categoria: "Mediano",
-		precio: 49.99,
-		destacado: false,
-	},
-	{
-		nombre: "Escultura Moderna",
-		desc: "Pieza moderna con líneas fluidas y acabado brillante",
-		categoria: "Pequeño",
-		precio: 39.99,
-		destacado: true,
-	},
-	{
-		nombre: "Figura Abstracta",
-		desc: "Diseño abstracto con múltiples interpretaciones",
-		categoria: "Grande",
-		precio: 79.99,
-		destacado: false,
-	},
-	{
-		nombre: "Miniatura Arquitectónica",
-		desc: "Modelo arquitectónico detallado",
-		categoria: "Mediano",
-		precio: 59.99,
-		destacado: false,
-	},
-	{
-		nombre: "Figura Animal",
-		desc: "Figura de animal realista",
-		categoria: "Pequeño",
-		precio: 24.99,
-		destacado: false,
-	},
-	{
-		nombre: "Escultura Orgánica",
-		desc: "Formas orgánicas y naturales",
-		categoria: "Grande",
-		precio: 89.99,
-		destacado: true,
-	},
-];
 
 export default function Home() {
 	const router = useRouter();
@@ -173,69 +122,7 @@ export default function Home() {
 						Descubre nuestros productos más populares y valorados
 					</p>
 				</div>
-				{/* Carrusel de productos fluido con borde */}
-				<div className="flex justify-center ">
-					<div className="relative overflow-hidden w-[1800px] max-w-full rounded-2xl border-4 shadow-lg border-[#b2dfdb] py-12 bg-[#e0f2f1]">
-						{/* Contenedor del carrusel */}
-						<div
-							className="flex gap-8 animate-carousel carousel-width"
-						>
-							{[...productosDestacados, ...productosDestacados].map((prod, i) => (
-								<div
-									key={i}
-									className="bg-white rounded-xl shadow w-80 flex-shrink-0 border border-[#b2dfdb] relative flex flex-col"
-								>
-									<div>
-										<Image
-											src="/Logo%20Thiart%20Tiktok.png"
-											alt="Logo producto"
-											width={128}
-											height={128}
-											className="w-32 h-32 object-contain"
-											priority
-										/>
-										{prod.destacado && (
-											<span className="absolute top-4 right-4 bg-[#007973] text-white text-xs px-3 py-1 rounded-full font-semibold">
-												Destacado
-											</span>
-										)}
-									</div>
-									<div className="p-6">
-										<h4 className="font-bold text-xl mb-1 text-[#007973]">
-											{prod.nombre}
-										</h4>
-										<p className="text-gray-600 mb-3">{prod.desc}</p>
-										<div className="flex items-center justify-between">
-											<span className="bg-[#e0f2f1] text-[#007973] px-3 py-1 rounded text-sm">
-												{prod.categoria}
-											</span>
-											<span className="font-bold text-lg text-[#007973]">
-												${prod.precio.toFixed(2)}
-											</span>
-										</div>
-									</div>
-								</div>
-							))}
-						</div>
-						{/* Carousel animation styles */}
-						<style jsx>{`
-							@keyframes carousel {
-								0% {
-									transform: translateX(0);
-								}
-								100% {
-									transform: translateX(-${productosDestacados.length * 22}rem);
-								}
-							}
-							.animate-carousel {
-								animation: carousel 40s linear infinite;
-							}
-							.carousel-width {
-								width: calc(${productosDestacados.length * 2} * 20rem + ${productosDestacados.length * 2} * 2rem);
-							}
-						`}</style>
-					</div>
-				</div>
+				<ProductosCarrusel />
 			</section>
 			<Button onClick={() => setModalOpen(true)} className="fixed bottom-8 right-8 z-50 bg-[#007973] text-white">
 				Contáctanos

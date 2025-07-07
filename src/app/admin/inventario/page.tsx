@@ -6,7 +6,7 @@ import { createClient } from "@supabase/supabase-js";
 import Loader from "~/components/providers/UiProvider";
 import CreateProductModal from "~/app/tienda/productos/CreateProductModal";
 import AjustarInventarioModal from "./AjustarInventarioModal";
-import { FiSettings, FiEdit2, FiEye } from "react-icons/fi";
+import { FiSettings, FiEdit2, FiEye, FiStar } from "react-icons/fi";
 import { Star, BadgeDollarSign } from "lucide-react";
 import clsx from "clsx";
 import { ProductDetailModal } from "~/components/ProductDetailModal";
@@ -44,6 +44,7 @@ export default function AdminInventarioPage() {
 	const [deleting, setDeleting] = useState(false);
 	const [modalDetalle, setModalDetalle] = useState<Producto | null>(null);
 	const [ajustarProducto, setAjustarProducto] = useState<Producto | null>(null);
+	const [destacando, setDestacando] = useState<number | null>(null);
 
 	// Métricas
 	const totalProductos = productos.length;
@@ -114,6 +115,17 @@ export default function AdminInventarioPage() {
 	// Crear/editar producto
 	const handleProductCreated = async () => {
 		await fetchProductos();
+	};
+
+	// Destacar producto como recomendado
+	const handleDestacar = async (producto: Producto) => {
+		setDestacando(producto.id);
+		// Primero, quitar el destacado de todos los productos
+		await supabase.from("productos").update({ destacado: false }).neq("id", producto.id);
+		// Luego, destacar solo el producto seleccionado
+		await supabase.from("productos").update({ destacado: true }).eq("id", producto.id);
+		await fetchProductos();
+		setDestacando(null);
 	};
 
 	return (
@@ -239,7 +251,9 @@ export default function AdminInventarioPage() {
 									<div className="flex flex-col w-full space-y-1">
 										<div className="flex items-center gap-2">
 											<span className="font-bold text-lg text-gray-900">{producto.nombre}</span>
-											{producto.destacado && <Star className="w-5 h-5 text-yellow-400" />}
+											{producto.destacado && (
+												<FiStar className="w-5 h-5 text-yellow-400" title="Producto recomendado" />
+											)}
 										</div>
 										<div className="text-gray-500 text-sm line-clamp-2">{producto.descripcion}</div>
 										<div className="flex flex-wrap gap-2 mt-1">
@@ -288,6 +302,22 @@ export default function AdminInventarioPage() {
 											onClick={() => setAjustarProducto(producto)}
 										>
 											<FiSettings className="w-4 h-4" /> Ajustar
+										</Button>
+										<Button
+											size="sm"
+											variant={producto.destacado ? "default" : "outline"}
+											className={clsx(
+												"rounded-full text-xs px-3 flex items-center gap-1",
+												producto.destacado
+													? "bg-yellow-400 text-white hover:bg-yellow-500"
+													: "bg-gray-100 hover:bg-yellow-100"
+											)}
+											onClick={() => handleDestacar(producto)}
+											disabled={destacando === producto.id}
+											title="Marcar como recomendado"
+										>
+											<FiStar className={producto.destacado ? "text-white" : "text-yellow-400"} />
+											{producto.destacado ? "Recomendado" : "Destacar"}
 										</Button>
 									</div>
 									{/* Botón Ver más */}
