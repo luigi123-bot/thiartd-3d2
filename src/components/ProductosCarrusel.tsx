@@ -15,34 +15,125 @@ interface Producto {
   imagen?: string;
 }
 
+interface ProductosCarruselProps {
+  soloDestacados?: boolean;
+  usarMock?: boolean;
+}
+
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-export default function ProductosCarrusel() {
+const mockProductos: Producto[] = [
+  {
+    id: 1,
+    nombre: "Figura Dragón",
+    descripcion: "Figura 3D de dragón pintada a mano.",
+    categoria: "Grandes",
+    precio: 350,
+    destacado: true,
+    imagen: "/mock-dragon.png",
+  },
+  {
+    id: 2,
+    nombre: "Miniatura Robot",
+    descripcion: "Mini robot articulado, ideal para escritorio.",
+    categoria: "Pequeños",
+    precio: 120,
+    destacado: false,
+    imagen: "/mock-robot.png",
+  },
+  {
+    id: 3,
+    nombre: "Jarrón Moderno",
+    descripcion: "Jarrón impreso en 3D con diseño geométrico.",
+    categoria: "Medianos",
+    precio: 200,
+    destacado: false,
+    imagen: "/mock-jarron.png",
+  },
+  {
+    id: 4,
+    nombre: "Lámpara Luna",
+    descripcion: "Lámpara LED con forma de luna, personalizada.",
+    categoria: "Personalizados",
+    precio: 450,
+    destacado: true,
+    imagen: "/mock-luna.png",
+  },
+];
+
+export default function ProductosCarrusel({ soloDestacados = false }: ProductosCarruselProps) {
   const [productos, setProductos] = useState<Producto[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Nueva función para alternar destacado
+  const toggleDestacado = async (producto: Producto) => {
+    // Si es mock, solo cambia el estado local
+    if (producto.id <= 4) {
+      setProductos((prev) =>
+        prev.map((p) =>
+          p.id === producto.id ? { ...p, destacado: !p.destacado } : p
+        )
+      );
+      return;
+    }
+    // Actualiza en Supabase
+    const { error } = await supabase
+      .from("productos")
+      .update({ destacado: !producto.destacado })
+      .eq("id", producto.id);
+    if (!error) {
+      setProductos((prev) =>
+        prev.map((p) =>
+          p.id === producto.id ? { ...p, destacado: !p.destacado } : p
+        )
+      );
+    }
+    // Podrías agregar manejo de error aquí si lo deseas
+  };
 
   useEffect(() => {
     const fetchProductos = async () => {
       setLoading(true);
       try {
         // Traer productos desde Supabase
-        const { data, error } = await supabase
+        const { data} = await supabase
           .from("productos")
           .select("id, nombre, descripcion, categoria, precio, destacado, imagen");
-        if (error) throw error;
+        let productosFiltrados = ((data as Producto[]) ?? []).map((p) => ({
+          ...p,
+          destacado: p.destacado ?? false,
+        }));
+        if (!!soloDestacados) {
+          productosFiltrados = productosFiltrados.filter((p: Producto) => p.destacado);
+        }
+        // Si no hay productos, usar mock
+        if (!productosFiltrados.length) {
+          productosFiltrados = (soloDestacados
+            ? mockProductos.filter((p) => p.destacado)
+            : mockProductos
+          ).map((p) => ({
+            ...p,
+            destacado: p.destacado ?? false,
+          }));
+        }
         // Destacados primero
-        const destacados = (data ?? []).filter((p: Producto) => p.destacado);
-        const normales = (data ?? []).filter((p: Producto) => !p.destacado);
+        const destacados = productosFiltrados.filter((p: Producto) => p.destacado);
+        const normales = productosFiltrados.filter((p: Producto) => !p.destacado);
         setProductos([...destacados, ...normales]);
       } catch {
-        setProductos([]);
+        // Si hay error, usar mock
+        setProductos(
+          soloDestacados
+            ? mockProductos.filter((p) => p.destacado)
+            : mockProductos
+        );
       }
       setLoading(false);
     };
     void fetchProductos();
-  }, []);
+  }, [soloDestacados]);
 
   if (loading) {
     return (
@@ -83,6 +174,14 @@ export default function ProductosCarrusel() {
                     Recomendado
                   </span>
                 )}
+                {/* Botón para alternar destacado */}
+                <button
+                  className="absolute top-4 left-4 bg-[#b2dfdb] text-[#007973] text-xs px-2 py-1 rounded font-semibold shadow hover:bg-[#007973] hover:text-white transition"
+                  onClick={() => toggleDestacado(prod)}
+                  type="button"
+                >
+                  {prod.destacado ? "Quitar Destacado" : "Destacar"}
+                </button>
               </div>
               <div className="p-6">
                 <h4 className="font-bold text-xl mb-1 text-[#007973]">
@@ -111,7 +210,7 @@ export default function ProductosCarrusel() {
             }
             100% {
               transform: translateX(-${productos.length * 22}rem);
-            }
+            }   
           }
           .animate-carousel {
             animation: carousel 40s linear infinite;

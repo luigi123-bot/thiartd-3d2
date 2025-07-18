@@ -1,4 +1,3 @@
-
 import Image from "next/image";
 import { Star, BadgeDollarSign, Pencil, X, Info } from "lucide-react";
 import { useRef, useEffect } from "react";
@@ -19,6 +18,7 @@ interface ProductDetailModalProps {
   onEditImage?: () => void;
   onEditProduct?: () => void;
   onToggleDestacado?: () => void;
+  onDeleteProduct?: () => void;
 }
 
 export function ProductDetailModal({
@@ -29,6 +29,7 @@ export function ProductDetailModal({
   onEditImage,
   onEditProduct,
   onToggleDestacado,
+  onDeleteProduct,
 }: ProductDetailModalProps) {
   const closeBtnRef = useRef<HTMLButtonElement>(null);
 
@@ -64,7 +65,7 @@ export function ProductDetailModal({
           ref={closeBtnRef}
           aria-label="Cerrar"
           onClick={() => onOpenChange(false)}
-          className="absolute top-4 right-4 z-10 p-2 rounded-full hover:bg-gray-200 transition focus:outline-none hover:rotate-90 transition-transform"
+          className="absolute top-4 right-4 z-10 p-2 rounded-full hover:bg-gray-200 transition focus:outline-none hover:rotate-90"
         >
           <X className="w-6 h-6 text-gray-500" />
         </button>
@@ -157,6 +158,29 @@ export function ProductDetailModal({
                 <BadgeDollarSign className="w-6 h-6 animate-bounce-slow" /> $
                 {producto?.precio}
               </span>
+            </div>
+            {/* Botones Editar y Eliminar */}
+            <div className="flex gap-4 mt-6 justify-end">
+              {onEditProduct && (
+                <button
+                  onClick={onEditProduct}
+                  className="rounded-full text-xs px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 transition"
+                  aria-label="Editar producto"
+                  tabIndex={0}
+                >
+                  Editar
+                </button>
+              )}
+              {onDeleteProduct && (
+                <button
+                  onClick={onDeleteProduct}
+                  className="rounded-full text-xs px-4 py-2 bg-red-600 text-white hover:bg-red-700 transition"
+                  aria-label="Eliminar producto"
+                  tabIndex={0}
+                >
+                  Eliminar
+                </button>
+              )}
             </div>
           </div>
         </div>

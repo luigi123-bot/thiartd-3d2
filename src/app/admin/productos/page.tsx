@@ -80,6 +80,22 @@ export default function AdminProductosPage() {
     await fetchProductos();
   };
 
+  // Nueva función para alternar destacado
+  const toggleDestacado = async (producto: Producto) => {
+    const { error } = await supabase
+      .from("productos")
+      .update({ destacado: !producto.destacado })
+      .eq("id", producto.id);
+    if (!error) {
+      setProductos((prev) =>
+        prev.map((p) =>
+          p.id === producto.id ? { ...p, destacado: !p.destacado } : p
+        )
+      );
+    }
+    // Podrías mostrar un mensaje de error si error !== null
+  };
+
   // Ordena los productos: los más nuevos primero
   const productosOrdenados = [...productos].sort((a, b) => b.id - a.id);
 
@@ -212,7 +228,7 @@ export default function AdminProductosPage() {
         ) : (
           <>
             <div
-              className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-6"
+              className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-8 sm:gap-10"
               style={{
                 maxWidth: "1920px",
                 marginLeft: "auto",
@@ -223,13 +239,10 @@ export default function AdminProductosPage() {
               {productosPagina.map((producto) => (
                 <Card
                   key={producto.id}
-                  className="flex flex-col items-stretch gap-0 shadow-sm border border-gray-100 rounded-xl bg-white animate-fade-in h-[340px] max-w-[320px] mx-auto"
-                  style={{
-                    minHeight: "340px",
-                  }}
+                  className="flex flex-col items-center shadow-sm border border-gray-100 rounded-xl bg-white animate-fade-in h-auto max-w-xs mx-auto p-4"
                 >
-                  {/* Imagen */}
-                  <div className="flex-shrink-0 flex items-center justify-center bg-gray-50 rounded-t-xl w-full h-32 overflow-hidden">
+                  {/* Imagen centrada */}
+                  <div className="flex items-center justify-center w-full mb-4">
                     <Image
                       src="/Logo%20Thiart%20Tiktok.png"
                       alt="Logo producto"
@@ -238,60 +251,70 @@ export default function AdminProductosPage() {
                       className="object-cover w-24 h-24 rounded-xl shadow"
                     />
                   </div>
-                  {/* Datos */}
-                  <div className="flex-1 flex flex-col justify-between px-4 py-3">
-                    <div>
-                      <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <span className="text-base sm:text-lg font-bold">{producto.nombre}</span>
-                        {producto.destacado && (
-                          <Star className="w-4 h-4 text-yellow-400" />
-                        )}
-                      </div>
-                      <div className="text-gray-500 text-xs mb-2 line-clamp-2">{producto.descripcion}</div>
-                      <div className="flex flex-wrap gap-2 mb-2">
-                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">{producto.categoria}</span>
-                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700">{producto.tamano}</span>
-                        {producto.stock === 0 && (
-                          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-600">Sin stock</span>
-                        )}
-                      </div>
+                  {/* Título + estrella */}
+                  <div className="flex items-center justify-center gap-2 w-full mb-1">
+                    <span className="text-lg font-bold text-center">{producto.nombre}</span>
+                    {producto.destacado && <Star className="w-5 h-5 text-yellow-400" />}
+                  </div>
+                  {/* Descripción */}
+                  <div className="text-gray-500 text-sm text-center mb-2 line-clamp-2">{producto.descripcion}</div>
+                  {/* Chips de categoría */}
+                  <div className="flex flex-wrap justify-center gap-2 mb-2">
+                    <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">{producto.categoria}</span>
+                    <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700">{producto.tamano}</span>
+                    {producto.stock === 0 && (
+                      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-600">Sin stock</span>
+                    )}
+                  </div>
+                  {/* Stock y precio alineados */}
+                  <div className="flex items-center justify-between w-full mb-4">
+                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${getStockColor(producto.stock)}`}>
+                      <span className="inline-flex items-center gap-1">
+                        <Layers className="w-4 h-4" /> {producto.stock}
+                      </span>
+                    </span>
+                    <span className="flex items-center gap-1 font-bold text-base text-[#00a19a]">
+                      <BadgeDollarSign className="w-5 h-5" /> ${producto.precio}
+                    </span>
+                  </div>
+                  {/* Botones secundarios centrados */}
+                  <div className="flex flex-col w-full gap-2">
+                    <div className="flex justify-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="rounded-full text-xs px-4"
+                        onClick={() => setModalDetalle(producto)}
+                      >
+                        Ver más
+                        <ChevronDown className="w-4 h-4 ml-1" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={producto.destacado ? "secondary" : "outline"}
+                        className="rounded-full text-xs px-4"
+                        onClick={() => toggleDestacado(producto)}
+                      >
+                        {producto.destacado ? "Quitar destacado" : "Destacar"}
+                      </Button>
                     </div>
-                    <div className="flex flex-col gap-2 mt-2">
-                      <div className="flex items-center gap-2">
-                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${getStockColor(producto.stock)}`}>
-                          Stock: {producto.stock}
-                        </span>
-                        <span className="flex items-center gap-1 font-bold text-base text-[#00a19a]">
-                          <BadgeDollarSign className="w-5 h-5" /> ${producto.precio}
-                        </span>
-                      </div>
-                      <div className="flex gap-2 mt-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="rounded-full text-xs px-4"
-                          onClick={() => setEditProduct(producto)}
-                        >
-                          Editar
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          className="rounded-full text-xs px-4"
-                          onClick={() => setDeleteProduct(producto)}
-                        >
-                          Eliminar
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="rounded-full text-xs px-4"
-                          onClick={() => setModalDetalle(producto)}
-                        >
-                          Ver más
-                          <ChevronDown className="w-4 h-4 ml-1" />
-                        </Button>
-                      </div>
+                    <div className="flex justify-between gap-2 mt-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="rounded-full text-xs px-4 w-1/2"
+                        onClick={() => setEditProduct(producto)}
+                      >
+                        Editar
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        className="rounded-full text-xs px-4 w-1/2"
+                        onClick={() => setDeleteProduct(producto)}
+                      >
+                        Eliminar
+                      </Button>
                     </div>
                   </div>
                 </Card>

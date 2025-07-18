@@ -122,7 +122,7 @@ export default function Home() {
 						Descubre nuestros productos más populares y valorados
 					</p>
 				</div>
-				<ProductosCarrusel />
+				<ProductosCarrusel soloDestacados />
 			</section>
 			<Button onClick={() => setModalOpen(true)} className="fixed bottom-8 right-8 z-50 bg-[#007973] text-white">
 				Contáctanos
