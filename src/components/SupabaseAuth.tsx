@@ -1,4 +1,7 @@
-import { useState } from "react";
+'use client';
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import { Input } from "~/components/ui/input";
 import { Button } from "~/components/ui/button";
@@ -16,49 +19,65 @@ type UsuarioDB = {
 };
 
 export default function SupabaseAuth({ onAuth }: { onAuth?: (user: UsuarioDB) => void }) {
+  const router = useRouter();
   const [tab, setTab] = useState<"login" | "register">("login");
   const [form, setForm] = useState({ nombre: "", email: "", password: "" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>("");
   const [usuario, setUsuario] = useState<UsuarioDB | null>(null);
 
+  useEffect(() => {
+    const getSession = async () => {
+      const { data } = await supabase.auth.getSession();
+      if (data.session) {
+        const { user } = data.session;
+        const { data: usuarioData } = await supabase
+          .from("usuarios")
+          .select("*")
+          .eq("id", user.id)
+          .single<UsuarioDB>();
+        setUsuario(usuarioData ?? null);
+        if (onAuth && usuarioData) onAuth(usuarioData);
+      }
+    };
+
+    void getSession();
+
+    // Escucha cambios en el estado de sesión
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        router.push("/"); // 🔁 Redirige después de login o registro
+      }
+    });
+
+    return () => {
+      listener.subscription.unsubscribe();
+    };
+  }, [router, onAuth]);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
     setError("");
   };
 
-  // Registro de usuario
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError("");
     setUsuario(null);
 
-    // 1. Registro en Supabase Auth (sin requerir confirmación de correo)
     const { data, error: signUpError } = await supabase.auth.signUp({
       email: form.email,
       password: form.password,
-      options: {
-        data: { nombre: form.nombre },
-        emailRedirectTo: undefined,
-        // Forzar confirmación automática (solo para proyectos donde esté permitido)
-        // Si tu proyecto requiere confirmación, debes desactivarla en el panel de Supabase Auth
-      }
+      options: { data: { nombre: form.nombre } }
     });
 
-    // Si el usuario ya existe, intenta loguear directamente
-    if (signUpError?.message?.includes("User already registered")) {
-      setError("El correo ya está registrado. Inicia sesión.");
-      setLoading(false);
-      return;
-    }
     if (signUpError) {
       setError(signUpError.message);
       setLoading(false);
       return;
     }
 
-    // 2. Crear entrada en la tabla usuarios
     const userId = data.user?.id;
     if (!userId) {
       setError("No se pudo obtener el ID del usuario.");
@@ -66,7 +85,6 @@ export default function SupabaseAuth({ onAuth }: { onAuth?: (user: UsuarioDB) =>
       return;
     }
 
-    // Inserta en la tabla usuarios (ignora si ya existe)
     await supabase.from("usuarios").upsert({
       id: userId,
       nombre: form.nombre,
@@ -75,26 +93,15 @@ export default function SupabaseAuth({ onAuth }: { onAuth?: (user: UsuarioDB) =>
       role: "cliente"
     });
 
-    // 3. Obtener usuario de la tabla usuarios
-    const { data: usuarioData } = await supabase
-      .from("usuarios")
-      .select("*")
-      .eq("id", userId)
-      .single<UsuarioDB>();
-
     setLoading(false);
-    setUsuario(usuarioData ?? null);
-    if (onAuth && usuarioData) onAuth(usuarioData);
   };
 
-  // Inicio de sesión
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError("");
     setUsuario(null);
 
-    // 1. Login en Supabase Auth
     const { data, error: signInError } = await supabase.auth.signInWithPassword({
       email: form.email,
       password: form.password,
@@ -106,7 +113,6 @@ export default function SupabaseAuth({ onAuth }: { onAuth?: (user: UsuarioDB) =>
       return;
     }
 
-    // 2. Buscar usuario en la tabla usuarios
     const userId = data.user?.id;
     if (!userId) {
       setError("No se pudo obtener el ID del usuario.");
@@ -129,6 +135,7 @@ export default function SupabaseAuth({ onAuth }: { onAuth?: (user: UsuarioDB) =>
     setLoading(false);
     setUsuario(usuarioData);
     if (onAuth) onAuth(usuarioData);
+    router.push("/"); // 🔁 Redirige después de login
   };
 
   return (
@@ -144,11 +151,6 @@ export default function SupabaseAuth({ onAuth }: { onAuth?: (user: UsuarioDB) =>
           <Input name="password" placeholder="Contraseña" type="password" value={form.password} onChange={handleChange} required />
           <Button type="submit" className="w-full" disabled={loading}>{loading ? "Registrando..." : "Registrarse"}</Button>
           {error && <div className="text-red-600 text-sm mt-2">{error}</div>}
-          {usuario && (
-            <div className="text-green-600 text-sm mt-2">
-              ¡Registro exitoso! Bienvenido, {usuario.nombre}.
-            </div>
-          )}
         </form>
       ) : (
         <form className="flex flex-col gap-4" onSubmit={handleLogin}>
@@ -156,11 +158,6 @@ export default function SupabaseAuth({ onAuth }: { onAuth?: (user: UsuarioDB) =>
           <Input name="password" placeholder="Contraseña" type="password" value={form.password} onChange={handleChange} required />
           <Button type="submit" className="w-full" disabled={loading}>{loading ? "Ingresando..." : "Iniciar sesión"}</Button>
           {error && <div className="text-red-600 text-sm mt-2">{error}</div>}
-          {usuario && (
-            <div className="text-green-600 text-sm mt-2">
-              ¡Bienvenido, {usuario.nombre}!
-            </div>
-          )}
         </form>
       )}
     </div>
