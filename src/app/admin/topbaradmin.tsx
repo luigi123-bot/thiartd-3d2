@@ -1,5 +1,4 @@
 import Link from "next/link";
-import Image from "next/image";
 import {
   FiBox,
   FiUsers,
@@ -10,13 +9,16 @@ import {
   FiHome,
   FiAlertCircle,
   FiBell,
-  FiUser,
   FiMenu,
   FiX,
 } from "react-icons/fi";
 import { useState, useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
+import SupabaseAuth from "~/components/SupabaseAuth";
+import { UserCircle } from "lucide-react";
+import Image from "next/image";
+import { Button } from "~/components/ui/button";
 
 const MENU = [
   { href: "/admin/productos", label: "Productos", icon: FiBox },
@@ -35,6 +37,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 export default function AdminTopbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
   type Notification = {
     tipo: string;
     texto: string;
@@ -43,6 +46,12 @@ export default function AdminTopbar() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loadingNotif, setLoadingNotif] = useState(false);
   const [unread, setUnread] = useState(0);
+  const [usuario, setUsuario] = useState<{
+    id?: string;
+    nombre?: string;
+    email?: string;
+    avatar_url?: string;
+  } | null>(null);
   const notifRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
 
@@ -125,6 +134,22 @@ export default function AdminTopbar() {
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, [notifOpen]);
+
+  useEffect(() => {
+    void (async () => {
+      const { data } = await supabase.auth.getUser();
+      if (data?.user) {
+        setUsuario({
+          id: data.user.id,
+          nombre: (data.user.user_metadata as { nombre?: string } | undefined)?.nombre ?? data.user.email,
+          email: data.user.email,
+          avatar_url: (data.user.user_metadata as { avatar_url?: string } | undefined)?.avatar_url,
+        });
+      } else {
+        setUsuario(null);
+      }
+    })();
+  }, [authModalOpen]);
 
   return (
     <>
@@ -219,12 +244,27 @@ export default function AdminTopbar() {
                 </div>
               )}
             </div>
-            <button
-              className="p-2 rounded-full hover:bg-slate-100 transition"
-              aria-label="Perfil"
-            >
-              <FiUser className="w-5 h-5 text-gray-700" />
-            </button>
+            {!usuario ? (
+              <>
+                <Button variant="outline" onClick={() => setAuthModalOpen(true)}>
+                  Iniciar sesión
+                </Button>
+                <Button variant="default" onClick={() => setAuthModalOpen(true)}>
+                  Registrarse
+                </Button>
+              </>
+            ) : (
+              <div className="flex items-center gap-2">
+                <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-white bg-white flex items-center justify-center">
+                  {usuario.avatar_url ? (
+                    <Image src={usuario.avatar_url} alt="Perfil" width={40} height={40} className="object-cover w-10 h-10" />
+                  ) : (
+                    <UserCircle className="w-8 h-8 text-[#00a19a]" />
+                  )}
+                </div>
+                <span className="font-semibold text-white">{usuario.nombre}</span>
+              </div>
+            )}
             {/* Menú hamburguesa */}
             <button
               className="lg:hidden p-2 rounded hover:bg-slate-100 transition"
@@ -271,6 +311,17 @@ export default function AdminTopbar() {
             </Link>
           </div>
         </nav>
+        {/* Modal de login/registro */}
+        {authModalOpen && (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40">
+            <div className="bg-white rounded-xl shadow-lg p-8 w-full max-w-md">
+              <SupabaseAuth onAuth={() => setAuthModalOpen(false)} />
+              <Button variant="secondary" className="mt-4 w-full" onClick={() => setAuthModalOpen(false)}>
+                Cerrar
+              </Button>
+            </div>
+          </div>
+        )}
       </header>
       {/* Espacio para el header */}
       <div className="pt-[64px] lg:pt-[60px]" />

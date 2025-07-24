@@ -1,10 +1,13 @@
 "use client";
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import TopbarTienda from "./tienda/componentes/TopbarTienda"; // Importa el Topbar
-import ContactModal from "~/components/ContactModal";
+import dynamic from "next/dynamic";
 import { Button } from "~/components/ui/button";
-import ProductosCarrusel from "~/components/ProductosCarrusel";
+
+// Importa componentes que usan datos dinámicos o Clerk con SSR desactivado
+const TopbarTienda = dynamic(() => import("./tienda/componentes/TopbarTienda"), { ssr: false });
+const ContactModal = dynamic(() => import("~/components/ContactModal"), { ssr: false });
+const ProductosCarrusel = dynamic(() => import("~/components/ProductosCarrusel"), { ssr: false });
 
 
 export default function Home() {

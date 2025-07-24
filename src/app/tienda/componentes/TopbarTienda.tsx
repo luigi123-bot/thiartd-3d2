@@ -14,21 +14,24 @@ import {
   IoIosMail,
   IoMdClose,
 } from "react-icons/io";
-import {
-  SignInButton,
-  SignUpButton,
-  SignedIn,
-  SignedOut,
-  UserButton,
-} from "@clerk/nextjs";
-import { ShoppingCart, Menu } from "lucide-react";
+import { ShoppingCart, Menu, UserCircle } from "lucide-react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { createClient } from "@supabase/supabase-js";
+import SupabaseAuth from "~/components/SupabaseAuth";
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 export default function TopbarTienda() {
-  const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
   const [showMobileSearch, setShowMobileSearch] = useState(false);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [usuario, setUsuario] = useState<
+    { id?: string; nombre?: string; email?: string; avatar_url?: string } | null
+  >(null);
+  const router = useRouter();
 
   // Evitar renderizado hasta que el componente esté montado en el cliente
   const [isMounted, setIsMounted] = React.useState(false);
@@ -54,6 +57,28 @@ export default function TopbarTienda() {
       sidebarRef.current.focus();
     }
   }, [menuOpen]);
+
+  useEffect(() => {
+    void (async () => {
+      const { data } = await supabase.auth.getUser();
+      if (data?.user) {
+        setUsuario({
+          id: data.user.id,
+          nombre:
+            typeof data.user.user_metadata === "object" && data.user.user_metadata !== null
+              ? (data.user.user_metadata as { nombre?: string }).nombre ?? data.user.email
+              : data.user.email,
+          email: data.user.email,
+          avatar_url:
+            typeof data.user.user_metadata === "object" && data.user.user_metadata !== null
+              ? (data.user.user_metadata as { avatar_url?: string }).avatar_url
+              : undefined,
+        });
+      } else {
+        setUsuario(null);
+      }
+    })();
+  }, [authModalOpen]);
 
   if (!isMounted) return null;
 
@@ -138,42 +163,43 @@ export default function TopbarTienda() {
             >
               <IoIosNotifications className="w-6 h-6 text-white" />
             </Button>
-            <SignedOut>
-              <SignInButton mode="modal">
+            {!usuario ? (
+              <>
                 <Button
                   variant="outline"
-                  className="bg-white border-[#00a19a] hover:bg-[#e0f2f1] font-bold font-sans px-4 rounded-full shadow-sm transition"
+                  onClick={() => setAuthModalOpen(true)}
+                  className="text-white"
                 >
                   Iniciar sesión
                 </Button>
-              </SignInButton>
-              <SignUpButton mode="modal">
                 <Button
-                  variant="outline"
-                  className="bg-white border-[#00a19a] hover:bg-[#e0f2f1] font-bold font-sans px-4 rounded-full shadow-sm transition"
+                  variant="default"
+                  onClick={() => setAuthModalOpen(true)}
+                  className="text-white"
                 >
                   Registrarse
                 </Button>
-              </SignUpButton>
-            </SignedOut>
-            <SignedIn>
-              <UserButton
-                appearance={{
-                  elements: {
-                    userButtonAvatarBox: "ring-2 ring-[#00a19a]",
-                    userButtonPopoverCard: "font-sans",
-                  },
-                  variables: {
-                    colorPrimary: "#00a19a",
-                    colorText: "#222",
-                    fontFamily: "var(--font-geist-sans), sans-serif",
-                  },
-                }}
-                afterSignOutUrl="/"
-                userProfileMode="navigation"
-                userProfileUrl="/perfil"
-              />
-            </SignedIn>
+              </>
+            ) : (
+              <div className="flex items-center gap-2">
+                <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-[#00a19a] bg-white flex items-center justify-center">
+                  {usuario.avatar_url ? (
+                    <Image
+                      src={usuario.avatar_url}
+                      alt="Perfil"
+                      width={40}
+                      height={40}
+                      className="object-cover w-10 h-10"
+                    />
+                  ) : (
+                    <UserCircle className="w-8 h-8 text-[#00a19a]" />
+                  )}
+                </div>
+                <span className="font-semibold text-[#00a19a]">
+                  {usuario.nombre}
+                </span>
+              </div>
+            )}
           </div>
         </nav>
       </div>
@@ -328,53 +354,33 @@ export default function TopbarTienda() {
               </nav>
               {/* Sesión */}
               <div className="px-4 pb-6 mt-auto">
-                <SignedOut>
-                  <SignInButton mode="modal">
-                    <Button
-                      variant="outline"
-                      className="w-full bg-white border-[#00a19a] hover:bg-[#e0f2f1] font-bold font-sans px-4 rounded-full shadow-sm transition mb-2"
-                    >
-                      Iniciar sesión
-                    </Button>
-                  </SignInButton>
-                  <SignUpButton mode="modal">
-                    <Button
-                      variant="outline"
-                      className="w-full bg-white border-[#00a19a] hover:bg-[#e0f2f1] font-bold font-sans px-4 rounded-full shadow-sm transition"
-                    >
-                      Registrarse
-                    </Button>
-                  </SignUpButton>
-                </SignedOut>
-                <SignedIn>
-                  <UserButton
-                    appearance={{
-                      elements: {
-                        userButtonAvatarBox: "ring-2 ring-[#00a19a]",
-                        userButtonPopoverCard: "font-sans",
-                      },
-                      variables: {
-                        colorPrimary: "#00a19a",
-                        colorText: "#222",
-                        fontFamily: "var(--font-geist-sans), sans-serif",
-                      },
-                    }}
-                    afterSignOutUrl="/"
-                    userProfileMode="navigation"
-                    userProfileUrl="/perfil"
-                  />
-                </SignedIn>
+                {/* Aquí puedes agregar tus propios botones de login/register si usas Supabase Auth */}
               </div>
             </div>
           </div>
         )}
       </div>
-      {/* 
+      {/* Carrito Sidebar */}
+      {/*
         NOTA: 
         - Para ver ambas vistas lado a lado, usa la estructura flex de arriba en un entorno de desarrollo.
         - Las clases animate-fade-in-down y animate-slide-in-left pueden implementarse con Tailwind CSS o CSS personalizado para animaciones suaves.
         - El diseño mantiene la paleta y tipografía, solo mejora la disposición y responsividad.
       */}
+      {authModalOpen && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-xl shadow-lg p-8 w-full max-w-md">
+            <SupabaseAuth onAuth={() => setAuthModalOpen(false)} />
+            <Button
+              variant="secondary"
+              className="mt-4 w-full"
+              onClick={() => setAuthModalOpen(false)}
+            >
+              Cerrar
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

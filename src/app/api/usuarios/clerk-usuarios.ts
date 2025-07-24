@@ -1,14 +1,13 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-
-// Importa el SDK de Clerk para Node.js
 import clerk from "@clerk/clerk-sdk-node";
+import { createClient } from "@supabase/supabase-js";
 
-// Clerk SDK usará automáticamente la clave secreta desde las variables de entorno
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
-    // Opcional: puedes validar el token del admin aquí si lo deseas
-
     // Trae todos los usuarios de Clerk (paginación opcional)
     const users = await clerk.users.getUserList({ limit: 100 });
 
@@ -19,6 +18,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       emailAddresses: Array<{ emailAddress: string }>;
       createdAt: number;
     };
+
+    // Sincroniza todos los usuarios de Clerk en Supabase en un solo upsert
+    const usuariosSupabase = users
+      .map((u: ClerkUser) => {
+        const nombre = [u.firstName, u.lastName].filter(Boolean).join(" ");
+        const email = u.emailAddresses?.[0]?.emailAddress ?? "";
+        if (!u.id || !email || !nombre) return null;
+        return {
+          clerk_id: u.id,
+          email,
+          nombre,
+          creado_en: new Date(u.createdAt).toISOString(),
+        };
+      })
+      .filter(Boolean);
+
+    if (usuariosSupabase.length > 0) {
+      // Upsert masivo, usando clerk_id como clave única
+      await supabase
+        .from("usuarios")
+        .upsert(usuariosSupabase, { onConflict: "clerk_id" });
+    }
 
     res.status(200).json({
       usuarios: users.map((u: ClerkUser) => ({

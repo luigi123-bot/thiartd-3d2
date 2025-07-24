@@ -1,7 +1,7 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import Image from "next/image";
-import { BadgeDollarSign } from "lucide-react";
+import { BadgeDollarSign, ChevronLeft, ChevronRight, ShoppingCart, Eye } from "lucide-react";
 import clsx from "clsx";
 import { createClient } from "@supabase/supabase-js";
 
@@ -17,7 +17,6 @@ interface Producto {
 
 interface ProductosCarruselProps {
   soloDestacados?: boolean;
-  usarMock?: boolean;
 }
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
@@ -32,7 +31,7 @@ const mockProductos: Producto[] = [
     categoria: "Grandes",
     precio: 350,
     destacado: true,
-    imagen: "/mock-dragon.png",
+    imagen: "/Logo%20Thiart%20Tiktok.png", // Imagen que sí existe en public/
   },
   {
     id: 2,
@@ -41,7 +40,7 @@ const mockProductos: Producto[] = [
     categoria: "Pequeños",
     precio: 120,
     destacado: false,
-    imagen: "/mock-robot.png",
+    imagen: "/Logo%20Thiart%20Tiktok.png",
   },
   {
     id: 3,
@@ -50,7 +49,7 @@ const mockProductos: Producto[] = [
     categoria: "Medianos",
     precio: 200,
     destacado: false,
-    imagen: "/mock-jarron.png",
+    imagen: "/Logo%20Thiart%20Tiktok.png",
   },
   {
     id: 4,
@@ -59,46 +58,60 @@ const mockProductos: Producto[] = [
     categoria: "Personalizados",
     precio: 450,
     destacado: true,
-    imagen: "/mock-luna.png",
+    imagen: "/Logo%20Thiart%20Tiktok.png",
   },
 ];
 
 export default function ProductosCarrusel({ soloDestacados = false }: ProductosCarruselProps) {
   const [productos, setProductos] = useState<Producto[]>([]);
   const [loading, setLoading] = useState(true);
+  const [current, setCurrent] = useState(0);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [isPaused, setIsPaused] = useState(false);
+
+  // Añadir más productos mock para el movimiento continuo
+
+  const extendedMock = useMemo(
+    () => [
+      ...mockProductos,
+      {
+        id: 5,
+        nombre: "Soporte Celular",
+        descripcion: "Soporte impreso en 3D para tu smartphone.",
+        categoria: "Pequeños",
+        precio: 90,
+        destacado: false,
+        imagen: "/Logo%20Thiart%20Tiktok.png",
+      },
+      {
+        id: 6,
+        nombre: "Organizador Escritorio",
+        descripcion: "Organizador modular para oficina.",
+        categoria: "Medianos",
+        precio: 180,
+        destacado: false,
+        imagen: "/Logo%20Thiart%20Tiktok.png",
+      },
+      {
+        id: 7,
+        nombre: "Maceta Geométrica",
+        descripcion: "Maceta decorativa con diseño moderno.",
+        categoria: "Grandes",
+        precio: 220,
+        destacado: true,
+        imagen: "/Logo%20Thiart%20Tiktok.png",
+      },
+    ],
+    []
+  );
 
   // Nueva función para alternar destacado
-  const toggleDestacado = async (producto: Producto) => {
-    // Si es mock, solo cambia el estado local
-    if (producto.id <= 4) {
-      setProductos((prev) =>
-        prev.map((p) =>
-          p.id === producto.id ? { ...p, destacado: !p.destacado } : p
-        )
-      );
-      return;
-    }
-    // Actualiza en Supabase
-    const { error } = await supabase
-      .from("productos")
-      .update({ destacado: !producto.destacado })
-      .eq("id", producto.id);
-    if (!error) {
-      setProductos((prev) =>
-        prev.map((p) =>
-          p.id === producto.id ? { ...p, destacado: !p.destacado } : p
-        )
-      );
-    }
-    // Podrías agregar manejo de error aquí si lo deseas
-  };
-
   useEffect(() => {
     const fetchProductos = async () => {
       setLoading(true);
       try {
         // Traer productos desde Supabase
-        const { data} = await supabase
+        const { data } = await supabase
           .from("productos")
           .select("id, nombre, descripcion, categoria, precio, destacado, imagen");
         let productosFiltrados = ((data as Producto[]) ?? []).map((p) => ({
@@ -111,8 +124,8 @@ export default function ProductosCarrusel({ soloDestacados = false }: ProductosC
         // Si no hay productos, usar mock
         if (!productosFiltrados.length) {
           productosFiltrados = (soloDestacados
-            ? mockProductos.filter((p) => p.destacado)
-            : mockProductos
+            ? extendedMock.filter((p) => p.destacado)
+            : extendedMock
           ).map((p) => ({
             ...p,
             destacado: p.destacado ?? false,
@@ -126,14 +139,55 @@ export default function ProductosCarrusel({ soloDestacados = false }: ProductosC
         // Si hay error, usar mock
         setProductos(
           soloDestacados
-            ? mockProductos.filter((p) => p.destacado)
-            : mockProductos
+            ? extendedMock.filter((p) => p.destacado)
+            : extendedMock
         );
       }
       setLoading(false);
     };
     void fetchProductos();
-  }, [soloDestacados]);
+  }, [soloDestacados, extendedMock]);
+
+  // Responsive: tarjetas por vista
+  const [cardsPerView, setCardsPerView] = useState(1);
+  useEffect(() => {
+    function handleResize() {
+      if (window.innerWidth < 640) setCardsPerView(1);
+      else if (window.innerWidth < 1024) setCardsPerView(2);
+      else setCardsPerView(4);
+    }
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  // Movimiento automático continuo
+  useEffect(() => {
+    if (isPaused || productos.length <= 1) return;
+    const interval = setInterval(() => {
+      setCurrent((prev) => (prev + 1) % productos.length);
+    }, 2500);
+    return () => clearInterval(interval);
+  }, [isPaused, productos.length]);
+
+  // Scroll a la tarjeta current
+  useEffect(() => {
+    if (scrollRef.current) {
+      const cardWidth = scrollRef.current.offsetWidth / cardsPerView;
+      scrollRef.current.scrollTo({
+        left: current * cardWidth,
+        behavior: "smooth",
+      });
+    }
+  }, [current, cardsPerView]);
+
+  // Funcionalidad de botones
+  const handleVerDetalles = (producto: Producto) => {
+    alert(`Detalles de: ${producto.nombre}\n${producto.descripcion}`);
+  };
+  const handleAnadir = (producto: Producto) => {
+    alert(`Añadido al carrito: ${producto.nombre}`);
+  };
 
   if (loading) {
     return (
@@ -151,75 +205,152 @@ export default function ProductosCarrusel({ soloDestacados = false }: ProductosC
     );
   }
 
+  // Paginación
+  const totalPages = Math.max(1, productos.length - cardsPerView + 1);
+
   return (
-    <div className="flex justify-center">
-      <div className="relative overflow-hidden w-[1800px] max-w-full rounded-2xl border-4 shadow-lg border-[#b2dfdb] py-12 bg-[#e0f2f1]">
-        <div className="flex gap-8 animate-carousel carousel-width">
-          {[...productos, ...productos].map((prod, i) => (
+    <div className="w-full flex flex-col items-center bg-white">
+      <div
+        className={clsx(
+          "relative w-full max-w-7xl group transition-colors",
+          "bg-white rounded-2xl py-10 px-2 sm:px-6"
+        )}
+        onMouseEnter={() => setIsPaused(true)}
+        onMouseLeave={() => setIsPaused(false)}
+      >
+        {/* Flechas laterales */}
+        <button
+          className={clsx(
+            "absolute left-2 top-1/2 -translate-y-1/2 z-10 p-2 bg-white border border-gray-300 rounded-full shadow-md flex items-center justify-center",
+            "hover:bg-gray-100 transition",
+            current === 0 && "opacity-30 pointer-events-none"
+          )}
+          aria-label="Anterior"
+          onClick={() => setCurrent((c) => Math.max(0, c - 1))}
+        >
+          <ChevronLeft className="w-6 h-6 text-black" />
+        </button>
+        <button
+          className={clsx(
+            "absolute right-2 top-1/2 -translate-y-1/2 z-10 p-2 bg-white border border-gray-300 rounded-full shadow-md flex items-center justify-center",
+            "hover:bg-gray-100 transition",
+            current >= totalPages - 1 && "opacity-30 pointer-events-none"
+          )}
+          aria-label="Siguiente"
+          onClick={() => setCurrent((c) => Math.min(totalPages - 1, c + 1))}
+        >
+          <ChevronRight className="w-6 h-6 text-black" />
+        </button>
+        {/* Carrusel */}
+        <div
+          ref={scrollRef}
+          className="flex overflow-x-auto scroll-smooth no-scrollbar snap-x snap-mandatory gap-4 px-2"
+          style={{ scrollBehavior: "smooth" }}
+        >
+          {productos.map((prod, i) => (
             <div
               key={prod.id + "-" + i}
-              className="bg-white rounded-xl shadow w-80 flex-shrink-0 border border-[#b2dfdb] relative flex flex-col"
+              className={clsx(
+                "relative flex flex-col items-center bg-white rounded-xl shadow-md transition-all duration-500 ease-in-out group/card",
+                "min-w-[90vw] max-w-[90vw] sm:min-w-[340px] sm:max-w-[340px] lg:min-w-[270px] lg:max-w-[270px] snap-center",
+                "hover:z-10"
+              )}
+              style={{
+                minHeight: 340,
+                marginLeft: i === 0 ? "auto" : undefined,
+                marginRight: i === productos.length - 1 ? "auto" : undefined,
+              }}
+              onMouseEnter={() => setIsPaused(true)}
+              onMouseLeave={() => setIsPaused(false)}
             >
-              <div>
+              {/* Badge Destacado */}
+              {prod.destacado && (
+                <span className="absolute top-4 right-4 bg-black text-white text-xs font-semibold px-3 py-1 rounded-full z-10 shadow">
+                  Destacado
+                </span>
+              )}
+              {/* Imagen */}
+              <div className="flex items-center justify-center w-full pt-6 pb-3 px-4">
                 <Image
                   src={prod.imagen ?? "/Logo%20Thiart%20Tiktok.png"}
                   alt={prod.nombre}
-                  width={128}
-                  height={128}
-                  className="w-32 h-32 object-contain"
+                  width={120}
+                  height={120}
+                  className="object-contain w-28 h-28 rounded-xl bg-gray-50"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    if (target.src !== window.location.origin + "/Logo%20Thiart%20Tiktok.png") {
+                      target.src = "/Logo%20Thiart%20Tiktok.png";
+                    }
+                  }}
                   priority={i < 2}
                 />
-                {prod.destacado && (
-                  <span className="absolute top-4 right-4 bg-[#007973] text-white text-xs px-3 py-1 rounded-full font-semibold">
-                    Recomendado
-                  </span>
-                )}
-                {/* Botón para alternar destacado */}
-                <button
-                  className="absolute top-4 left-4 bg-[#b2dfdb] text-[#007973] text-xs px-2 py-1 rounded font-semibold shadow hover:bg-[#007973] hover:text-white transition"
-                  onClick={() => toggleDestacado(prod)}
-                  type="button"
-                >
-                  {prod.destacado ? "Quitar Destacado" : "Destacar"}
-                </button>
               </div>
-              <div className="p-6">
-                <h4 className="font-bold text-xl mb-1 text-[#007973]">
-                  {prod.nombre}
-                </h4>
-                <p className="text-gray-600 mb-3 line-clamp-2">{prod.descripcion}</p>
-                <div className="flex items-center justify-between">
-                  <span className={clsx(
-                    "bg-[#e0f2f1] text-[#007973] px-3 py-1 rounded text-sm",
-                    prod.destacado && "font-bold"
-                  )}>
-                    {prod.categoria}
-                  </span>
-                  <span className="font-bold text-lg text-[#007973] flex items-center gap-1">
-                    <BadgeDollarSign className="w-5 h-5" /> ${prod.precio?.toFixed(2)}
-                  </span>
-                </div>
+              {/* Nombre */}
+              <div className="flex items-center justify-center w-full mb-1 px-4">
+                <span className="text-base font-bold text-center text-black w-full truncate">{prod.nombre}</span>
+              </div>
+              {/* Descripción */}
+              <div className="text-gray-500 text-xs text-center mb-2 px-4 line-clamp-2">{prod.descripcion}</div>
+              {/* Chips de categoría */}
+              <div className="flex flex-wrap justify-center gap-2 mb-2 px-4">
+                <span className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-gray-100 text-gray-700">{prod.categoria}</span>
+              </div>
+              {/* Precio */}
+              <div className="flex items-center justify-end w-full mb-4 px-4">
+                <span className="flex items-center gap-1 text-sm font-semibold text-black">
+                  <BadgeDollarSign className="w-4 h-4" /> ${prod.precio?.toFixed(2)}
+                </span>
+              </div>
+              {/* Overlay al hacer hover */}
+              <div className="absolute inset-0 bg-black/30 opacity-0 group-hover/card:opacity-100 transition-opacity rounded-xl pointer-events-none z-10"></div>
+              {/* Botones */}
+              <div className="flex w-full gap-2 px-4 pb-6 z-20">
+                <button
+                  className="flex-1 flex items-center justify-center gap-2 border border-gray-300 rounded-md bg-white text-black py-2 text-xs font-semibold hover:bg-gray-100 transition relative z-20"
+                  type="button"
+                  onClick={() => handleAnadir(prod)}
+                >
+                  <ShoppingCart className="w-4 h-4" /> Añadir
+                </button>
+                <button
+                  className="flex-1 flex items-center justify-center gap-2 rounded-md bg-black text-white py-2 text-xs font-semibold hover:bg-gray-900 transition relative z-20"
+                  type="button"
+                  onClick={() => handleVerDetalles(prod)}
+                >
+                  <Eye className="w-4 h-4" /> Ver detalles
+                </button>
               </div>
             </div>
           ))}
         </div>
-        <style jsx>{`
-          @keyframes carousel {
-            0% {
-              transform: translateX(0);
-            }
-            100% {
-              transform: translateX(-${productos.length * 22}rem);
-            }   
-          }
-          .animate-carousel {
-            animation: carousel 40s linear infinite;
-          }
-          .carousel-width {
-            width: calc(${productos.length * 2} * 20rem + ${productos.length * 2} * 2rem);
-          }
-        `}</style>
+        {/* Indicadores de paginación */}
+        <div className="flex justify-center items-center gap-2 mt-6">
+          {Array.from({ length: totalPages }).map((_, idx) => (
+            <button
+              key={idx}
+              className={clsx(
+                "h-2 w-2 rounded-full transition-all duration-300",
+                current === idx
+                  ? "bg-black w-6"
+                  : "bg-gray-300 w-2"
+              )}
+              style={{ minWidth: current === idx ? 24 : 8 }}
+              onClick={() => setCurrent(idx)}
+              aria-label={`Ir a la página ${idx + 1}`}
+            />
+          ))}
+        </div>
       </div>
+      <style jsx global>{`
+        .no-scrollbar::-webkit-scrollbar {
+          display: none;
+        }
+        .no-scrollbar {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+      `}</style>
     </div>
   );
 }

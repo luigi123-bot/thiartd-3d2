@@ -1,4 +1,4 @@
-import { db } from "./client"; // Asegúrate de tener tu cliente Drizzle configurado
+import { db } from "./client";
 import { usuario } from "./schema";
 
 // Agregar un usuario

@@ -2,7 +2,6 @@
 import AdminSidebar from "./topbaradmin";
 import React, { Suspense, useEffect, useState } from "react";
 import Loader from "~/components/providers/UiProvider";
-import { UserButton, useUser } from "@clerk/nextjs";
 import { FiBell, FiMessageCircle } from "react-icons/fi";
 import { createClient } from "@supabase/supabase-js";
 import { useRouter } from "next/navigation";
@@ -207,27 +206,31 @@ function NotificacionesMensajes() {
 }
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const { user, isLoaded } = useUser();
+  const [usuario, setUsuario] = useState<{ id?: string; rol?: string } | null>(null);
   const router = useRouter();
 
-  // Guardar el rol en Clerk si no existe (solo ejemplo, ajusta según tu lógica real)
   useEffect(() => {
-    if (isLoaded && user && !user.publicMetadata?.role) {
-      void user.update({ unsafeMetadata: { ...user.unsafeMetadata, role: "user" } });
-    }
-  }, [isLoaded, user]);
+    // Obtén el usuario actual de Supabase Auth
+    void (async () => {
+      const { data } = await supabase.auth.getUser();
+      if (data?.user) {
+        // Busca el usuario en la tabla usuarios por su correo y rol
+        const { data: usuarioData } = await supabase
+          .from("usuarios")
+          .select("id, rol")
+          .eq("correo", data.user.email)
+          .single();
+        setUsuario(usuarioData ?? null);
+        if (!usuarioData || usuarioData.rol !== "admin") {
+          router.replace("/");
+        }
+      } else {
+        router.replace("/");
+      }
+    })();
+  }, [router]);
 
-  useEffect(() => {
-    if (isLoaded && user?.publicMetadata?.role !== "admin") {
-      router.replace("/");
-    }
-  }, [isLoaded, user, router]);
-
-  if (!isLoaded) {
-    return <Loader />;
-  }
-
-  if (user?.publicMetadata?.role !== "admin") {
+  if (!usuario || usuario.rol !== "admin") {
     return null;
   }
 
@@ -238,7 +241,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <div className="flex justify-end items-center gap-4 p-4 border-b bg-white">
           <NotificacionesMensajes />
           <Notificaciones />
-          <UserButton afterSignOutUrl="/" />
         </div>
         <Suspense fallback={<Loader />}>
           {children}

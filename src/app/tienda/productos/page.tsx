@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription} from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
@@ -7,6 +7,7 @@ import { ShoppingCart } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import CreateProductModal from "./CreateProductModal";
+import { createClient } from "@supabase/supabase-js";
 
 const categorias = [
   "Figuras",
@@ -36,7 +37,179 @@ type Product = {
   // agrega aquí otros campos si tu producto tiene más propiedades
 };
 
+// --- Contexto de Carrito ---
+type CarritoItem = {
+  id: string;
+  nombre: string;
+  precio: number;
+  imagen: string;
+  cantidad: number;
+  stock: number;
+  categoria: string;
+  destacado: boolean;
+};
+
+type CarritoContextType = {
+  carrito: CarritoItem[];
+  addToCarrito: (producto: CarritoItem) => Promise<boolean>;
+};
+
+const CarritoContext = createContext<CarritoContextType | undefined>(undefined);
+
+function useCarrito() {
+  const ctx = useContext(CarritoContext);
+  if (!ctx) throw new Error("CarritoContext no disponible");
+  return ctx;
+}
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+function CarritoProvider({ children }: { children: React.ReactNode }) {
+  const [carrito, setCarrito] = useState<CarritoItem[]>([]);
+  const [sincronizado, setSincronizado] = useState(false);
+
+  // Cargar carrito desde Supabase SIEMPRE al iniciar (y luego sincronizar localStorage)
+  useEffect(() => {
+    void (async () => {
+      const { data } = await supabase.from("carrito").select("*");
+      if (data && Array.isArray(data)) {
+        type SupabaseCarritoItem = {
+          producto_id: string;
+          nombre: string;
+          precio: number;
+          imagen: string;
+          cantidad: number;
+          stock?: number;
+          categoria: string;
+          destacado: boolean;
+        };
+        const carritoSupabase: CarritoItem[] = (data as SupabaseCarritoItem[]).map((item) => ({
+          id: item.producto_id,
+          nombre: item.nombre,
+          precio: item.precio,
+          imagen: item.imagen,
+          cantidad: item.cantidad,
+          stock: item.stock ?? 99,
+          categoria: item.categoria,
+          destacado: item.destacado,
+        }));
+        setCarrito(carritoSupabase);
+        localStorage.setItem("carrito", JSON.stringify(carritoSupabase));
+        setSincronizado(true);
+      }
+    })();
+  }, []);
+
+  // Sincroniza localStorage cada vez que cambia el carrito (después de la primera carga)
+  useEffect(() => {
+    if (sincronizado) {
+      localStorage.setItem("carrito", JSON.stringify(carrito));
+    }
+  }, [carrito, sincronizado]);
+
+  // Añadir producto con validación de stock y guardar en Supabase
+  const addToCarrito = async (producto: CarritoItem) => {
+    // 1. Leer el carrito actual de Supabase para evitar condiciones de carrera
+    const { data: dataActual } = await supabase.from("carrito").select("*");
+    type SupabaseCarritoItem = {
+      producto_id: string;
+      nombre: string;
+      precio: number;
+      imagen: string;
+      cantidad: number;
+      stock?: number;
+      categoria: string;
+      destacado: boolean;
+    };
+    let carritoActual: CarritoItem[] = [];
+    if (dataActual && Array.isArray(dataActual)) {
+      carritoActual = (dataActual as SupabaseCarritoItem[]).map((item) => ({
+        id: item.producto_id,
+        nombre: item.nombre,
+        precio: item.precio,
+        imagen: item.imagen,
+        cantidad: item.cantidad,
+        stock: item.stock ?? 99,
+        categoria: item.categoria,
+        destacado: item.destacado,
+      }));
+    }
+
+    let added = false;
+    let nuevoCarrito: CarritoItem[] = [];
+    const idx = carritoActual.findIndex((p) => p.id === producto.id);
+    if (idx >= 0) {
+      if (carritoActual[idx] && carritoActual[idx].cantidad < carritoActual[idx].stock) {
+        nuevoCarrito = [...carritoActual];
+        if (nuevoCarrito[idx]) {
+          nuevoCarrito[idx].cantidad += 1;
+        }
+        added = true;
+      } else {
+        nuevoCarrito = carritoActual;
+      }
+    } else {
+      if (producto.stock > 0) {
+        nuevoCarrito = [...carritoActual, { ...producto, cantidad: 1 }];
+        added = true;
+      } else {
+        nuevoCarrito = carritoActual;
+      }
+    }
+
+    // 2. Guardar en Supabase
+    if (added) {
+      const prod = nuevoCarrito.find((p) => p.id === producto.id);
+      await supabase.from("carrito").upsert({
+        producto_id: producto.id,
+        nombre: producto.nombre,
+        imagen: producto.imagen,
+        precio: producto.precio,
+        cantidad: prod?.cantidad ?? 1,
+        categoria: producto.categoria,
+        destacado: producto.destacado,
+      });
+      // 3. Actualizar el estado local y localStorage con el carrito actualizado
+      setCarrito(nuevoCarrito);
+      localStorage.setItem("carrito", JSON.stringify(nuevoCarrito));
+      console.log("Producto guardado en carrito:", producto);
+    }
+    return added;
+  };
+
+  return (
+    <CarritoContext.Provider value={{ carrito, addToCarrito }}>
+      {children}
+    </CarritoContext.Provider>
+  );
+}
+
+// --- Toast feedback ---
+function showToast(msg: string, success = true) {
+  const toast = document.createElement("div");
+  toast.textContent = msg;
+  toast.className =
+    "fixed bottom-8 left-1/2 -translate-x-1/2 px-6 py-3 rounded-xl font-semibold shadow-lg z-[9999] transition bg-white border " +
+    (success ? "border-green-400 text-green-700" : "border-red-400 text-red-700");
+  document.body.appendChild(toast);
+  setTimeout(() => {
+    toast.style.opacity = "0";
+    setTimeout(() => document.body.removeChild(toast), 500);
+  }, 1800);
+}
+
 export default function ProductosTiendaPage() {
+  return (
+    <CarritoProvider>
+      <ProductosTiendaPageInner />
+    </CarritoProvider>
+  );
+}
+
+// Extrae la lógica principal a un componente interno
+function ProductosTiendaPageInner() {
   const [productos, setProductos] = useState<Product[]>([]);
   const [filtros, setFiltros] = useState({
     categoria: [] as string[],
@@ -48,6 +221,7 @@ export default function ProductosTiendaPage() {
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const router = useRouter();
+  const { carrito, addToCarrito } = useCarrito();
 
   // Define fetchProductos ANTES de usarla
   const fetchProductos = async () => {
@@ -108,6 +282,7 @@ export default function ProductosTiendaPage() {
     return matchCategoria && matchTamano && matchPrecio && matchBuscar && matchDestacado;
   });
 
+  // Usa el contexto de carrito
   return (
     <div className="bg-white min-h-screen px-8 py-8">
       {/* Botón para abrir modal */}
@@ -219,52 +394,79 @@ export default function ProductosTiendaPage() {
             <div className="text-center py-12">Cargando productos...</div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-              {productosFiltrados.map((producto) => (
-                <Card key={producto.id} className="relative flex flex-col">
-                  <div className="h-48 flex items-center justify-center bg-gray-200 rounded-t-xl">
-                    <span className="text-gray-400 text-4xl">🖼️</span>
-                    {producto.destacado && (
-                      <span className="absolute top-3 right-3 bg-black text-white text-xs px-3 py-1 rounded-full font-semibold">
-                        Destacado
-                      </span>
-                    )}
-                    {producto.stock === 0 && (
-                      <span className="absolute top-3 left-3 bg-red-600 text-white text-xs px-3 py-1 rounded-full font-semibold">
-                        Agotado
-                      </span>
-                    )}
-                  </div>
-                  <CardHeader>
-                    <CardTitle className="font-bold text-lg mb-1">{producto.nombre}</CardTitle>
-                    <CardDescription className="mb-2">{producto.desc}</CardDescription>
-                  </CardHeader>
-                  <CardContent className="flex flex-col flex-1">
-                    <div className="flex gap-2 mb-2">
-                      <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs font-semibold">
-                        {producto.categoria}
-                      </span>
+              {productosFiltrados.map((producto) => {
+                const enCarrito: CarritoItem | undefined = carrito.find((p: CarritoItem) => p.id === producto.id);
+                const cantidadEnCarrito = enCarrito?.cantidad ?? 0;
+                const stockDisponible = producto.stock - cantidadEnCarrito;
+                return (
+                  <Card key={producto.id} className="relative flex flex-col">
+                    <div className="h-48 flex items-center justify-center bg-gray-200 rounded-t-xl">
+                      <span className="text-gray-400 text-4xl">🖼️</span>
+                      {producto.destacado && (
+                        <span className="absolute top-3 right-3 bg-black text-white text-xs px-3 py-1 rounded-full font-semibold">
+                          Destacado
+                        </span>
+                      )}
+                      {producto.stock === 0 && (
+                        <span className="absolute top-3 left-3 bg-red-600 text-white text-xs px-3 py-1 rounded-full font-semibold">
+                          Agotado
+                        </span>
+                      )}
                     </div>
-                    <div className="flex items-center justify-between mt-auto">
-                      <span className="font-bold text-lg">${producto.precio.toFixed(2)}</span>
-                    </div>
-                    <div className="flex gap-2 mt-4">
-                      <Button
-                        className="flex items-center gap-2"
-                        disabled={producto.stock === 0}
-                      >
-                        <ShoppingCart className="w-4 h-4" />
-                        Añadir
-                      </Button>
-                      <Button
-                        variant="outline"
-                        onClick={() => router.push(`/tienda/productos/${producto.id}`)}
-                      >
-                        Ver Detalles
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                    <CardHeader>
+                      <CardTitle className="font-bold text-lg mb-1">{producto.nombre}</CardTitle>
+                      <CardDescription className="mb-2">{producto.desc}</CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex flex-col flex-1">
+                      <div className="flex gap-2 mb-2">
+                        <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs font-semibold">
+                          {producto.categoria}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between mt-auto">
+                        <span className="font-bold text-lg">${producto.precio.toFixed(2)}</span>
+                      </div>
+                      <div className="flex gap-2 mt-4">
+                        <Button
+                          className="flex items-center gap-2 bg-[#00a19a] text-white font-bold rounded-full px-5 py-2 hover:bg-[#007973] transition"
+                          disabled={stockDisponible <= 0}
+                          onClick={async () => {
+                            const ok = await addToCarrito({
+                              id: producto.id,
+                              nombre: producto.nombre,
+                              precio: producto.precio,
+                              imagen: "/Logo%20Thiart%20Tiktok.png",
+                              cantidad: cantidadEnCarrito,
+                              stock: producto.stock,
+                              categoria: producto.categoria,
+                              destacado: producto.destacado,
+                            });
+                            if (ok) {
+                              showToast("Producto agregado al carrito ✅", true);
+                            } else {
+                              showToast("No hay suficiente stock ❌", false);
+                            }
+                          }}
+                        >
+                          <ShoppingCart className="w-4 h-4" />
+                          Añadir
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => router.push(`/tienda/productos/${producto.id}`)}
+                        >
+                          Ver Detalles
+                        </Button>
+                      </div>
+                      {cantidadEnCarrito > 0 && (
+                        <div className="mt-2 text-xs text-[#00a19a] font-bold">
+                          Cantidad en carrito: {cantidadEnCarrito}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           )}
         </section>
@@ -272,3 +474,5 @@ export default function ProductosTiendaPage() {
     </div>
   );
 }
+
+// --- CarritoProvider, useCarrito, showToast, etc. ---

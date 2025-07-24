@@ -4,6 +4,7 @@ import { Card } from "~/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~/components/ui/table";
 import { Button } from "~/components/ui/button";
 import { CreateUserModal } from "~/components/CreateUserModal";
+import { useRouter } from "next/navigation";
 
 export default function AdminUsuariosPage() {
   interface Usuario {
@@ -17,8 +18,7 @@ export default function AdminUsuariosPage() {
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
-
-  // removed duplicate import of useCallback
+  const router = useRouter();
 
   const fetchUsuarios = useCallback(async () => {
     setLoading(true);
@@ -32,6 +32,13 @@ export default function AdminUsuariosPage() {
     setLoading(false);
   }, []);
 
+  const syncClerkUsuarios = async () => {
+    setLoading(true);
+    await fetch("/api/usuarios/clerk-usuarios"); // Llama al endpoint que sincroniza
+    await fetchUsuarios(); // Refresca la tabla
+    setLoading(false);
+  };
+
   useEffect(() => {
     void fetchUsuarios();
   }, [fetchUsuarios]);
@@ -40,7 +47,11 @@ export default function AdminUsuariosPage() {
     <div className="min-h-screen p-10 bg-gray-50">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Usuarios Registrados</h1>
-        <Button onClick={() => setModalOpen(true)}>Agregar usuario</Button>
+        <div className="flex gap-2">
+          <Button onClick={() => setModalOpen(true)}>Agregar usuario</Button>
+          <Button variant="secondary" onClick={syncClerkUsuarios}>Sincronizar Clerk</Button>
+          <Button variant="outline" onClick={() => router.push("/admin/panel")}>Panel</Button>
+        </div>
       </div>
       <CreateUserModal
         open={modalOpen}

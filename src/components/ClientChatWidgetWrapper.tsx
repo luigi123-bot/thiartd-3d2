@@ -1,15 +1,15 @@
 "use client";
-import { useUser } from "@clerk/nextjs";
 import ChatWidget from "./ChatWidget";
 
-export default function ClientChatWidgetWrapper() {
-  const { user } = useUser();
-  const clienteId = user?.id ?? "anon";
-  const clienteNombre =
-    user?.firstName && user?.lastName
-      ? `${user.firstName} ${user.lastName}`
-      : user?.username ?? user?.emailAddresses?.[0]?.emailAddress ?? "Invitado";
-  const clienteEmail = user?.emailAddresses?.[0]?.emailAddress ?? "sin-email@thiart3d.com";
+// Recibe datos del usuario por props o contexto propio
+export default function ClientChatWidgetWrapper({
+  usuario,
+}: {
+  usuario?: { id?: string; nombre?: string; email?: string };
+}) {
+  const clienteId = usuario?.id ?? "anon";
+  const clienteNombre = usuario?.nombre ?? "Invitado";
+  const clienteEmail = usuario?.email ?? "sin-email@thiart3d.com";
 
   return (
     <ChatWidget
