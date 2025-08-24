@@ -1,17 +1,23 @@
-import { useState } from "react";
+import React, { useState } from "react";
+
+type TrackResult = Record<string, unknown> | null;
 
 export default function TrackForm() {
-  const [trackingNumber, setTrackingNumber] = useState("");
-  const [result, setResult] = useState<any>(null);
+  const [trackingNumber, setTrackingNumber] = useState<string>("");
+  const [result, setResult] = useState<TrackResult>(null);
+  const [loading, setLoading] = useState(false);
 
   const handleTrack = async () => {
+    setLoading(true);
+    setResult(null);
     const res = await fetch("/api/envia/track", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ trackingNumber }),
     });
-    const data = await res.json();
-    setResult(data);
+    const data: unknown = await res.json();
+    setResult(data as TrackResult);
+    setLoading(false);
   };
 
   return (
@@ -26,7 +32,7 @@ export default function TrackForm() {
         onClick={handleTrack}
         className="ml-2 px-4 py-2 bg-blue-500 text-white rounded"
       >
-        Rastrear
+        {loading ? "Cargando..." : "Rastrear"}
       </button>
 
       {result && (

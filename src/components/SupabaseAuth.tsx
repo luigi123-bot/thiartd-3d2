@@ -24,7 +24,6 @@ export default function SupabaseAuth({ onAuth }: { onAuth?: (user: UsuarioDB) =>
   const [form, setForm] = useState({ nombre: "", email: "", password: "" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>("");
-  const [usuario, setUsuario] = useState<UsuarioDB | null>(null);
 
   useEffect(() => {
     const getSession = async () => {
@@ -36,7 +35,6 @@ export default function SupabaseAuth({ onAuth }: { onAuth?: (user: UsuarioDB) =>
           .select("*")
           .eq("id", user.id)
           .single<UsuarioDB>();
-        setUsuario(usuarioData ?? null);
         if (onAuth && usuarioData) onAuth(usuarioData);
       }
     };
@@ -64,7 +62,6 @@ export default function SupabaseAuth({ onAuth }: { onAuth?: (user: UsuarioDB) =>
     e.preventDefault();
     setLoading(true);
     setError("");
-    setUsuario(null);
 
     const { data, error: signUpError } = await supabase.auth.signUp({
       email: form.email,
@@ -100,7 +97,6 @@ export default function SupabaseAuth({ onAuth }: { onAuth?: (user: UsuarioDB) =>
     e.preventDefault();
     setLoading(true);
     setError("");
-    setUsuario(null);
 
     const { data, error: signInError } = await supabase.auth.signInWithPassword({
       email: form.email,
@@ -133,7 +129,6 @@ export default function SupabaseAuth({ onAuth }: { onAuth?: (user: UsuarioDB) =>
     }
 
     setLoading(false);
-    setUsuario(usuarioData);
     if (onAuth) onAuth(usuarioData);
     router.push("/"); // 🔁 Redirige después de login
   };
