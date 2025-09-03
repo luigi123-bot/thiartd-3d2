@@ -14,11 +14,17 @@ import {
   IoIosMail,
   IoMdClose,
 } from "react-icons/io";
-import { ShoppingCart, Menu, UserCircle } from "lucide-react";
+import {
+  IoIosCart,
+  IoMdMenu,
+  IoMdPerson,
+  IoMdArrowDropdown
+} from "react-icons/io";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import SupabaseAuth from "~/components/SupabaseAuth";
+
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
@@ -31,6 +37,7 @@ export default function TopbarTienda() {
   const [usuario, setUsuario] = useState<
     { id?: string; nombre?: string; email?: string; avatar_url?: string } | null
   >(null);
+  const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
   const router = useRouter();
 
   // Evitar renderizado hasta que el componente esté montado en el cliente
@@ -79,6 +86,16 @@ export default function TopbarTienda() {
       }
     })();
   }, [authModalOpen]);
+
+  // Cerrar menú de avatar al hacer click fuera
+  useEffect(() => {
+    if (!avatarMenuOpen) return;
+    const handleClick = (_: MouseEvent) => {
+      setAvatarMenuOpen(false);
+    };
+    window.addEventListener("click", handleClick);
+    return () => window.removeEventListener("click", handleClick);
+  }, [avatarMenuOpen]);
 
   if (!isMounted) return null;
 
@@ -154,7 +171,7 @@ export default function TopbarTienda() {
               onClick={() => router.push("/tienda/carrito")}
               className="hover:bg-[#00a19a]/20 transition"
             >
-              <ShoppingCart className="w-6 h-6 text-white" />
+              <IoIosCart className="w-6 h-6 text-white" />
             </Button>
             <Button
               variant="ghost"
@@ -181,23 +198,74 @@ export default function TopbarTienda() {
                 </Button>
               </>
             ) : (
-              <div className="flex items-center gap-2">
-                <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-[#00a19a] bg-white flex items-center justify-center">
-                  {usuario.avatar_url ? (
-                    <Image
-                      src={usuario.avatar_url}
-                      alt="Perfil"
-                      width={40}
-                      height={40}
-                      className="object-cover w-10 h-10"
-                    />
-                  ) : (
-                    <UserCircle className="w-8 h-8 text-[#00a19a]" />
-                  )}
-                </div>
-                <span className="font-semibold text-[#00a19a]">
-                  {usuario.nombre}
-                </span>
+              <div className="relative flex items-center gap-2">
+                <button
+                  className="flex items-center gap-2 focus:outline-none"
+                  onClick={e => {
+                    e.stopPropagation();
+                    setAvatarMenuOpen(v => !v);
+                  }}
+                  type="button"
+                >
+                  <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-[#00a19a] bg-white flex items-center justify-center">
+                    {usuario.avatar_url ? (
+                      <Image
+                        src={usuario.avatar_url}
+                        alt="Perfil"
+                        width={40}
+                        height={40}
+                        className="object-cover w-10 h-10"
+                      />
+                    ) : (
+                      <IoMdPerson className="w-8 h-8 text-[#00a19a]" />
+                    )}
+                  </div>
+                  <span className="font-semibold text-[#00a19a]">{usuario.nombre}</span>
+                  <IoMdArrowDropdown className="w-4 h-4 text-[#00a19a]" />
+                </button>
+                {avatarMenuOpen && (
+                  <div
+                    className="absolute right-0 mt-12 w-44 bg-white border rounded shadow-lg z-50"
+                    onClick={e => e.stopPropagation()}
+                  >
+                    <ul className="py-2">
+                      <li>
+                        <button
+                          className="w-full text-left px-4 py-2 hover:bg-[#e0f2f1]"
+                          onClick={() => {
+                            setAvatarMenuOpen(false);
+                            router.push("/envios");
+                          }}
+                        >
+                          Envíos
+                        </button>
+                      </li>
+                      <li>
+                        <button
+                          className="w-full text-left px-4 py-2 hover:bg-[#e0f2f1]"
+                          onClick={() => {
+                            setAvatarMenuOpen(false);
+                            router.push("/admin");
+                          }}
+                        >
+                          Admin
+                        </button>
+                      </li>
+                      <li>
+                        <button
+                          className="w-full text-left px-4 py-2 hover:bg-[#e0f2f1]"
+                          onClick={async () => {
+                            setAvatarMenuOpen(false);
+                            await supabase.auth.signOut();
+                            router.push("/");
+                          }}
+                        >
+                          Cerrar sesión
+                        </button>
+                      </li>
+                    </ul>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -242,7 +310,7 @@ export default function TopbarTienda() {
               className="text-white"
               aria-label="Carrito"
             >
-              <ShoppingCart className="w-6 h-6" />
+              <IoIosCart className="w-6 h-6" />
             </Button>
             <Button
               variant="ghost"
@@ -259,7 +327,7 @@ export default function TopbarTienda() {
               onClick={() => setMenuOpen((open) => !open)}
               aria-label="Abrir menú"
             >
-              <Menu className="w-7 h-7" />
+              <IoMdMenu className="w-7 h-7" />
             </Button>
           </div>
         </nav>
@@ -370,6 +438,7 @@ export default function TopbarTienda() {
       {authModalOpen && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-xl shadow-lg p-8 w-full max-w-md">
+            {/* Aquí se muestra el componente para login/registro */}
             <SupabaseAuth onAuth={() => setAuthModalOpen(false)} />
             <Button
               variant="secondary"

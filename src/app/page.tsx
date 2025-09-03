@@ -1,6 +1,5 @@
 "use client";
 import React, { useState } from "react";
-import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { Button } from "~/components/ui/button";
 
@@ -13,7 +12,6 @@ type TrackResult = Record<string, unknown> | null;
 type PedidoResult = Record<string, unknown> | null;
 
 export default function Home() {
-	const router = useRouter();
 	const [modalOpen, setModalOpen] = useState(false);
 	// Modal para probar la API de envío/rastreo
 	const [trackModalOpen, setTrackModalOpen] = useState(false);
@@ -66,16 +64,6 @@ export default function Home() {
 	return (
 		<div className="min-h-screen bg-[#007973]">
 			<TopbarTienda /> {/* Renderiza el Topbar aquí */}
-			{/* Barra superior con notificaciones y botón Admin */}
-			<div className="flex justify-end items-center gap-8 px-5 py-4 bg-white shadow">
-				{/* Botón Admin */}
-				<button
-					className="bg-[#007973] text-white px-5 py-2 rounded font-semibold hover:bg-[#005f56] transition"
-					onClick={() => router.push("/admin")}
-				>
-					Admin
-				</button>
-			</div>
 			{/* Hero Section */}
 			<section className="flex flex-col md:flex-row items-center justify-between px-12 py-20 bg-gradient-to-br from-white to-[#e0f2f1]">
 				<div className="max-w-xl">
