@@ -2,64 +2,16 @@
 import React, { useState } from "react";
 import dynamic from "next/dynamic";
 import { Button } from "~/components/ui/button";
+import ContactModal from "~/components/ContactModal";
+import ProductosCarrusel from "~/components/ProductosCarrusel";
+import UsuariosAdminModal from "~/components/UsuariosAdminModal";
 
 // Importa componentes que usan datos dinámicos o Clerk con SSR desactivado
 const TopbarTienda = dynamic(() => import("./tienda/componentes/TopbarTienda"), { ssr: false });
-const ContactModal = dynamic(() => import("~/components/ContactModal"), { ssr: false });
-const ProductosCarrusel = dynamic(() => import("~/components/ProductosCarrusel"), { ssr: false });
-
-type TrackResult = Record<string, unknown> | null;
-type PedidoResult = Record<string, unknown> | null;
 
 export default function Home() {
 	const [modalOpen, setModalOpen] = useState(false);
-	// Modal para probar la API de envío/rastreo
-	const [trackModalOpen, setTrackModalOpen] = useState(false);
-	const [trackingNumber, setTrackingNumber] = useState("");
-	const [result, setResult] = useState<TrackResult>(null);
-	const [loading, setLoading] = useState(false);
-	const [createModalOpen, setCreateModalOpen] = useState(false);
-	const [pedido, setPedido] = useState({
-		recipient: "",
-		address: "",
-		package: "",
-	});
-	const [pedidoResult, setPedidoResult] = useState<PedidoResult>(null);
-	const [pedidoLoading, setPedidoLoading] = useState(false);
-
-	const handleTrack = async () => {
-		setLoading(true);
-		setResult(null);
-		const res = await fetch("/api/envia/track", {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ trackingNumber }),
-		});
-		const data: unknown = await res.json();
-		if (data && typeof data === "object" && !Array.isArray(data)) {
-			setResult(data as TrackResult);
-		} else {
-			setResult(null);
-		}
-		setLoading(false);
-	};
-
-	const handleCreatePedido = async () => {
-		setPedidoLoading(true);
-		setPedidoResult(null);
-		const res = await fetch("/api/envia/create", {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify(pedido),
-		});
-		const data: unknown = await res.json();
-		if (data && typeof data === "object" && !Array.isArray(data)) {
-			setPedidoResult(data as PedidoResult);
-		} else {
-			setPedidoResult(null);
-		}
-		setPedidoLoading(false);
-	};
+	const [usuariosModalOpen, setUsuariosModalOpen] = useState(false);
 
 	return (
 		<div className="min-h-screen bg-[#007973]">
@@ -168,98 +120,10 @@ export default function Home() {
 				Contáctanos
 			</Button>
 			<ContactModal open={modalOpen} onOpenChangeAction={setModalOpen} />
-
-			{/* Botón para abrir el modal de prueba de API */}
-			<button
-				className="fixed bottom-24 right-8 z-50 bg-blue-600 text-white px-6 py-3 rounded shadow"
-				onClick={() => setTrackModalOpen(true)}
-			>
-				Probar envío/rastreo API
-			</button>
-
-			{/* Modal para probar la API */}
-			{trackModalOpen && (
-				<div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-					<div className="bg-white rounded-lg p-6 shadow-lg min-w-[320px] relative">
-						<button
-							className="absolute top-2 right-2 text-gray-500"
-							onClick={() => setTrackModalOpen(false)}
-						>
-							✕
-						</button>
-						<h2 className="text-lg font-semibold mb-4">Rastrear producto</h2>
-						<input
-							className="border p-2 w-full mb-3"
-							value={trackingNumber}
-							onChange={(e) => setTrackingNumber(e.target.value)}
-							placeholder="Número de guía"
-						/>
-						<button
-							onClick={handleTrack}
-							className="w-full px-4 py-2 bg-blue-500 text-white rounded"
-							disabled={loading || !trackingNumber}
-						>
-							{loading ? "Consultando..." : "Rastrear"}
-						</button>
-						{result && (
-							<pre className="mt-4 bg-gray-100 p-2 rounded text-sm max-h-60 overflow-auto">
-								{JSON.stringify(result, null, 2)}
-							</pre>
-						)}
-					</div>
-				</div>
-			)}
-			{/* Botón para abrir el modal de crear pedido */}
-			<button
-				className="fixed bottom-40 right-8 z-50 bg-green-600 text-white px-6 py-3 rounded shadow"
-				onClick={() => setCreateModalOpen(true)}
-			>
-				Crear pedido (API Envia)
-			</button>
-			{/* Modal para crear pedido */}
-			{createModalOpen && (
-				<div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-					<div className="bg-white rounded-lg p-6 shadow-lg min-w-[320px] relative">
-						<button
-							className="absolute top-2 right-2 text-gray-500"
-							onClick={() => setCreateModalOpen(false)}
-						>
-							✕
-						</button>
-						<h2 className="text-lg font-semibold mb-4">Crear pedido</h2>
-						<input
-							className="border p-2 w-full mb-3"
-							value={pedido.recipient}
-							onChange={e => setPedido({ ...pedido, recipient: e.target.value })}
-							placeholder="Nombre del destinatario"
-						/>
-						<input
-							className="border p-2 w-full mb-3"
-							value={pedido.address}
-							onChange={e => setPedido({ ...pedido, address: e.target.value })}
-							placeholder="Dirección"
-						/>
-						<input
-							className="border p-2 w-full mb-3"
-							value={pedido.package}
-							onChange={e => setPedido({ ...pedido, package: e.target.value })}
-							placeholder="Descripción del paquete"
-						/>
-						<button
-							onClick={handleCreatePedido}
-							className="w-full px-4 py-2 bg-green-500 text-white rounded"
-							disabled={pedidoLoading || !pedido.recipient || !pedido.address || !pedido.package}
-						>
-							{pedidoLoading ? "Enviando..." : "Crear pedido"}
-						</button>
-						{pedidoResult && (
-							<pre className="mt-4 bg-gray-100 p-2 rounded text-sm max-h-60 overflow-auto">
-								{JSON.stringify(pedidoResult, null, 2)}
-							</pre>
-						)}
-					</div>
-				</div>
-			)}
+			<Button onClick={() => setUsuariosModalOpen(true)} className="fixed bottom-8 left-8 z-50 bg-blue-700 text-white">
+				Gestionar usuarios y roles
+			</Button>
+			<UsuariosAdminModal open={usuariosModalOpen} onOpenChange={setUsuariosModalOpen} />
 		</div>
 	);
 }

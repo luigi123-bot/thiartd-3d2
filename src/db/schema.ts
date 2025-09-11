@@ -5,6 +5,7 @@ export const usuario = pgTable("usuario", {
   nombre: varchar("nombre", { length: 100 }),
   email: varchar("email", { length: 100 }),
   password: varchar("password", { length: 255 }).notNull(),
+  role: varchar("role", { length: 20 }).default("user"), // <-- Cambiado a 'role'
 });
 
 export const products = pgTable("productos_3d", {

@@ -346,7 +346,6 @@ export default function TopbarTienda() {
           <div
             className="fixed inset-0 z-50 bg-black/40 md:hidden transition-colors"
             onClick={() => setMenuOpen(false)}
-            aria-modal="true"
             tabIndex={-1}
           >
             <div

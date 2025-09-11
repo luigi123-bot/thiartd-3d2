@@ -204,6 +204,7 @@ export default function AdminInventarioPage() {
 							className="pl-3 pr-6 py-2 rounded-full border border-gray-200 bg-white shadow-sm text-sm"
 							value={orden}
 							onChange={(e) => setOrden(e.target.value)}
+							title="Ordenar productos por"
 						>
 							<option value="nombre">Nombre</option>
 							<option value="stock">Stock</option>
@@ -221,15 +222,7 @@ export default function AdminInventarioPage() {
 					<div className="text-center py-8 text-gray-500">No hay productos registrados.</div>
 				) : (
 					<>
-						<div
-							className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6"
-							style={{
-								maxWidth: "1920px",
-								marginLeft: "auto",
-								marginRight: "auto",
-								width: "100%",
-							}}
-						>
+						<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
 							{productosPagina.map((producto) => (
 								<div
 									key={producto.id}

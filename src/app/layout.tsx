@@ -9,7 +9,8 @@ import { ToastProvider } from "~/components/ui/use-toast";
 import SyncUser from "../components/SyncUser";
 import Footer from "~/components/Footer";
 import { UiProvider } from "~/components/providers/UiProvider";
-import ClientChatWidgetWrapper from "~/components/ClientChatWidgetWrapper"; // Importa directamente
+import ClientChatWidgetWrapper from "~/components/ClientChatWidgetWrapper";
+
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -54,7 +55,5 @@ export default function RootLayout({
 export const dynamic = "force-dynamic"; // Forzar la regeneración de la página en cada solicitud
 export const revalidate = 0; // Desactivar la caché para esta página
 export const fetchCache = "force-no-store"; // Desactivar la caché de Next.js para esta página
-export const runtime = "edge"; // Ejecutar en el edge para mejor rendimiento
 export const preferredRegion = "auto"; // Usar la región más cercana automáticamente
-// export const tags = ["nextjs", "react", "typescript", "tailwindcss"]; // Etiquetas para la página
 export const dynamicParams = false; // Desactivar los parámetros dinámicos para esta página
