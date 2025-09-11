@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import {  Plus, Minus, Trash2 } from "lucide-react";
+import { crearPagoWompi } from "~/utils/wompi";
 
 interface CarritoProducto {
   id: number;
@@ -31,6 +32,7 @@ const saveCarritoToStorage = (carrito: CarritoProducto[]) => {
 
 export default function CarritoPage() {
   const [carrito, setCarrito] = useState<CarritoProducto[]>([]);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     setCarrito(getCarritoFromStorage());
@@ -57,6 +59,29 @@ export default function CarritoPage() {
 
   const handleEliminar = (id: number) => {
     setCarrito((prev) => prev.filter((p) => p.id !== id));
+  };
+
+  const handleCheckout = async () => {
+    setLoading(true);
+    try {
+      // Puedes obtener el email del usuario autenticado si lo tienes
+      const email = "cliente@correo.com";
+      const referencia = `carrito_${Date.now()}`;
+      const pago = await crearPagoWompi({
+        amount_in_cents: Math.round(total * 100), // Wompi espera centavos
+        currency: "COP",
+        customer_email: email,
+        reference: referencia,
+      });
+      if (pago?.data?.payment_link) {
+        window.location.href = pago.data.payment_link;
+      } else {
+        alert("No se pudo generar el pago. Intenta de nuevo.");
+      }
+    } catch {
+      alert("Error al procesar el pago");
+    }
+    setLoading(false);
   };
 
   // Cálculos de totales
@@ -88,7 +113,11 @@ export default function CarritoPage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
                     <span className="font-semibold text-base truncate">{p.nombre}</span>
-                    <button onClick={() => handleEliminar(p.id)} className="p-1 rounded hover:bg-red-50">
+                    <button
+                      onClick={() => handleEliminar(p.id)}
+                      className="p-1 rounded hover:bg-red-50"
+                      title="Eliminar producto"
+                    >
                       <Trash2 className="w-4 h-4 text-red-500" />
                     </button>
                   </div>
@@ -105,6 +134,7 @@ export default function CarritoPage() {
                         className="px-2 py-1 text-gray-600 hover:text-black"
                         onClick={() => handleCantidad(p.id, -1)}
                         disabled={p.cantidad <= 1}
+                        title="Disminuir cantidad"
                       >
                         <Minus className="w-4 h-4" />
                       </button>
@@ -113,6 +143,7 @@ export default function CarritoPage() {
                         className="px-2 py-1 text-gray-600 hover:text-black"
                         onClick={() => handleCantidad(p.id, 1, p.stock)}
                         disabled={p.stock !== undefined && p.cantidad >= p.stock}
+                        title="Aumentar cantidad"
                       >
                         <Plus className="w-4 h-4" />
                       </button>
@@ -146,9 +177,10 @@ export default function CarritoPage() {
           </div>
           <button
             className="w-full py-3 rounded-xl bg-black text-white font-semibold text-lg hover:bg-gray-900 transition"
-            disabled={carrito.length === 0}
+            disabled={carrito.length === 0 || loading}
+            onClick={handleCheckout}
           >
-            Finalizar compra
+            {loading ? "Procesando..." : "Finalizar compra"}
           </button>
         </div>
       </div>
