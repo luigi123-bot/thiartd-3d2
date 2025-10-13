@@ -214,7 +214,10 @@ export default function AdminPanel() {
       <div className="mb-8 px-8">
         <div className="mb-4 text-lg font-semibold text-gray-700">Filtrar pedidos</div>
         <div className="flex flex-wrap gap-4 items-center">
+          <label htmlFor="estadoFiltro" className="sr-only">Filtrar por estado</label>
           <select
+            id="estadoFiltro"
+            aria-label="Filtrar por estado"
             className="border rounded-md shadow-sm bg-white ring-1 ring-gray-200 px-3 py-2 text-base"
             value={estadoFiltro}
             onChange={e => setEstadoFiltro(e.target.value)}
@@ -224,7 +227,10 @@ export default function AdminPanel() {
               <option key={e.value} value={e.value}>{e.label}</option>
             ))}
           </select>
+          <label htmlFor="ordenSelect" className="sr-only">Ordenar pedidos</label>
           <select
+            id="ordenSelect"
+            aria-label="Ordenar pedidos"
             className="border rounded-md shadow-sm bg-white ring-1 ring-gray-200 px-3 py-2 text-base"
             value={orden}
             onChange={e => setOrden(e.target.value as "fecha" | "estado")}
@@ -279,25 +285,24 @@ export default function AdminPanel() {
             {p.productos && p.productos.length > 1 && (
               <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden mb-2">
                 <div
-                  className="h-2 rounded-full transition-all"
-                  style={{
-                    width: `${(p.productos.filter(prod => prod.estado === "entregado").length / p.productos.length) * 100}%`,
-                    background: "#10b981"
-                  }}
+                  className={clsx(
+                    "h-2 rounded-full transition-all bg-emerald-500",
+                    `progress-bar-width-${Math.round((p.productos.filter(prod => prod.estado === "entregado").length / p.productos.length) * 100)}`
+                  )}
                 />
               </div>
             )}
           </div>
         ))}
       </div>
-      {loading && <div className="text-center py-8 text-gray-500">Cargando datos...</div>}
-      {/* Responsividad extra para móvil */}
       <style jsx global>{`
         @media (max-width: 640px) {
           .min-w-[320px] { min-width: 100% !important; }
           .max-w-2xl { max-width: 100% !important; }
         }
+        ${Array.from({ length: 101 }, (_, i) => `.progress-bar-width-${i} { width: ${i}%; }`).join('\n')}
       `}</style>
     </div>
   );
 }
+  

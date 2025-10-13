@@ -59,6 +59,20 @@ const FAQS = [
 	},
 ];
 
+interface CarritoProducto {
+  id: string;
+  nombre: string;
+  precio: number;
+  imagen?: string;
+  cantidad: number;
+  stock: number;
+  categoria: string;
+  destacado: boolean;
+  descripcion?: string;
+  tamano?: string;
+  detalles?: string;
+}
+
 export default function PersonalizarPage() {
 	const [tab, setTab] = useState<"nuevo" | "modificar">("nuevo");
 	const [size, setSize] = useState("pequeno");
@@ -67,7 +81,6 @@ export default function PersonalizarPage() {
 	const [acabado, setAcabado] = useState(ACABADOS[0]);
 	const [presupuesto, setPresupuesto] = useState(PRESUPUESTOS[0]);
 	const [plazo, setPlazo] = useState(PLAZOS[0]);
-	const [img, setImg] = useState<File | null>(null);
 	const [mensaje, setMensaje] = useState("");
 	const [loading, setLoading] = useState(false);
 	const [showPago, setShowPago] = useState(false);
@@ -176,122 +189,85 @@ export default function PersonalizarPage() {
 		};
 	}, [convId]);
 
+	// Añade helpers para el carrito
+	function addToCarritoLocal(producto: CarritoProducto) {
+		if (typeof window === "undefined") return;
+		const carritoLocal = localStorage.getItem("carrito");
+		const carrito: CarritoProducto[] = carritoLocal ? JSON.parse(carritoLocal) as CarritoProducto[] : [];
+		carrito.push({ ...producto, cantidad: 1 });
+		localStorage.setItem("carrito", JSON.stringify(carrito));
+		console.log("Producto personalizado agregado al carrito:", producto);
+	}
+
+	function clearCarritoLocal() {
+		if (typeof window === "undefined") return;
+		localStorage.setItem("carrito", "[]");
+	}
+
 	// Manejar envío de personalización
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
 		setLoading(true);
-		let referenciaUrl = "";
-		if (img) {
-			const fileExt = img.name.split(".").pop();
-			const fileName = `referencia-${usuario?.id ?? "anon"}-${Date.now()}.${fileExt}`;
-			const { error } = await supabase.storage
-				.from("referencias")
-				.upload(fileName, img);
-			if (!error) {
-				referenciaUrl = supabase.storage.from("referencias").getPublicUrl(fileName).data.publicUrl;
-			}
-		}
-		// Guarda la solicitud de personalización (en tabla temporal)
-		const persResult = await supabase.from("personalizaciones").insert([
-			{
-				usuario_id: usuario?.id ?? null,
-				nombre: usuario?.nombre ?? "",
-				email: usuario?.email ?? "",
-				tamano: size,
-				material,
-				color,
-				acabado,
-				presupuesto,
-				plazo,
-				descripcion: (document.querySelector("textarea"))?.value ?? "",
-				referencia_url: referenciaUrl,
-				estado: "pendiente_pago",
-				created_at: new Date().toISOString(),
-			},
-		]).select().single();
+		// Guarda los datos personalizados en el carrito local (no en productos)
+		const personalizado = {
+			nombre: "Producto Personalizado",
+			descripcion: (document.querySelector("textarea"))?.value ?? "",
+			categoria: "Personalizado",
+			precio: 0,
+			stock: 1,
+			tamano: size,
+			detalles: `Material: ${material}, Color: ${color}, Acabado: ${acabado}, Presupuesto: ${presupuesto}, Plazo: ${plazo}`,
+			destacado: false,
+		};
+		addToCarritoLocal({
+			id: Date.now().toString(), // ID temporal solo para el carrito
+			...personalizado,
+			cantidad: 1,
+		});
 		setLoading(false);
-		if (!persResult.error && persResult.data) {
-			setShowPago(true); // Abre modal de pago
-		} else {
-			setMensaje("Error al enviar la solicitud.");
-		}
+		setShowPago(true);
 	};
 
 	// Simular pago y crear producto + pedido
 	const handlePagar = async () => {
 		setLoading(true);
-		// Busca la última personalización pendiente de este usuario
-		const persResult = await supabase
-			.from("personalizaciones")
-			.select("*")
-			.eq("usuario_id", usuario?.id)
-			.eq("estado", "pendiente_pago")
-			.order("created_at", { ascending: false })
-			.limit(1)
-			.single();
-
-		type Personalizacion = {
-			id: string;
-			usuario_id: string;
-			nombre: string;
-			email: string;
-			tamano: string;
-			material: string;
-			color: string;
-			acabado: string;
-			presupuesto: string;
-			plazo: string;
-			descripcion: string;
-			referencia_url: string;
-			estado: string;
-			created_at: string;
-			titulo?: string;
-		};
-		const pers = persResult.data as Personalizacion | null;
-
-		if (!pers) {
-			setMensaje("No se encontró la personalización.");
+		const carritoLocal = typeof window !== "undefined" ? localStorage.getItem("carrito") : null;
+		const carrito: CarritoProducto[] = carritoLocal ? JSON.parse(carritoLocal) as CarritoProducto[] : [];
+		if (carrito.length === 0) {
+			setMensaje("No hay productos personalizados en el carrito.");
 			setShowPago(false);
 			setLoading(false);
 			return;
 		}
 
-		// Crea el producto personalizado
-		const prodResult = await supabase.from("productos").insert([
-			{
-				nombre: pers.titulo ?? "Producto Personalizado",
-				descripcion: pers.descripcion,
-				categoria: "Personalizado",
-				precio: 0,
-				stock: 1,
-				imagen_url: pers.referencia_url,
-				tamano: pers.tamano,
-				created_at: new Date().toISOString(),
-			},
-		]).select().single();
-
-		const prod: { id: string } | null = prodResult.data as { id: string } | null;
-
-		// Crea el pedido pendiente
-		if (prod) {
-			await supabase.from("pedidos").insert([
-				{
-					cliente_id: usuario?.id,
-					productos: JSON.stringify([{ producto_id: prod.id, cantidad: 1, precio_unitario: 0 }]),
-					total: 0,
-					estado: "pendiente",
-					direccion_envio: "",
-					datos_contacto: JSON.stringify({ nombre: pers.nombre, email: pers.email }),
-					created_at: new Date().toISOString(),
-				},
-			]);
+		// Envía el pedido al backend
+		const res = await fetch("/api/pedidos", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				cliente_id: usuario?.id,
+				productos: carrito.map((prod: CarritoProducto) => ({
+					nombre: prod.nombre,
+					descripcion: prod.descripcion,
+					categoria: prod.categoria,
+					tamano: prod.tamano,
+					detalles: prod.detalles,
+					cantidad: prod.cantidad,
+					precio_unitario: prod.precio,
+				})),
+				total: 0, // Gratis por ahora
+				estado: "pendiente",
+				direccion: "",
+				datos_contacto: { nombre: usuario?.nombre, email: usuario?.email },
+			}),
+		});
+		if (res.ok) {
+			clearCarritoLocal();
+			setShowPago(false);
+			setMensaje("¡Pago realizado! Tu producto personalizado está en proceso.");
+		} else {
+			setMensaje("Error al crear el pedido.");
 		}
-
-		// Actualiza la personalización a "pagado"
-		await supabase.from("personalizaciones").update({ estado: "pagado" }).eq("id", pers.id);
-
-		setShowPago(false);
-		setMensaje("¡Pago realizado! Tu producto personalizado está en proceso.");
 		setLoading(false);
 	};
 
@@ -421,17 +397,6 @@ export default function PersonalizarPage() {
 							/>
 						</div>
 
-						{/* Imagen de referencia */}
-						<div>
-							<label className="block mb-1 font-medium">Imagen de referencia (opcional)</label>
-							<Input
-								type="file"
-								accept="image/*"
-								className="rounded-lg"
-								onChange={e => setImg(e.target.files?.[0] ?? null)}
-							/>
-						</div>
-
 						{/* Presupuesto y plazo */}
 						<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 							<div>
@@ -509,8 +474,7 @@ export default function PersonalizarPage() {
 			</button>
 			{chatOpen && (
 				<div
-					className="fixed bottom-24 right-8 w-80 h-[420px] bg-white rounded-xl shadow-lg border flex flex-col z-[9999]"
-					style={{ maxHeight: 420, minHeight: 420 }}
+					className="fixed bottom-24 right-8 w-80 bg-white rounded-xl shadow-lg border flex flex-col z-[9999] chat-float"
 				>
 					<div className="flex items-center justify-between p-3 border-b flex-shrink-0">
 						<div className="font-bold text-lg flex items-center gap-2">
@@ -522,8 +486,7 @@ export default function PersonalizarPage() {
 					</div>
 					{/* Área de mensajes con scroll */}
 					<div
-						className="flex-1 overflow-y-auto"
-						style={{ minHeight: 0, maxHeight: 320, padding: "0.5rem" }}
+						className="flex-1 overflow-y-auto chat-messages-area"
 					>
 						<div className="flex flex-col gap-2">
 							{mensajes.map((m, idx) => (

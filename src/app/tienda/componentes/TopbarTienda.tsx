@@ -24,6 +24,8 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import SupabaseAuth from "~/components/SupabaseAuth";
+import { FiSettings } from "react-icons/fi";
+import { IoMdLogOut } from "react-icons/io";
 
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
@@ -185,14 +187,14 @@ export default function TopbarTienda() {
                 <Button
                   variant="outline"
                   onClick={() => setAuthModalOpen(true)}
-                  className="text-white"
+                  className="text-white border-white hover:bg-white hover:text-[#00a19a]"
                 >
                   Iniciar sesión
                 </Button>
                 <Button
                   variant="default"
                   onClick={() => setAuthModalOpen(true)}
-                  className="text-white"
+                  className="bg-white text-[#00a19a] hover:bg-gray-100"
                 >
                   Registrarse
                 </Button>
@@ -200,14 +202,14 @@ export default function TopbarTienda() {
             ) : (
               <div className="relative flex items-center gap-2">
                 <button
-                  className="flex items-center gap-2 focus:outline-none"
+                  className="flex items-center gap-3 p-2 rounded-full hover:bg-white/10 transition-colors focus:outline-none focus:ring-2 focus:ring-white/30"
                   onClick={e => {
                     e.stopPropagation();
                     setAvatarMenuOpen(v => !v);
                   }}
                   type="button"
                 >
-                  <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-[#00a19a] bg-white flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-white bg-white flex items-center justify-center shadow-sm">
                     {usuario.avatar_url ? (
                       <Image
                         src={usuario.avatar_url}
@@ -217,53 +219,128 @@ export default function TopbarTienda() {
                         className="object-cover w-10 h-10"
                       />
                     ) : (
-                      <IoMdPerson className="w-8 h-8 text-[#00a19a]" />
+                      <IoMdPerson className="w-6 h-6 text-[#00a19a]" />
                     )}
                   </div>
-                  <span className="font-semibold text-[#00a19a]">{usuario.nombre}</span>
-                  <IoMdArrowDropdown className="w-4 h-4 text-[#00a19a]" />
+                  <div className="hidden md:flex flex-col items-start">
+                    <span className="font-semibold text-white text-sm">
+                      {usuario.nombre ?? usuario.email?.split('@')[0] ?? 'Usuario'}
+                    </span>
+                    <span className="text-xs text-white/70">
+                      {usuario.email}
+                    </span>
+                  </div>
+                  <IoMdArrowDropdown className="w-4 h-4 text-white" />
                 </button>
                 {avatarMenuOpen && (
                   <div
-                    className="absolute right-0 mt-12 w-44 bg-white border rounded shadow-lg z-50"
+                    className="absolute right-0 top-full mt-2 w-64 bg-white border border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden animate-fade-in"
                     onClick={e => e.stopPropagation()}
                   >
-                    <ul className="py-2">
-                      <li>
-                        <button
-                          className="w-full text-left px-4 py-2 hover:bg-[#e0f2f1]"
-                          onClick={() => {
-                            setAvatarMenuOpen(false);
-                            router.push("/envios");
-                          }}
-                        >
-                          Envíos
-                        </button>
-                      </li>
-                      <li>
-                        <button
-                          className="w-full text-left px-4 py-2 hover:bg-[#e0f2f1]"
-                          onClick={() => {
-                            setAvatarMenuOpen(false);
-                            router.push("/admin");
-                          }}
-                        >
-                          Admin
-                        </button>
-                      </li>
-                      <li>
-                        <button
-                          className="w-full text-left px-4 py-2 hover:bg-[#e0f2f1]"
-                          onClick={async () => {
-                            setAvatarMenuOpen(false);
-                            await supabase.auth.signOut();
-                            router.push("/");
-                          }}
-                        >
-                          Cerrar sesión
-                        </button>
-                      </li>
-                    </ul>
+                    {/* Header del menú */}
+                    <div className="bg-gradient-to-r from-[#00a19a] to-[#007973] p-4 text-white">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-white bg-white flex items-center justify-center">
+                          {usuario.avatar_url ? (
+                            <Image
+                              src={usuario.avatar_url}
+                              alt="Perfil"
+                              width={48}
+                              height={48}
+                              className="object-cover w-12 h-12"
+                            />
+                          ) : (
+                            <IoMdPerson className="w-8 h-8 text-[#00a19a]" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-semibold text-white truncate">
+                            {usuario.nombre ?? usuario.email?.split('@')[0] ?? 'Usuario'}
+                          </div>
+                          <div className="text-xs text-white/80 truncate">
+                            {usuario.email}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Opciones del menú */}
+                    <div className="py-2">
+                      <button
+                        className="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors flex items-center gap-3 text-gray-700"
+                        onClick={() => {
+                          setAvatarMenuOpen(false);
+                          router.push("/tienda/mi-perfil");
+                        }}
+                      >
+                        <IoMdPerson className="w-5 h-5 text-[#00a19a]" />
+                        <div>
+                          <div className="font-medium">Mi perfil</div>
+                          <div className="text-xs text-gray-500">Gestiona tu información personal</div>
+                        </div>
+                      </button>
+                      
+                      <button
+                        className="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors flex items-center gap-3 text-gray-700"
+                        onClick={() => {
+                          setAvatarMenuOpen(false);
+                          router.push("/envios");
+                        }}
+                      >
+                        <IoIosCube className="w-5 h-5 text-[#00a19a]" />
+                        <div>
+                          <div className="font-medium">Mis pedidos</div>
+                          <div className="text-xs text-gray-500">Ver historial de compras</div>
+                        </div>
+                      </button>
+                      
+                      <button
+                        className="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors flex items-center gap-3 text-gray-700"
+                        onClick={() => {
+                          setAvatarMenuOpen(false);
+                          router.push("/tienda/carrito");
+                        }}
+                      >
+                        <IoIosCart className="w-5 h-5 text-[#00a19a]" />
+                        <div>
+                          <div className="font-medium">Mi carrito</div>
+                          <div className="text-xs text-gray-500">Productos guardados</div>
+                        </div>
+                      </button>
+                      
+                      <hr className="my-2 border-gray-100" />
+                      
+                      <button
+                        className="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors flex items-center gap-3 text-gray-700"
+                        onClick={() => {
+                          setAvatarMenuOpen(false);
+                          router.push("/admin");
+                        }}
+                      >
+                        <FiSettings className="w-5 h-5 text-[#00a19a]" />
+                        <div>
+                          <div className="font-medium">Panel de administración</div>
+                          <div className="text-xs text-gray-500">Gestión de la tienda</div>
+                        </div>
+                      </button>
+                      
+                      <hr className="my-2 border-gray-100" />
+                      
+                      <button
+                        className="w-full text-left px-4 py-3 hover:bg-red-50 transition-colors flex items-center gap-3 text-red-600"
+                        onClick={async () => {
+                          setAvatarMenuOpen(false);
+                          await supabase.auth.signOut();
+                          router.push("/");
+                        }}
+                      >
+                        <IoMdLogOut className="w-5 h-5" />
+                        <div>
+                          <div className="font-medium">Cerrar sesión</div>
+                          <div className="text-xs text-red-500">Salir de tu cuenta</div>
+                        </div>
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -449,6 +526,22 @@ export default function TopbarTienda() {
           </div>
         </div>
       )}
+      {/* Agregar estilos de animación */}
+      <style jsx global>{`
+        .animate-fade-in {
+          animation: fadeIn 0.2s ease-out;
+        }
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(-10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+      `}</style>
     </div>
   );
 }

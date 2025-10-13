@@ -3,7 +3,7 @@ import {
   ClerkProvider,
 } from "@clerk/nextjs";
 import { Geist, Geist_Mono } from "next/font/google";
-import "~/styles/globals.css";
+import "../styles/globals.css";
 
 import { ToastProvider } from "~/components/ui/use-toast";
 import SyncUser from "../components/SyncUser";

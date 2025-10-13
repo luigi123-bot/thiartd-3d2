@@ -7,7 +7,6 @@ import { ShoppingCart } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import CreateProductModal from "./CreateProductModal";
-import { createClient } from "@supabase/supabase-js";
 
 const categorias = [
   "Figuras",
@@ -62,119 +61,54 @@ function useCarrito() {
   return ctx;
 }
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
-const supabase = createClient(supabaseUrl, supabaseKey);
-
 function CarritoProvider({ children }: { children: React.ReactNode }) {
   const [carrito, setCarrito] = useState<CarritoItem[]>([]);
-  const [sincronizado, setSincronizado] = useState(false);
 
-  // Cargar carrito desde Supabase SIEMPRE al iniciar (y luego sincronizar localStorage)
+  // Cargar carrito desde localStorage al iniciar
   useEffect(() => {
-    void (async () => {
-      const { data } = await supabase.from("carrito").select("*");
-      if (data && Array.isArray(data)) {
-        type SupabaseCarritoItem = {
-          producto_id: string;
-          nombre: string;
-          precio: number;
-          imagen: string;
-          cantidad: number;
-          stock?: number;
-          categoria: string;
-          destacado: boolean;
-        };
-        const carritoSupabase: CarritoItem[] = (data as SupabaseCarritoItem[]).map((item) => ({
-          id: item.producto_id,
-          nombre: item.nombre,
-          precio: item.precio,
-          imagen: item.imagen,
-          cantidad: item.cantidad,
-          stock: item.stock ?? 99,
-          categoria: item.categoria,
-          destacado: item.destacado,
-        }));
-        setCarrito(carritoSupabase);
-        localStorage.setItem("carrito", JSON.stringify(carritoSupabase));
-        setSincronizado(true);
+    if (typeof window !== "undefined") {
+      const carritoLocal = localStorage.getItem("carrito");
+      if (carritoLocal) {
+        setCarrito(JSON.parse(carritoLocal) as CarritoItem[]);
       }
-    })();
+      // Escuchar cambios en localStorage (multi-tab)
+      const syncCarrito = (e: StorageEvent) => {
+        if (e.key === "carrito") {
+          setCarrito(e.newValue ? (JSON.parse(e.newValue) as CarritoItem[]) : []);
+        }
+      };
+      window.addEventListener("storage", syncCarrito);
+      return () => window.removeEventListener("storage", syncCarrito);
+    }
   }, []);
 
-  // Sincroniza localStorage cada vez que cambia el carrito (después de la primera carga)
+  // Sincroniza localStorage cada vez que cambia el carrito
   useEffect(() => {
-    if (sincronizado) {
+    if (typeof window !== "undefined") {
       localStorage.setItem("carrito", JSON.stringify(carrito));
     }
-  }, [carrito, sincronizado]);
+  }, [carrito]);
 
-  // Añadir producto con validación de stock y guardar en Supabase
+  // Añadir producto con validación de stock y guardar en localStorage
   const addToCarrito = async (producto: CarritoItem) => {
-    // 1. Leer el carrito actual de Supabase para evitar condiciones de carrera
-    const { data: dataActual } = await supabase.from("carrito").select("*");
-    type SupabaseCarritoItem = {
-      producto_id: string;
-      nombre: string;
-      precio: number;
-      imagen: string;
-      cantidad: number;
-      stock?: number;
-      categoria: string;
-      destacado: boolean;
-    };
-    let carritoActual: CarritoItem[] = [];
-    if (dataActual && Array.isArray(dataActual)) {
-      carritoActual = (dataActual as SupabaseCarritoItem[]).map((item) => ({
-        id: item.producto_id,
-        nombre: item.nombre,
-        precio: item.precio,
-        imagen: item.imagen,
-        cantidad: item.cantidad,
-        stock: item.stock ?? 99,
-        categoria: item.categoria,
-        destacado: item.destacado,
-      }));
-    }
-
+    const nuevoCarrito = [...carrito];
+    const idx = nuevoCarrito.findIndex((p) => p.id === producto.id);
     let added = false;
-    let nuevoCarrito: CarritoItem[] = [];
-    const idx = carritoActual.findIndex((p) => p.id === producto.id);
-    if (idx >= 0) {
-      if (carritoActual[idx] && carritoActual[idx].cantidad < carritoActual[idx].stock) {
-        nuevoCarrito = [...carritoActual];
-        if (nuevoCarrito[idx]) {
-          nuevoCarrito[idx].cantidad += 1;
-        }
+    if (idx >= 0 && nuevoCarrito[idx]) {
+      if (nuevoCarrito[idx].cantidad < nuevoCarrito[idx].stock) {
+        nuevoCarrito[idx].cantidad += 1;
         added = true;
-      } else {
-        nuevoCarrito = carritoActual;
       }
     } else {
       if (producto.stock > 0) {
-        nuevoCarrito = [...carritoActual, { ...producto, cantidad: 1 }];
+        nuevoCarrito.push({ ...producto, cantidad: 1 });
         added = true;
-      } else {
-        nuevoCarrito = carritoActual;
       }
     }
-
-    // 2. Guardar en Supabase
     if (added) {
-      const prod = nuevoCarrito.find((p) => p.id === producto.id);
-      await supabase.from("carrito").upsert({
-        producto_id: producto.id,
-        nombre: producto.nombre,
-        imagen: producto.imagen,
-        precio: producto.precio,
-        cantidad: prod?.cantidad ?? 1,
-        categoria: producto.categoria,
-        destacado: producto.destacado,
-      });
-      // 3. Actualizar el estado local y localStorage con el carrito actualizado
       setCarrito(nuevoCarrito);
       localStorage.setItem("carrito", JSON.stringify(nuevoCarrito));
-      console.log("Producto guardado en carrito:", producto);
+      console.log("Producto guardado en carrito (localStorage):", producto);
     }
     return added;
   };
