@@ -19,6 +19,7 @@ import SupabaseAuth from "~/components/SupabaseAuth";
 import { UserCircle } from "lucide-react";
 import Image from "next/image";
 import { Button } from "~/components/ui/button";
+import { Truck } from "lucide-react";
 
 const MENU = [
   { href: "/admin/productos", label: "Productos", icon: FiBox },
@@ -308,6 +309,13 @@ export default function AdminTopbar() {
             >
               <FiHome className="w-5 h-5" />
               Ir a la tienda
+            </Link>
+            <Link
+              href="/admin/tracking"
+              className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors"
+            >
+              <Truck className="w-5 h-5 text-gray-600" />
+              <span>Tracking de Envíos</span>
             </Link>
           </div>
         </nav>

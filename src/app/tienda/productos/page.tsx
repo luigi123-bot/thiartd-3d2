@@ -3,7 +3,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription} from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
-import { ShoppingCart } from "lucide-react";
+import { ShoppingCart, X, Filter } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import CreateProductModal from "./CreateProductModal";
@@ -154,6 +154,7 @@ function ProductosTiendaPageInner() {
   });
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
+  const [mostrarFiltros, setMostrarFiltros] = useState(false);
   const router = useRouter();
   const { carrito, addToCarrito } = useCarrito();
 
@@ -218,8 +219,19 @@ function ProductosTiendaPageInner() {
 
   // Usa el contexto de carrito
   return (
-    <div className="bg-white min-h-screen px-8 py-8">
-      {/* Botón para abrir modal */}
+    <div className="bg-white min-h-screen px-4 md:px-8 py-8">
+      {/* Botón flotante para mostrar filtros en móvil */}
+      <button
+        className={`fixed left-4 top-1/2 transform -translate-y-1/2 bg-[#00a19a] text-white p-3 rounded-full shadow-lg hover:bg-[#007973] transition-all z-50 flex items-center justify-center lg:hidden ${
+          mostrarFiltros ? "rotate-45" : "rotate-0"
+        }`}
+        onClick={() => setMostrarFiltros(!mostrarFiltros)}
+        aria-label={mostrarFiltros ? "Cerrar filtros" : "Abrir filtros"}
+      >
+        {mostrarFiltros ? <X className="w-6 h-6" /> : <Filter className="w-6 h-6" />}
+      </button>
+      
+      {/* Modal para crear producto */}
       <div className="flex justify-end mb-6">
         <Button
           onClick={() => setModalOpen(true)}
@@ -239,62 +251,94 @@ function ProductosTiendaPageInner() {
       <p className="mb-8 text-gray-500 text-lg">
         Explora nuestra colección de productos 3D en diferentes tamaños
       </p>
-      <div className="flex gap-8">
+      <div className="flex flex-col lg:flex-row gap-8">
         {/* Filtros */}
-        <aside className="w-64 min-w-[220px]">
-          <Card className="mb-6">
+        <aside
+          className={`w-full lg:w-64 min-w-[220px] bg-white lg:bg-transparent lg:relative lg:translate-x-0 lg:shadow-none lg:transition-none ${
+            mostrarFiltros ? "fixed top-0 left-0 w-full h-full bg-white z-40 p-4 shadow-lg overflow-y-auto" : "hidden lg:block"
+          }`}
+        >
+          <div className="flex justify-between items-center mb-4 lg:hidden">
+            <h2 className="text-xl font-bold">Filtros</h2>
+            <button
+              className="text-gray-500 hover:text-gray-800"
+              onClick={() => setMostrarFiltros(false)}
+              aria-label="Cerrar filtros"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
+          <Card className="mb-6 bg-gradient-to-br from-[#00a19a] to-[#007973] text-white shadow-lg hover:shadow-xl transition-shadow">
             <CardHeader>
-              <CardTitle className="text-lg">Categorías</CardTitle>
+              <CardTitle className="text-lg font-bold">Categorías</CardTitle>
             </CardHeader>
-            <CardContent className="flex flex-col gap-1">
+            <CardContent className="flex flex-col gap-2">
               {categorias.map((cat) => (
-                <label key={cat} className="flex items-center gap-2 text-gray-700">
+                <label
+                  key={cat}
+                  className={`flex items-center gap-2 cursor-pointer hover:scale-105 transition-transform ${
+                    filtros.categoria.includes(cat) ? "bg-[#007973] text-white rounded-lg px-2 py-1" : ""
+                  }`}
+                >
                   <input
                     type="checkbox"
+                    className="accent-blue-500 w-4 h-4" // Cambiado a azul
                     checked={filtros.categoria.includes(cat)}
                     onChange={() => handleCheckbox("categoria", cat)}
                   />
-                  {cat}
+                  <span className="text-sm">{cat}</span>
                 </label>
               ))}
             </CardContent>
           </Card>
-          <Card className="mb-6">
+          <Card className="mb-6 bg-gradient-to-br from-[#00a19a] to-[#007973] text-white shadow-lg hover:shadow-xl transition-shadow">
             <CardHeader>
-              <CardTitle className="text-lg">Tamaño</CardTitle>
+              <CardTitle className="text-lg font-bold">Tamaño</CardTitle>
             </CardHeader>
-            <CardContent className="flex flex-col gap-1">
+            <CardContent className="flex flex-col gap-2">
               {tamanos.map((t) => (
-                <label key={t} className="flex items-center gap-2 text-gray-700">
+                <label
+                  key={t}
+                  className={`flex items-center gap-2 cursor-pointer hover:scale-105 transition-transform ${
+                    filtros.tamano.includes(t) ? "bg-[#007973] text-white rounded-lg px-2 py-1" : ""
+                  }`}
+                >
                   <input
                     type="checkbox"
+                    className="accent-blue-500 w-4 h-4" // Cambiado a azul
                     checked={filtros.tamano.includes(t)}
                     onChange={() => handleCheckbox("tamano", t)}
                   />
-                  {t}
+                  <span className="text-sm">{t}</span>
                 </label>
               ))}
             </CardContent>
           </Card>
-          <Card className="mb-6">
+          <Card className="mb-6 bg-gradient-to-br from-[#00a19a] to-[#007973] text-white shadow-lg hover:shadow-xl transition-shadow">
             <CardHeader>
-              <CardTitle className="text-lg">Precio</CardTitle>
+              <CardTitle className="text-lg font-bold">Precio</CardTitle>
             </CardHeader>
-            <CardContent className="flex flex-col gap-1">
+            <CardContent className="flex flex-col gap-2">
               {rangosPrecio.map((r) => (
-                <label key={r.label} className="flex items-center gap-2 text-gray-700">
+                <label
+                  key={r.label}
+                  className={`flex items-center gap-2 cursor-pointer hover:scale-105 transition-transform ${
+                    filtros.precio.includes(r.label) ? "bg-[#007973] text-white rounded-lg px-2 py-1" : ""
+                  }`}
+                >
                   <input
                     type="checkbox"
+                    className="accent-blue-500 w-4 h-4" // Cambiado a azul
                     checked={filtros.precio.includes(r.label)}
                     onChange={() => handleCheckbox("precio", r.label)}
                   />
-                  {r.label}
+                  <span className="text-sm">{r.label}</span>
                 </label>
               ))}
             </CardContent>
           </Card>
           <Button
-            className="w-full mt-2"
+            className="w-full mt-2 bg-[#007973] text-white font-bold py-2 rounded-lg hover:bg-[#005f5a] transition-colors"
             variant="secondary"
             onClick={limpiarFiltros}
           >
@@ -408,5 +452,3 @@ function ProductosTiendaPageInner() {
     </div>
   );
 }
-
-// --- CarritoProvider, useCarrito, showToast, etc. ---

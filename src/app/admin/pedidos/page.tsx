@@ -27,12 +27,22 @@ interface DatosContacto {
 interface Pedido {
   id: number;
   cliente_id: string;
-  direccion?: string;
   estado: string;
   created_at: string;
   total: number;
+  subtotal?: number;
+  costo_envio?: number;
   productos: string;
   datos_contacto?: string;
+  // Información de envío
+  direccion_envio?: string;
+  ciudad_envio?: string;
+  departamento_envio?: string;
+  codigo_postal_envio?: string;
+  telefono_envio?: string;
+  notas_envio?: string;
+  payment_id?: string;
+  payment_method?: string;
 }
 
 export default function AdminPedidosPage() {
@@ -65,11 +75,12 @@ export default function AdminPedidosPage() {
           <table className="w-full text-sm border">
             <thead>
               <tr className="bg-gray-100">
-                {/* <th className="p-2">ID</th> <-- Eliminado */}
                 <th className="p-2">Cliente</th>
-                <th className="p-2">Dirección</th>
+                <th className="p-2">Ciudad de envío</th>
                 <th className="p-2">Estado</th>
                 <th className="p-2">Fecha</th>
+                <th className="p-2">Subtotal</th>
+                <th className="p-2">Envío</th>
                 <th className="p-2">Total</th>
                 <th className="p-2">Acción</th>
               </tr>
@@ -104,12 +115,15 @@ export default function AdminPedidosPage() {
                 
                 return (
                   <tr key={p.id} className="border-b">
-                    {/* <td className="p-2">{p.id}</td> <-- Eliminado */}
                     <td className="p-2">{datosContactoObj.nombre ?? p.cliente_id}</td>
-                    <td className="p-2">{p.direccion ?? "-"}</td>
+                    <td className="p-2">
+                      {p.ciudad_envio ? `${p.ciudad_envio}, ${p.departamento_envio}` : "-"}
+                    </td>
                     <td className="p-2 font-bold">{p.estado}</td>
                     <td className="p-2">{p.created_at?.slice(0, 19).replace("T", " ")}</td>
-                    <td className="p-2">${Number(p.total).toFixed(2)}</td>
+                    <td className="p-2">${Number(p.subtotal ?? p.total).toFixed(2)}</td>
+                    <td className="p-2">${Number(p.costo_envio ?? 0).toFixed(2)}</td>
+                    <td className="p-2 font-bold">${Number(p.total).toFixed(2)}</td>
                     <td className="p-2">
                       <Button size="sm" variant="secondary" onClick={() => setDetallePedido(p)}>
                         Ver detalle
@@ -127,53 +141,108 @@ export default function AdminPedidosPage() {
           </table>
         )}
       </Card>
+      
       {/* Modal de detalle de pedido */}
       <Dialog open={!!detallePedido} onOpenChange={v => !v && setDetallePedido(null)}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Detalle del pedido</DialogTitle>
+            <DialogTitle>Detalle del pedido #{detallePedido?.id}</DialogTitle>
           </DialogHeader>
           {detallePedido && (
-            <div>
-              <div className="mb-2 font-semibold">Cliente: {(() => {
-                let datosContactoObj: DatosContacto = {};
-                if (typeof detallePedido.datos_contacto === "string") {
-                  try {
-                    const parsed = JSON.parse(detallePedido.datos_contacto) as unknown;
-                    datosContactoObj = typeof parsed === "object" && parsed !== null ? parsed as DatosContacto : {};
-                  } catch {
-                    datosContactoObj = {};
-                  }
-                } else if (typeof detallePedido.datos_contacto === "object" && detallePedido.datos_contacto !== null) {
-                  datosContactoObj = detallePedido.datos_contacto as DatosContacto;
-                }
-                return datosContactoObj.nombre ?? detallePedido.cliente_id;
-              })()}</div>
-              <div className="mb-2">Dirección: {detallePedido.direccion ?? "-"}</div>
-              <div className="mb-2">Estado: <b>{detallePedido.estado}</b></div>
-              <div className="mb-2">Fecha: {detallePedido.created_at?.slice(0, 19).replace("T", " ")}</div>
-              <div className="mb-2">Total: ${Number(detallePedido.total).toFixed(2)}</div>
-              <div className="mb-2 font-semibold">Productos:</div>
-              <ul className="text-sm ml-2">
-                {(typeof detallePedido.productos === "string"
-                  ? (() => { 
-                      try { 
-                        const parsed = JSON.parse(detallePedido.productos) as unknown;
-                        return Array.isArray(parsed) ? parsed as Producto[] : [];
-                      } catch { 
-                        return []; 
-                      } 
-                    })()
-                  : Array.isArray(detallePedido.productos)
-                  ? detallePedido.productos as Producto[]
-                  : []
-                ).map((prod: Producto, idx: number) => (
-                  <li key={idx} className="mb-1">
-                    <b>{prod.titulo ?? prod.nombre ?? prod.producto_id}</b>
-                    {prod.descripcion && <span className="ml-2 text-gray-500">({prod.descripcion})</span>}
-                  </li>
-                ))}
-              </ul>
+            <div className="space-y-4">
+              {/* Información del cliente */}
+              <div>
+                <h3 className="font-semibold mb-2">Información del cliente</h3>
+                <div className="bg-gray-50 p-3 rounded">
+                  <div>Cliente: {(() => {
+                    let datosContactoObj: DatosContacto = {};
+                    if (typeof detallePedido.datos_contacto === "string") {
+                      try {
+                        const parsed = JSON.parse(detallePedido.datos_contacto) as unknown;
+                        datosContactoObj = typeof parsed === "object" && parsed !== null ? parsed as DatosContacto : {};
+                      } catch {
+                        datosContactoObj = {};
+                      }
+                    } else if (typeof detallePedido.datos_contacto === "object" && detallePedido.datos_contacto !== null) {
+                      datosContactoObj = detallePedido.datos_contacto as DatosContacto;
+                    }
+                    return datosContactoObj.nombre ?? detallePedido.cliente_id;
+                  })()}</div>
+                  <div>Email: {(() => {
+                    let datosContactoObj: DatosContacto = {};
+                    if (typeof detallePedido.datos_contacto === "string") {
+                      try {
+                        const parsed = JSON.parse(detallePedido.datos_contacto) as unknown;
+                        datosContactoObj = typeof parsed === "object" && parsed !== null ? parsed as DatosContacto : {};
+                      } catch {
+                        datosContactoObj = {};
+                      }
+                    }
+                    return datosContactoObj.email ?? "-";
+                  })()}</div>
+                  <div>Teléfono: {detallePedido.telefono_envio ?? "-"}</div>
+                </div>
+              </div>
+
+              {/* Información de envío */}
+              <div>
+                <h3 className="font-semibold mb-2">Información de envío</h3>
+                <div className="bg-gray-50 p-3 rounded">
+                  <div>Dirección: {detallePedido.direccion_envio ?? "-"}</div>
+                  <div>Ciudad: {detallePedido.ciudad_envio ?? "-"}</div>
+                  <div>Departamento: {detallePedido.departamento_envio ?? "-"}</div>
+                  <div>Código postal: {detallePedido.codigo_postal_envio ?? "-"}</div>
+                  {detallePedido.notas_envio && (
+                    <div>Notas: {detallePedido.notas_envio}</div>
+                  )}
+                </div>
+              </div>
+
+              {/* Información del pedido */}
+              <div>
+                <h3 className="font-semibold mb-2">Información del pedido</h3>
+                <div className="bg-gray-50 p-3 rounded">
+                  <div>Estado: <span className="font-bold">{detallePedido.estado}</span></div>
+                  <div>Fecha: {detallePedido.created_at?.slice(0, 19).replace("T", " ")}</div>
+                  <div>Subtotal: ${Number(detallePedido.subtotal ?? detallePedido.total).toFixed(2)}</div>
+                  <div>Costo de envío: ${Number(detallePedido.costo_envio ?? 0).toFixed(2)}</div>
+                  <div>Total: <span className="font-bold">${Number(detallePedido.total).toFixed(2)}</span></div>
+                  {detallePedido.payment_method && (
+                    <div>Método de pago: {detallePedido.payment_method}</div>
+                  )}
+                  {detallePedido.payment_id && (
+                    <div>ID de transacción: {detallePedido.payment_id}</div>
+                  )}
+                </div>
+              </div>
+
+              {/* Productos */}
+              <div>
+                <h3 className="font-semibold mb-2">Productos</h3>
+                <ul className="text-sm ml-2 space-y-1">
+                  {(typeof detallePedido.productos === "string"
+                    ? (() => { 
+                        try { 
+                          const parsed = JSON.parse(detallePedido.productos) as unknown;
+                          return Array.isArray(parsed) ? parsed as Producto[] : [];
+                        } catch { 
+                          return []; 
+                        } 
+                      })()
+                    : Array.isArray(detallePedido.productos)
+                    ? detallePedido.productos as Producto[]
+                    : []
+                  ).map((prod: Producto, idx: number) => (
+                    <li key={idx} className="bg-gray-50 p-2 rounded">
+                      <div className="font-bold">{prod.titulo ?? prod.nombre ?? prod.producto_id}</div>
+                      <div>Cantidad: {prod.cantidad}</div>
+                      <div>Precio unitario: ${prod.precio_unitario}</div>
+                      <div>Total: ${(prod.cantidad * prod.precio_unitario).toFixed(2)}</div>
+                      {prod.descripcion && <div className="text-gray-600">({prod.descripcion})</div>}
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </div>
           )}
           <DialogFooter>

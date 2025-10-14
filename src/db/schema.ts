@@ -45,7 +45,49 @@ export const pedidos = pgTable("pedidos", {
   productos: text("productos"),
   total: numeric("total", { precision: 10, scale: 2 }),
   estado: varchar("estado", { length: 30 }),
-  direccion: text("direccion"), // <-- Agregado
+  direccion: text("direccion"),
   datos_contacto: text("datos_contacto"),
+  // Información de envío detallada
+  direccion_envio: text("direccion_envio"),
+  ciudad_envio: varchar("ciudad_envio", { length: 100 }),
+  departamento_envio: varchar("departamento_envio", { length: 100 }),
+  codigo_postal_envio: varchar("codigo_postal_envio", { length: 20 }),
+  telefono_envio: varchar("telefono_envio", { length: 20 }),
+  notas_envio: text("notas_envio"),
+  costo_envio: numeric("costo_envio", { precision: 10, scale: 2 }).default("0"),
+  // Información de pago
+  payment_id: varchar("payment_id", { length: 100 }),
+  payment_method: varchar("payment_method", { length: 50 }),
+  // Tracking de envío
+  numero_tracking: varchar("numero_tracking", { length: 100 }),
+  empresa_envio: varchar("empresa_envio", { length: 50 }),
+  fecha_estimada_entrega: timestamp("fecha_estimada_entrega"),
+  fecha_real_entrega: timestamp("fecha_real_entrega"),
+  created_at: timestamp("created_at").defaultNow(),
+  updated_at: timestamp("updated_at").defaultNow(),
+});
+
+// Nueva tabla para el historial de estados
+export const historial_envios = pgTable("historial_envios", {
+  id: serial("id").primaryKey(),
+  pedido_id: integer("pedido_id").references(() => pedidos.id).notNull(),
+  estado: varchar("estado", { length: 50 }).notNull(),
+  descripcion: text("descripcion"),
+  ubicacion: varchar("ubicacion", { length: 200 }),
+  fecha: timestamp("fecha").defaultNow(),
+  notificado_cliente: boolean("notificado_cliente").default(false),
+  created_at: timestamp("created_at").defaultNow(),
+});
+
+// Nueva tabla para notificaciones
+export const notificaciones = pgTable("notificaciones", {
+  id: serial("id").primaryKey(),
+  usuario_id: uuid("usuario_id"),
+  pedido_id: integer("pedido_id").references(() => pedidos.id),
+  tipo: varchar("tipo", { length: 50 }).notNull(), // 'email', 'push', 'sms'
+  titulo: varchar("titulo", { length: 200 }).notNull(),
+  mensaje: text("mensaje").notNull(),
+  enviado: boolean("enviado").default(false),
+  fecha_envio: timestamp("fecha_envio"),
   created_at: timestamp("created_at").defaultNow(),
 });

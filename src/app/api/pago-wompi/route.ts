@@ -1,23 +1,35 @@
 import { NextResponse } from "next/server";
-import crypto from "crypto";
 
-interface WompiPaymentRequest {
-  amount_in_cents: number;
+
+interface WompiPaymentLinkRequest {
+  name: string;
+  description: string;
+  single_use: boolean;
+  collect_shipping: boolean;
   currency: string;
-  customer_email: string;
-  reference: string;
+  amount_in_cents: number;
   redirect_url?: string;
+  customer_data?: {
+    phone_number?: string;
+    full_name?: string;
+  };
 }
 
-interface WompiPaymentResponse {
+interface WompiPaymentLinkResponse {
   data?: {
     id: string;
     permalink: string;
-    status: string;
+    name: string;
+    description: string;
+    amount_in_cents: number;
+    currency: string;
   };
   error?: {
-    code: string;
-    message: string;
+    type: string;
+    reason: string;
+    code?: string;
+    message?: string;
+    messages?: Record<string, string[]>;
   };
 }
 
@@ -26,55 +38,115 @@ interface PaymentRequestBody {
   customer_email: string;
   reference: string;
   redirect_url?: string;
+  customer_name?: string;
+  customer_phone?: string;
 }
 
 export async function POST(req: Request) {
   try {
-    const body = (await req.json()) as PaymentRequestBody;
-    const {
-      amount,
-      customer_email,
-      reference,
-      redirect_url = `${req.headers.get("origin")}/payment/success`,
+    // Verificar que las variables de entorno estén configuradas
+    const wompiPublicKey = process.env.NEXT_PUBLIC_WOMPI_PUBLIC_KEY;
+
+    if (!wompiPublicKey) {
+      console.error("NEXT_PUBLIC_WOMPI_PUBLIC_KEY no está configurada");
+      return NextResponse.json(
+        { error: "Configuración de Wompi incompleta - clave pública" },
+        { status: 500 }
+      );
+    }
+
+    const body = await req.json() as PaymentRequestBody;
+    const { 
+      amount, 
+      customer_email, 
+      reference, 
+      redirect_url,
+      customer_name,
+      customer_phone
     } = body;
 
-    const wompiPayload: WompiPaymentRequest = {
-      amount_in_cents: Math.round(amount * 100),
+    // Validaciones
+    if (!amount || amount <= 0) {
+      return NextResponse.json(
+        { error: "El monto debe ser mayor a 0" },
+        { status: 400 }
+      );
+    }
+
+    if (!customer_email || !reference) {
+      return NextResponse.json(
+        { error: "Email del cliente y referencia son obligatorios" },
+        { status: 400 }
+      );
+    }
+
+    // Convertir a centavos (Wompi maneja centavos)
+    const amountInCents = Math.round(amount * 100);
+
+    // Crear link de pago en lugar de transacción directa
+    const wompiPayload: WompiPaymentLinkRequest = {
+      name: `Pedido Thiart3D - ${reference}`,
+      description: `Compra en Thiart3D - Ref: ${reference}`,
+      single_use: true,
+      collect_shipping: false,
       currency: "COP",
-      customer_email,
-      reference,
-      redirect_url,
+      amount_in_cents: amountInCents,
+      redirect_url: redirect_url ?? `${req.headers.get('origin')}/tienda/pago-exitoso`,
     };
 
-    // Crear hash de integridad
-    const integrityString = `${reference}${wompiPayload.amount_in_cents}${wompiPayload.currency}${process.env.WOMPI_INTEGRITY_SECRET!}`;
-    const integrity = crypto.createHash("sha256").update(integrityString).digest("hex");
+    // Agregar datos adicionales del cliente si están disponibles
+    if (customer_name || customer_phone) {
+      wompiPayload.customer_data = {
+        full_name: customer_name,
+        phone_number: customer_phone,
+      };
+    }
 
-    const response = await fetch("https://production.wompi.co/v1/transactions", {
+    console.log("Enviando a Wompi (Payment Link):", {
+      payload: wompiPayload,
+      publicKey: wompiPublicKey,
+    });
+
+    // Usar el endpoint de payment links de Wompi - PRODUCCIÓN
+    const response = await fetch("https://production.wompi.co/v1/payment_links", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.WOMPI_PUBLIC_KEY!}`,
-        "X-Integrity-Signature": integrity,
+        "Authorization": `Bearer ${wompiPublicKey}`,
       },
       body: JSON.stringify(wompiPayload),
     });
 
-    const data = (await response.json()) as WompiPaymentResponse;
+    const data = await response.json() as WompiPaymentLinkResponse;
+
+    console.log("Respuesta de Wompi:", {
+      status: response.status,
+      data
+    });
 
     if (!response.ok || data.error) {
+      const errorMessage = data.error?.reason ?? data.error?.message ?? "Error desconocido al procesar el pago";
+      
       return NextResponse.json(
-        { error: data.error?.message ?? "Error al procesar el pago" },
+        { 
+          error: errorMessage,
+          wompi_error: data.error,
+          type: data.error?.type
+        },
         { status: response.status }
       );
     }
 
-    return NextResponse.json({
+    return NextResponse.json({ 
       payment_id: data.data?.id,
       permalink: data.data?.permalink,
-      status: data.data?.status,
+      name: data.data?.name,
+      description: data.data?.description,
+      amount: data.data?.amount_in_cents ? data.data.amount_in_cents / 100 : amount,
     });
+
   } catch (error: unknown) {
+    console.error("Error en pago-wompi:", error);
     const errorMessage = error instanceof Error ? error.message : "Error inesperado";
     return NextResponse.json(
       { error: `Error al procesar pago: ${errorMessage}` },
