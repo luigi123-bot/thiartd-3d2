@@ -102,15 +102,17 @@ export default function TrackingAdminPage() {
       void fetchHistorial();
 
       // Pre-llenar formulario con datos existentes
+      const fechaEntrega = pedidoSeleccionado.fecha_estimada_entrega 
+        ? new Date(pedidoSeleccionado.fecha_estimada_entrega).toISOString().split('T')[0]
+        : "";
+        
       setFormTracking({
         estado: pedidoSeleccionado.estado,
         descripcion: "",
         ubicacion: "",
         numero_tracking: pedidoSeleccionado.numero_tracking ?? "",
         empresa_envio: pedidoSeleccionado.empresa_envio ?? "",
-        fecha_estimada_entrega: pedidoSeleccionado.fecha_estimada_entrega 
-          ? new Date(pedidoSeleccionado.fecha_estimada_entrega).toISOString().split('T')[0]
-          : ""
+        fecha_estimada_entrega: fechaEntrega ?? ""
       });
     }
   }, [pedidoSeleccionado]);
@@ -175,7 +177,7 @@ export default function TrackingAdminPage() {
 
   const getEstadoInfo = (estado: string): EstadoInfo => {
     const estadoEncontrado = estadosEnvio.find(e => e.value === estado);
-    return estadoEncontrado ?? estadosEnvio[0];
+    return estadoEncontrado ?? estadosEnvio[0]!;
   };
 
   const getContactInfo = (datosContacto: string): { nombre?: string; email?: string } => {
