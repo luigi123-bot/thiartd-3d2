@@ -19,6 +19,7 @@ export const products = pgTable("productos_3d", {
   featured: boolean("featured").default(false),             // Opcional (default false)
   details: text("details"),                                 // Opcional
   image_url: text("image_url"),                             // Opcional
+  model_url: text("model_url"),                             // Opcional - URL del modelo 3D (GLB/GLTF)
   user_id: uuid("user_id").references(() => usuario.id).notNull(), // OBLIGATORIO
 });
 

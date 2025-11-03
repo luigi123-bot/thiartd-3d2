@@ -6,6 +6,7 @@ import { Input } from "~/components/ui/input";
 import { ShoppingCart, X, Filter } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import CreateProductModal from "./CreateProductModal";
 
 const categorias = [
@@ -33,6 +34,7 @@ type Product = {
   precio: number;
   destacado: boolean;
   stock: number;
+  image_url?: string;
   // agrega aquí otros campos si tu producto tiene más propiedades
 };
 
@@ -378,15 +380,25 @@ function ProductosTiendaPageInner() {
                 const stockDisponible = producto.stock - cantidadEnCarrito;
                 return (
                   <Card key={producto.id} className="relative flex flex-col">
-                    <div className="h-48 flex items-center justify-center bg-gray-200 rounded-t-xl">
-                      <span className="text-gray-400 text-4xl">🖼️</span>
+                    <div className="h-48 flex items-center justify-center bg-gray-100 rounded-t-xl relative overflow-hidden">
+                      {producto.image_url ? (
+                        <Image
+                          src={producto.image_url}
+                          alt={producto.nombre}
+                          fill
+                          className="object-cover"
+                          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                        />
+                      ) : (
+                        <span className="text-gray-400 text-4xl">🖼️</span>
+                      )}
                       {producto.destacado && (
-                        <span className="absolute top-3 right-3 bg-black text-white text-xs px-3 py-1 rounded-full font-semibold">
+                        <span className="absolute top-3 right-3 bg-black text-white text-xs px-3 py-1 rounded-full font-semibold z-10">
                           Destacado
                         </span>
                       )}
                       {producto.stock === 0 && (
-                        <span className="absolute top-3 left-3 bg-red-600 text-white text-xs px-3 py-1 rounded-full font-semibold">
+                        <span className="absolute top-3 left-3 bg-red-600 text-white text-xs px-3 py-1 rounded-full font-semibold z-10">
                           Agotado
                         </span>
                       )}
@@ -413,7 +425,7 @@ function ProductosTiendaPageInner() {
                               id: producto.id,
                               nombre: producto.nombre,
                               precio: producto.precio,
-                              imagen: "/Logo%20Thiart%20Tiktok.png",
+                              imagen: producto.image_url ?? "/Logo%20Thiart%20Tiktok.png",
                               cantidad: cantidadEnCarrito,
                               stock: producto.stock,
                               categoria: producto.categoria,

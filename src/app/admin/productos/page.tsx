@@ -27,6 +27,7 @@ interface Producto {
   stock: number;
   precio: number;
   destacado: boolean;
+  image_url?: string;
 }
 
 export default function AdminProductosPage() {
@@ -239,8 +240,8 @@ export default function AdminProductosPage() {
                   {/* Imagen centrada */}
                   <div className="flex items-center justify-center w-full mb-4">
                     <Image
-                      src="/Logo%20Thiart%20Tiktok.png"
-                      alt="Logo producto"
+                      src={producto.image_url ?? "/Logo%20Thiart%20Tiktok.png"}
+                      alt={producto.nombre}
                       width={120}
                       height={120}
                       className="object-cover w-24 h-24 rounded-xl shadow"
