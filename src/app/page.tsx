@@ -16,33 +16,35 @@ export default function Home() {
 	return (
 		<div className="min-h-screen bg-[#007973]">
 			<TopbarTienda /> {/* Renderiza el Topbar aquí */}
+			
 			{/* Hero Section */}
-			<section className="flex flex-col md:flex-row items-center justify-between px-12 py-20 bg-gradient-to-br from-white to-[#e0f2f1]">
-				<div className="max-w-xl">
-					<h1 className="text-6xl font-extrabold mb-4 text-[#007973]">Thiart3D</h1>
-					<p className="text-xl text-gray-600 mb-8">
+			<section className="flex flex-col lg:flex-row items-center justify-between px-4 sm:px-6 md:px-8 lg:px-12 py-10 sm:py-12 md:py-16 lg:py-20 bg-gradient-to-br from-white to-[#e0f2f1]">
+				<div className="max-w-xl w-full lg:w-1/2 text-center lg:text-left mb-8 lg:mb-0">
+					<h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold mb-3 md:mb-4 text-[#007973]">
+						Thiart3D
+					</h1>
+					<p className="text-base sm:text-lg md:text-xl text-gray-600 mb-6 md:mb-8 px-4 lg:px-0">
 						Descubre nuestros productos 3D únicos y personalizados. Arte
 						tridimensional para todos los gustos y espacios.
 					</p>
-					<div className="flex gap-4">
-						<button className="bg-[#009688] text-white px-6 py-3 rounded font-semibold hover:bg-[#007973] transition">
+					<div className="flex flex-col sm:flex-row gap-3 md:gap-4 justify-center lg:justify-start px-4 lg:px-0">
+						<button className="bg-[#009688] text-white px-5 py-2.5 md:px-6 md:py-3 rounded font-semibold hover:bg-[#007973] transition text-sm md:text-base w-full sm:w-auto">
 							Ver Productos
 						</button>
-						<button className="border border-[#009688] text-[#009688] px-6 py-3 rounded font-semibold hover:bg-[#e0f2f1] transition">
+						<button className="border border-[#009688] text-[#009688] px-5 py-2.5 md:px-6 md:py-3 rounded font-semibold hover:bg-[#e0f2f1] transition text-sm md:text-base w-full sm:w-auto">
 							Personalizar Producto
 						</button>
 					</div>
 				</div>
-				<div className="w-full md:w-1/2 flex justify-center mt-10 md:mt-0">
-					{/* Icono grande */}
-					<div className="bg-[#e0f2f1] rounded-xl flex items-center justify-center w-96 h-96 shadow">
-						{/* Usa tu ícono aquí */}
+				<div className="w-full lg:w-1/2 flex justify-center mt-8 lg:mt-0">
+					{/* Icono grande - responsive */}
+					<div className="bg-[#e0f2f1] rounded-xl flex items-center justify-center w-64 h-64 sm:w-80 sm:h-80 lg:w-96 lg:h-96 shadow">
 						<svg
-							width="160"
-							height="160"
+							className="w-24 h-24 sm:w-32 sm:h-32 lg:w-40 lg:h-40"
 							fill="none"
 							stroke="#007973"
 							strokeWidth="8"
+							viewBox="0 0 160 160"
 						>
 							<rect x="40" y="40" width="80" height="80" rx="12" />
 							<path d="M40 80h80M80 40v80" />
@@ -50,18 +52,19 @@ export default function Home() {
 					</div>
 				</div>
 			</section>
+			
 			{/* Categorías */}
-			<section className="bg-[#e0f2f1] py-16">
-				<div className="text-center mb-12">
-					<h2 className="text-5xl font-extrabold mb-2 text-[#007973]">
+			<section className="bg-[#e0f2f1] py-10 sm:py-12 md:py-16">
+				<div className="text-center mb-8 md:mb-12 px-4">
+					<h2 className="text-3xl sm:text-4xl md:text-5xl font-extrabold mb-2 text-[#007973]">
 						Nuestras Categorías
 					</h2>
-					<p className="text-xl text-gray-600">
+					<p className="text-base sm:text-lg md:text-xl text-gray-600">
 						Explora nuestra variedad de productos 3D en diferentes tamaños y
 						estilos
 					</p>
 				</div>
-				<div className="flex flex-wrap justify-center gap-8 px-4 ">
+				<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 md:gap-8 px-4 sm:px-6 md:px-8 max-w-7xl mx-auto">
 					{/* Tarjeta de categoría */}
 					{[
 						{
@@ -83,45 +86,61 @@ export default function Home() {
 					].map((cat, i) => (
 						<div
 							key={i}
-							className="bg-white rounded-xl shadow p-8 w-72 flex flex-col items-center border border-[#b2dfdb]"
+							className="bg-white rounded-xl shadow p-6 md:p-8 flex flex-col items-center border border-[#b2dfdb] hover:shadow-lg transition-shadow"
 						>
-							<div className="bg-[#b2dfdb] rounded-full p-4 mb-4">
+							<div className="bg-[#b2dfdb] rounded-full p-3 md:p-4 mb-3 md:mb-4">
 								{/* Icono */}
 								<svg
-									width="40"
-									height="40"
+									className="w-8 h-8 md:w-10 md:h-10"
 									fill="none"
 									stroke="#007973"
 									strokeWidth="3"
+									viewBox="0 0 40 40"
 								>
 									<rect x="8" y="8" width="24" height="24" rx="6" />
 									<path d="M8 20h24M20 8v24" />
 								</svg>
 							</div>
-							<h3 className="font-bold text-2xl mb-2 text-[#007973]">{cat.title}</h3>
-							<p className="text-gray-600 text-center">{cat.desc}</p>
+							<h3 className="font-bold text-xl md:text-2xl mb-2 text-[#007973]">
+								{cat.title}
+							</h3>
+							<p className="text-sm md:text-base text-gray-600 text-center">
+								{cat.desc}
+							</p>
 						</div>
 					))}
 				</div>
 			</section>
+			
 			{/* Productos Destacados */}
-			<section className="py-16 bg-white">
-				<div className="text-center mb-12">
-					<h2 className="text-5xl font-extrabold mb-2 text-[#007973]">
+			<section className="py-10 sm:py-12 md:py-16 bg-white">
+				<div className="text-center mb-8 md:mb-12 px-4">
+					<h2 className="text-3xl sm:text-4xl md:text-5xl font-extrabold mb-2 text-[#007973]">
 						Productos Destacados
 					</h2>
-					<p className="text-xl text-gray-600">
+					<p className="text-base sm:text-lg md:text-xl text-gray-600">
 						Descubre nuestros productos más populares y valorados
 					</p>
 				</div>
 				<ProductosCarrusel soloDestacados />
 			</section>
-			<Button onClick={() => setModalOpen(true)} className="fixed bottom-8 right-8 z-50 bg-[#007973] text-white">
-				Contáctanos
+			
+			{/* Botones flotantes - responsive */}
+			<Button 
+				onClick={() => setModalOpen(true)} 
+				className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 md:bottom-8 md:right-8 z-50 bg-[#007973] text-white text-sm md:text-base px-4 py-2 md:px-6 md:py-3 shadow-lg hover:shadow-xl transition-shadow"
+			>
+				<span className="hidden sm:inline">Contáctanos</span>
+				<span className="sm:hidden">Contacto</span>
 			</Button>
 			<ContactModal open={modalOpen} onOpenChangeAction={setModalOpen} />
-			<Button onClick={() => setUsuariosModalOpen(true)} className="fixed bottom-8 left-8 z-50 bg-blue-700 text-white">
-				Gestionar usuarios y roles
+			
+			<Button 
+				onClick={() => setUsuariosModalOpen(true)} 
+				className="fixed bottom-4 left-4 sm:bottom-6 sm:left-6 md:bottom-8 md:left-8 z-50 bg-blue-700 text-white text-sm md:text-base px-4 py-2 md:px-6 md:py-3 shadow-lg hover:shadow-xl transition-shadow"
+			>
+				<span className="hidden lg:inline">Gestionar usuarios y roles</span>
+				<span className="lg:hidden">Usuarios</span>
 			</Button>
 			<UsuariosAdminModal open={usuariosModalOpen} onOpenChange={setUsuariosModalOpen} />
 		</div>

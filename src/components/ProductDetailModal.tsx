@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { Star, BadgeDollarSign, Pencil, X, Info } from "lucide-react";
+import { Star, BadgeDollarSign, Pencil, X, Info, Video } from "lucide-react";
 import { useRef, useEffect } from "react";
 
 interface ProductDetailModalProps {
@@ -13,6 +13,7 @@ interface ProductDetailModalProps {
     stock: number;
     precio: number;
     destacado?: boolean;
+    video_url?: string;
   } | null;
   getStockColor: (stock: number) => string;
   onEditImage?: () => void;
@@ -147,6 +148,26 @@ export function ProductDetailModal({
                 <Info className="w-3 h-3" /> {producto?.tamano}
               </span>
             </div>
+
+            {/* Video del producto */}
+            {producto?.video_url && (
+              <div className="mt-4 space-y-2">
+                <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                  <Video className="w-4 h-4 text-indigo-600" />
+                  <span>Video del producto</span>
+                </div>
+                <div className="rounded-xl overflow-hidden border-2 border-gray-200 shadow-md">
+                  <video
+                    controls
+                    className="w-full h-auto max-h-64 bg-black"
+                    src={producto.video_url}
+                  >
+                    Tu navegador no soporta la reproducción de videos.
+                  </video>
+                </div>
+              </div>
+            )}
+
             <div className="flex flex-wrap items-center gap-4 mt-2">
               <span className="inline-block px-5 py-2 rounded-full text-base font-bold shadow-inner border border-yellow-300 bg-yellow-100 text-yellow-900 animate-fadeInStock">
                 Stock:{" "}

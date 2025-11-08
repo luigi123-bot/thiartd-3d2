@@ -290,53 +290,55 @@ export default function PersonalizarPage() {
 	return (
 		<div className="bg-white min-h-screen flex flex-col">
 			{/* Header */}
-			<header className="py-12 px-4 text-center">
-				<h1 className="text-4xl md:text-5xl font-extrabold mb-3">Crea tu Producto Personalizado</h1>
-				<p className="text-lg text-gray-600 max-w-2xl mx-auto">
+			<header className="py-6 sm:py-8 md:py-12 px-4 text-center">
+				<h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extrabold mb-2 sm:mb-3">Crea tu Producto Personalizado</h1>
+				<p className="text-sm sm:text-base md:text-lg text-gray-600 max-w-2xl mx-auto px-2">
 					Diseñamos y fabricamos productos 3D únicos según tus especificaciones. Cuéntanos tu idea y la haremos realidad.
 				</p>
 			</header>
 
 			{/* Tabs */}
-			<div className="flex justify-center mb-8">
+			<div className="flex justify-center mb-6 sm:mb-8 px-4">
 				<div className="inline-flex bg-gray-100 rounded-full p-1">
 					<button
-						className={`px-6 py-2 rounded-full font-semibold transition ${tab === "nuevo" ? "bg-black text-white shadow" : "text-gray-700"}`}
+						className={`px-4 sm:px-6 py-1.5 sm:py-2 rounded-full text-sm sm:text-base font-semibold transition ${tab === "nuevo" ? "bg-black text-white shadow" : "text-gray-700"}`}
 						onClick={() => setTab("nuevo")}
 					>
-						Nuevo Diseño
+						<span className="hidden xs:inline">Nuevo Diseño</span>
+						<span className="xs:hidden">Nuevo</span>
 					</button>
 					<button
-						className={`px-6 py-2 rounded-full font-semibold transition ${tab === "modificar" ? "bg-black text-white shadow" : "text-gray-700"}`}
+						className={`px-4 sm:px-6 py-1.5 sm:py-2 rounded-full text-sm sm:text-base font-semibold transition ${tab === "modificar" ? "bg-black text-white shadow" : "text-gray-700"}`}
 						onClick={() => setTab("modificar")}
 					>
-						Modificar Existente
+						<span className="hidden xs:inline">Modificar Existente</span>
+						<span className="xs:hidden">Modificar</span>
 					</button>
 				</div>
 			</div>
 
 			{/* Formulario */}
 			<main className="flex-1 flex flex-col items-center px-4">
-				<div className="w-full max-w-2xl bg-white rounded-2xl shadow p-8 mb-12">
-					<h2 className="text-2xl font-bold mb-6 text-center">
+				<div className="w-full max-w-2xl bg-white rounded-xl sm:rounded-2xl shadow p-4 sm:p-6 md:p-8 mb-8 sm:mb-12">
+					<h2 className="text-lg sm:text-xl md:text-2xl font-bold mb-4 sm:mb-6 text-center">
 						{tab === "nuevo" ? "Solicitud de Nuevo Diseño" : "Modificar Producto Existente"}
 					</h2>
-					<form className="flex flex-col gap-5" onSubmit={handleSubmit}>
-						<div className="flex flex-col md:flex-row gap-4">
-							<Input placeholder="Nombre" className="rounded-lg" required />
-							<Input placeholder="Correo electrónico" type="email" className="rounded-lg" required />
+					<form className="flex flex-col gap-3 sm:gap-4 md:gap-5" onSubmit={handleSubmit}>
+						<div className="flex flex-col xs:flex-row gap-3 sm:gap-4">
+							<Input placeholder="Nombre" className="rounded-lg text-sm sm:text-base" required />
+							<Input placeholder="Correo electrónico" type="email" className="rounded-lg text-sm sm:text-base" required />
 						</div>
-						<Input placeholder="Título del proyecto" className="rounded-lg" required />
+						<Input placeholder="Título del proyecto" className="rounded-lg text-sm sm:text-base" required />
 
 						{/* Selector de tamaño */}
 						<div>
-							<div className="mb-2 font-medium">Tamaño</div>
-							<div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+							<div className="mb-2 text-sm sm:text-base font-medium">Tamaño</div>
+							<div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3">
 								{SIZES.map((s) => (
 									<button
 										type="button"
 										key={s.value}
-										className={`rounded-xl border-2 p-4 flex flex-col items-center transition font-semibold ${
+										className={`rounded-lg sm:rounded-xl border-2 p-2 sm:p-3 md:p-4 flex flex-col items-center transition font-semibold text-xs sm:text-sm ${
 											size === s.value
 												? "border-black bg-gray-100 shadow"
 												: "border-gray-200 bg-white hover:border-black"
@@ -344,19 +346,19 @@ export default function PersonalizarPage() {
 										onClick={() => setSize(s.value)}
 									>
 										<span>{s.label}</span>
-										<span className="text-xs text-gray-500">{s.desc}</span>
+										<span className="text-[10px] sm:text-xs text-gray-500">{s.desc}</span>
 									</button>
 								))}
 							</div>
 						</div>
 
 						{/* Material, color, acabado */}
-						<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+						<div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
 							<div>
-								<label htmlFor="material-select" className="block mb-1 font-medium">Material</label>
+								<label htmlFor="material-select" className="block mb-1 text-xs sm:text-sm font-medium">Material</label>
 								<select
 									id="material-select"
-									className="w-full border rounded-lg px-3 py-2"
+									className="w-full border rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-sm sm:text-base"
 									value={material}
 									onChange={e => setMaterial(e.target.value)}
 								>
@@ -364,10 +366,10 @@ export default function PersonalizarPage() {
 								</select>
 							</div>
 							<div>
-								<label htmlFor="color-select" className="block mb-1 font-medium">Color</label>
+								<label htmlFor="color-select" className="block mb-1 text-xs sm:text-sm font-medium">Color</label>
 								<select
 									id="color-select"
-									className="w-full border rounded-lg px-3 py-2"
+									className="w-full border rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-sm sm:text-base"
 									value={color}
 									onChange={e => setColor(e.target.value)}
 								>
@@ -375,10 +377,10 @@ export default function PersonalizarPage() {
 								</select>
 							</div>
 							<div>
-								<label htmlFor="acabado-select" className="block mb-1 font-medium">Acabado</label>
+								<label htmlFor="acabado-select" className="block mb-1 text-xs sm:text-sm font-medium">Acabado</label>
 								<select
 									id="acabado-select"
-									className="w-full border rounded-lg px-3 py-2"
+									className="w-full border rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-sm sm:text-base"
 									value={acabado}
 									onChange={e => setAcabado(e.target.value)}
 								>
@@ -389,21 +391,21 @@ export default function PersonalizarPage() {
 
 						{/* Descripción */}
 						<div>
-							<label className="block mb-1 font-medium">Descripción del Proyecto</label>
+							<label className="block mb-1 text-xs sm:text-sm font-medium">Descripción del Proyecto</label>
 							<textarea
-								className="w-full border rounded-lg px-3 py-2 min-h-[100px]"
+								className="w-full border rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-sm sm:text-base min-h-[80px] sm:min-h-[100px]"
 								placeholder="Describe tu idea, detalles, medidas, funcionalidades, etc."
 								required
 							/>
 						</div>
 
 						{/* Presupuesto y plazo */}
-						<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+						<div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
 							<div>
-								<label htmlFor="presupuesto-select" className="block mb-1 font-medium">Presupuesto aproximado</label>
+								<label htmlFor="presupuesto-select" className="block mb-1 text-xs sm:text-sm font-medium">Presupuesto aproximado</label>
 								<select
 									id="presupuesto-select"
-									className="w-full border rounded-lg px-3 py-2"
+									className="w-full border rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-sm sm:text-base"
 									value={presupuesto}
 									onChange={e => setPresupuesto(e.target.value)}
 								>
@@ -411,10 +413,10 @@ export default function PersonalizarPage() {
 								</select>
 							</div>
 							<div>
-								<label htmlFor="plazo-select" className="block mb-1 font-medium">Plazo de entrega deseado</label>
+								<label htmlFor="plazo-select" className="block mb-1 text-xs sm:text-sm font-medium">Plazo de entrega deseado</label>
 								<select
 									id="plazo-select"
-									className="w-full border rounded-lg px-3 py-2"
+									className="w-full border rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-sm sm:text-base"
 									value={plazo}
 									onChange={e => setPlazo(e.target.value)}
 								>
@@ -423,21 +425,21 @@ export default function PersonalizarPage() {
 							</div>
 						</div>
 
-						<Button type="submit" className="w-full mt-4 rounded-lg font-semibold" disabled={loading}>
+						<Button type="submit" className="w-full mt-3 sm:mt-4 rounded-lg font-semibold text-sm sm:text-base" disabled={loading}>
 							{loading ? "Enviando..." : "Enviar solicitud"}
 						</Button>
-						{mensaje && <div className="text-green-600 text-center mt-2">{mensaje}</div>}
+						{mensaje && <div className="text-green-600 text-center mt-2 text-sm sm:text-base">{mensaje}</div>}
 					</form>
 				</div>
 
 				{/* FAQ */}
-				<section className="w-full max-w-3xl mb-16">
-					<h3 className="text-xl font-bold mb-4 text-center">Preguntas Frecuentes</h3>
-					<div className="grid md:grid-cols-2 gap-4">
+				<section className="w-full max-w-3xl mb-12 sm:mb-16">
+					<h3 className="text-lg sm:text-xl font-bold mb-3 sm:mb-4 text-center">Preguntas Frecuentes</h3>
+					<div className="grid sm:grid-cols-2 gap-3 sm:gap-4">
 						{FAQS.map((faq, idx) => (
-							<div key={idx} className="bg-gray-100 rounded-xl p-5 shadow-sm">
-								<div className="font-semibold mb-2">{faq.q}</div>
-								<div className="text-gray-600">{faq.a}</div>
+							<div key={idx} className="bg-gray-100 rounded-lg sm:rounded-xl p-4 sm:p-5 shadow-sm">
+								<div className="font-semibold mb-2 text-sm sm:text-base">{faq.q}</div>
+								<div className="text-gray-600 text-xs sm:text-sm">{faq.a}</div>
 							</div>
 						))}
 					</div>
@@ -445,19 +447,19 @@ export default function PersonalizarPage() {
 			</main>
 			{/* Modal de pago */}
 			<Dialog open={showPago} onOpenChange={setShowPago}>
-				<DialogContent>
+				<DialogContent className="w-[calc(100%-2rem)] sm:max-w-md mx-auto">
 					<DialogHeader>
-						<DialogTitle>Pago de Personalización</DialogTitle>
+						<DialogTitle className="text-base sm:text-lg">Pago de Personalización</DialogTitle>
 					</DialogHeader>
-					<div className="text-center py-4">
-						<div className="text-2xl font-bold mb-2">Total: $0</div>
-						<div className="mb-4 text-gray-600">Por ahora, la personalización es gratuita para pruebas.</div>
-						<Button className="w-full" onClick={handlePagar} disabled={loading}>
+					<div className="text-center py-3 sm:py-4">
+						<div className="text-xl sm:text-2xl font-bold mb-2">Total: $0</div>
+						<div className="mb-3 sm:mb-4 text-xs sm:text-sm text-gray-600">Por ahora, la personalización es gratuita para pruebas.</div>
+						<Button className="w-full text-sm sm:text-base" onClick={handlePagar} disabled={loading}>
 							{loading ? "Procesando..." : "Finalizar compra"}
 						</Button>
 					</div>
 					<DialogFooter>
-						<Button variant="secondary" onClick={() => setShowPago(false)} disabled={loading}>
+						<Button variant="secondary" className="text-sm sm:text-base" onClick={() => setShowPago(false)} disabled={loading}>
 							Cancelar
 						</Button>
 					</DialogFooter>
@@ -466,64 +468,64 @@ export default function PersonalizarPage() {
 
 			{/* Chat flotante */}
 			<button
-				className="fixed bottom-8 right-8 bg-black text-white rounded-full p-4 shadow-lg hover:bg-gray-800 z-[9999]"
+				className="fixed bottom-4 right-4 sm:bottom-8 sm:right-8 bg-black text-white rounded-full p-3 sm:p-4 shadow-lg hover:bg-gray-800 z-[9999]"
 				onClick={() => setChatOpen(true)}
 				title="Chatea con nosotros"
 			>
-				<FiSend className="text-2xl" />
+				<FiSend className="text-lg sm:text-2xl" />
 			</button>
 			{chatOpen && (
 				<div
-					className="fixed bottom-24 right-8 w-80 bg-white rounded-xl shadow-lg border flex flex-col z-[9999] chat-float"
+					className="fixed bottom-16 right-4 sm:bottom-24 sm:right-8 w-[calc(100%-2rem)] xs:w-80 bg-white rounded-xl shadow-lg border flex flex-col z-[9999] chat-float h-[400px] sm:h-auto"
 				>
-					<div className="flex items-center justify-between p-3 border-b flex-shrink-0">
-						<div className="font-bold text-lg flex items-center gap-2">
-							<FiSend /> Chat Personalización
+					<div className="flex items-center justify-between p-2 sm:p-3 border-b flex-shrink-0">
+						<div className="font-bold text-sm sm:text-base lg:text-lg flex items-center gap-2">
+							<FiSend /> <span className="hidden xs:inline">Chat Personalización</span><span className="xs:hidden">Chat</span>
 						</div>
-						<button onClick={() => setChatOpen(false)} className="p-1 rounded hover:bg-gray-100" title="Cerrar chat">
+						<button onClick={() => setChatOpen(false)} className="p-1 rounded hover:bg-gray-100 text-xl sm:text-2xl" title="Cerrar chat">
 							×
 						</button>
 					</div>
 					{/* Área de mensajes con scroll */}
 					<div
-						className="flex-1 overflow-y-auto chat-messages-area"
+						className="flex-1 overflow-y-auto chat-messages-area p-2 sm:p-3"
 					>
-						<div className="flex flex-col gap-2">
+						<div className="flex flex-col gap-1.5 sm:gap-2">
 							{mensajes.map((m, idx) => (
 								<div
 									key={idx}
 									className={`flex ${m.remitente === "cliente" ? "justify-end" : "justify-start"}`}
 								>
 									<div
-										className={`rounded-lg px-4 py-2 text-sm max-w-[70%] ${
+										className={`rounded-lg px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm max-w-[80%] sm:max-w-[70%] ${
 											m.remitente === "cliente"
 												? "bg-black text-white rounded-br-none"
 												: "bg-gray-100 text-gray-900 rounded-bl-none"
 										}`}
 									>
 										{m.texto}
-										<div className="text-xs text-gray-400 text-right mt-1">{m.hora}</div>
+										<div className="text-[10px] sm:text-xs text-gray-400 text-right mt-1">{m.hora}</div>
 									</div>
 								</div>
 							))}
 						</div>
 					</div>
 					{/* Input fijo abajo */}
-					<form className="flex items-center gap-2 p-3 border-t flex-shrink-0" onSubmit={enviarMensaje}>
+					<form className="flex items-center gap-2 p-2 sm:p-3 border-t flex-shrink-0" onSubmit={enviarMensaje}>
 						<input
 							type="text"
-							className="border rounded px-3 py-2 w-full"
+							className="border rounded px-2 sm:px-3 py-1.5 sm:py-2 w-full text-xs sm:text-sm"
 							placeholder="Escribe un mensaje..."
 							value={nuevoMensaje}
 							onChange={e => setNuevoMensaje(e.target.value)}
 						/>
 						<button
 							type="submit"
-							className="bg-black text-white rounded-full p-2 hover:bg-gray-800"
+							className="bg-black text-white rounded-full p-1.5 sm:p-2 hover:bg-gray-800 flex-shrink-0"
 							disabled={!nuevoMensaje.trim()}
 							title="Enviar mensaje"
 						>
-							<FiSend />
+							<FiSend className="text-sm sm:text-base" />
 						</button>
 					</form>
 				</div>

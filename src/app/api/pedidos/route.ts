@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+// Usar service_role key para bypass RLS policies
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 interface ProductoPedido {
@@ -31,7 +32,7 @@ interface PedidoRequestBody {
   cliente_id: string;
   productos: ProductoPedido[];
   total: number;
-  subtotal: number;
+  subtotal?: number; // Opcional, no se usa en la BD
   costo_envio: number;
   estado: string;
   datos_contacto: DatosContacto;
@@ -43,7 +44,6 @@ interface PedidoInserted {
   cliente_id: string;
   productos: string;
   total: number;
-  subtotal?: number;
   estado: string;
   datos_contacto: string;
   direccion_envio: string;
@@ -71,7 +71,7 @@ export async function POST(req: Request) {
       cliente_id, 
       productos, 
       total, 
-      subtotal, 
+      // subtotal ya no existe en la tabla
       costo_envio,
       estado, 
       datos_contacto,
@@ -82,11 +82,46 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Faltan campos obligatorios." }, { status: 400 });
     }
 
+    // Verificar si el usuario existe en la tabla usuario, si no, crearlo
+    const { data: usuarioExistente } = await supabase
+      .from("usuario")
+      .select("id")
+      .eq("id", cliente_id)
+      .single();
+
+    if (!usuarioExistente) {
+      console.log("Usuario no existe en tabla 'usuario', creándolo...");
+      // Obtener datos del usuario de Supabase Auth
+      const { data: authUser } = await supabase.auth.admin.getUserById(cliente_id);
+      
+      if (authUser?.user) {
+        const userMetadata = authUser.user.user_metadata as { nombre?: string } | undefined;
+        const nombreUsuario = userMetadata?.nombre ?? authUser.user.email?.split('@')[0] ?? 'Usuario';
+        
+        const { error: insertUserError } = await supabase
+          .from("usuario")
+          .insert([{
+            id: cliente_id,
+            email: authUser.user.email ?? '',
+            nombre: nombreUsuario,
+            password: '', // Password vacío porque usa Supabase Auth
+            role: 'user'
+          }]);
+        
+        if (insertUserError) {
+          console.error("Error creando usuario:", insertUserError);
+          // Continuar de todas formas, el pedido es más importante
+        } else {
+          console.log("✅ Usuario creado en tabla 'usuario'");
+        }
+      }
+    }
+
     const insertData = {
       cliente_id,
       productos: JSON.stringify(productos),
       total,
-      subtotal,
+      // REMOVIDO: subtotal (no existe en la tabla)
       estado,
       datos_contacto: JSON.stringify(datos_contacto ?? {}),
       // Información de envío detallada
@@ -119,8 +154,28 @@ export async function POST(req: Request) {
   }
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    const { searchParams } = new URL(req.url);
+    const pedidoId = searchParams.get("id");
+
+    // Si hay un ID específico, buscar ese pedido
+    if (pedidoId) {
+      const { data, error } = await supabase
+        .from("pedidos")
+        .select("*")
+        .eq("id", pedidoId)
+        .single<Record<string, unknown>>();
+
+      if (error) {
+        const supabaseError = error as SupabaseError;
+        return NextResponse.json({ error: supabaseError.message }, { status: 500 });
+      }
+
+      return NextResponse.json({ pedido: data });
+    }
+
+    // Si no hay ID, devolver todos los pedidos
     const { data, error } = await supabase
       .from("pedidos")
       .select("*")
@@ -131,9 +186,70 @@ export async function GET() {
       return NextResponse.json({ error: supabaseError.message }, { status: 500 });
     }
 
-    return NextResponse.json({ pedidos: data });
+    return NextResponse.json({ pedidos: data as Record<string, unknown>[] });
   } catch (err) {
     console.error("Error obteniendo pedidos:", err);
     return NextResponse.json({ error: "Error obteniendo pedidos" }, { status: 500 });
+  }
+}
+
+export async function PATCH(req: Request) {
+  try {
+    const body = await req.json() as { 
+      pedido_id?: number; 
+      pedidoId?: number;
+      payment_id?: string; 
+      payment_method?: string;
+      estado?: string;
+    };
+    console.log("Actualizando pedido:", body);
+
+    // Aceptar tanto pedido_id como pedidoId
+    const pedidoId = body.pedido_id ?? body.pedidoId;
+    const { payment_id, payment_method, estado } = body;
+
+    if (!pedidoId) {
+      return NextResponse.json({ error: "Falta el ID del pedido" }, { status: 400 });
+    }
+
+    const updateData: { 
+      payment_id?: string; 
+      payment_method?: string;
+      estado?: string;
+      updated_at?: string;
+    } = {
+      updated_at: new Date().toISOString()
+    };
+
+    // Solo actualizar los campos que vienen en el body
+    if (payment_id) {
+      updateData.payment_id = payment_id;
+    }
+
+    if (payment_method) {
+      updateData.payment_method = payment_method;
+    }
+
+    if (estado) {
+      updateData.estado = estado;
+    }
+
+    const result = await supabase
+      .from("pedidos")
+      .update(updateData)
+      .eq("id", pedidoId)
+      .select()
+      .single();
+
+    if (result.error) {
+      console.error("Error actualizando pedido:", result.error);
+      return NextResponse.json({ error: result.error.message }, { status: 500 });
+    }
+
+    console.log("✅ Pedido actualizado:", result.data);
+    return NextResponse.json({ pedido: result.data as Record<string, unknown> });
+  } catch (err) {
+    console.error("Error en PATCH /api/pedidos:", err);
+    return NextResponse.json({ error: "Error actualizando pedido" }, { status: 500 });
   }
 }

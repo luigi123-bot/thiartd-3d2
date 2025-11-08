@@ -20,6 +20,7 @@ export const products = pgTable("productos_3d", {
   details: text("details"),                                 // Opcional
   image_url: text("image_url"),                             // Opcional
   model_url: text("model_url"),                             // Opcional - URL del modelo 3D (GLB/GLTF)
+  video_url: text("video_url"),                             // Opcional - URL del video del producto
   user_id: uuid("user_id").references(() => usuario.id).notNull(), // OBLIGATORIO
 });
 

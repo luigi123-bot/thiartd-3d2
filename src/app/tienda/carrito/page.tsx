@@ -28,24 +28,32 @@ export default function CarritoPage() {
   const [carrito, setCarrito] = useState<CarritoItem[]>([]);
   const [cuponCodigo, setCuponCodigo] = useState("");
   const [descuento, setDescuento] = useState(0);
-  const [procesandoPago, setProcesandoPago] = useState(false);
   const [usuario, setUsuario] = useState<{ id?: string; email?: string; nombre?: string } | null>(null);
+  const [cargaInicial, setCargaInicial] = useState(true);
   const router = useRouter();
   const { toast } = useToast();
 
   // Cargar carrito y usuario
   useEffect(() => {
+    console.log("🛒 Página de carrito montada");
     if (typeof window !== "undefined") {
       const carritoLocal = localStorage.getItem("carrito");
+      console.log("📦 Carrito en localStorage:", carritoLocal);
       if (carritoLocal) {
-        setCarrito(JSON.parse(carritoLocal) as CarritoItem[]);
+        const carritoParseado = JSON.parse(carritoLocal) as CarritoItem[];
+        console.log("✅ Carrito parseado:", carritoParseado);
+        setCarrito(carritoParseado);
+      } else {
+        console.log("⚠️ No hay carrito en localStorage");
       }
+      setCargaInicial(false);
     }
 
     // Obtener usuario actual
     void (async () => {
       const { data } = await supabase.auth.getUser();
       if (data?.user) {
+        console.log("👤 Usuario encontrado:", data.user.email);
         setUsuario({
           id: data.user.id,
           nombre: typeof data.user.user_metadata === "object" && data.user.user_metadata !== null
@@ -53,16 +61,19 @@ export default function CarritoPage() {
             : data.user.email,
           email: data.user.email,
         });
+      } else {
+        console.log("⚠️ No hay usuario autenticado");
       }
     })();
   }, []);
 
-  // Sincronizar localStorage cuando cambia el carrito
+  // Sincronizar localStorage cuando cambia el carrito (SOLO después de la carga inicial)
   useEffect(() => {
-    if (typeof window !== "undefined") {
+    if (!cargaInicial && typeof window !== "undefined") {
+      console.log("💾 Sincronizando carrito con localStorage:", carrito);
       localStorage.setItem("carrito", JSON.stringify(carrito));
     }
-  }, [carrito]);
+  }, [carrito, cargaInicial]);
 
   // Actualizar cantidad
   const actualizarCantidad = (id: string, nuevaCantidad: number) => {
@@ -110,110 +121,26 @@ export default function CarritoPage() {
     }
   };
 
-  // Procesar pago directo
-  const procesarPagoDirecto = async () => {
-    if (carrito.length === 0) {
-      toast({
-        title: "Carrito vacío",
-        description: "Agrega productos para continuar",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (!usuario) {
-      toast({
-        title: "Inicia sesión",
-        description: "Debes iniciar sesión para continuar con la compra",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setProcesandoPago(true);
-
-    try {
-      // Datos de ejemplo para el pedido
-      const pedidoData = {
-        cliente_id: usuario.id,
-        productos: carrito.map(prod => ({
-          nombre: prod.nombre,
-          cantidad: prod.cantidad,
-          precio_unitario: prod.precio,
-          categoria: prod.categoria
-        })),
-        subtotal,
-        costo_envio: envio,
-        total,
-        estado: "pendiente_pago",
-        datos_contacto: {
-          nombre: usuario.nombre ?? "Usuario",
-          email: usuario.email ?? "email@ejemplo.com",
-          telefono: "+57 300 123 4567",
-        },
-        datos_envio: {
-          direccion: "Dirección de ejemplo",
-          ciudad: "Bogotá",
-          departamento: "Cundinamarca",
-          codigoPostal: "110111",
-          telefono: "+57 300 123 4567",
-          notas: "",
-        }
-      };
-
-      // Crear pedido
-      const pedidoResponse = await fetch("/api/pedidos", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(pedidoData)
-      });
-
-      if (!pedidoResponse.ok) {
-        throw new Error("Error al crear el pedido");
-      }
-
-      const pedidoResult = await pedidoResponse.json() as { pedido: { id: string } };
-      
-      // Por ahora, simular pago exitoso y redirigir
-      localStorage.removeItem("carrito");
-      setCarrito([]);
-      
-      toast({
-        title: "¡Pedido creado!",
-        description: `Tu pedido #${pedidoResult.pedido.id} ha sido creado exitosamente`,
-      });
-
-      // Redirigir a página de éxito con ID del pedido
-      router.push(`/tienda/pago-exitoso?pedido=${pedidoResult.pedido.id}`);
-
-    } catch (error) {
-      console.error("Error procesando pedido:", error);
-      toast({
-        title: "Error al procesar pedido",
-        description: error instanceof Error ? error.message : "Error desconocido",
-        variant: "destructive"
-      });
-    } finally {
-      setProcesandoPago(false);
-    }
-  };
-
   // Cálculos
   const subtotal = carrito.reduce((acc, item) => acc + (item.precio * item.cantidad), 0);
   const montoDescuento = subtotal * descuento;
   const subtotalConDescuento = subtotal - montoDescuento;
-  const envio = subtotalConDescuento > 50000 ? 0 : 8000;
+  const envio = 0; // Envío gratis para testing en producción
   const total = subtotalConDescuento + envio;
+
+  // Detectar entorno de desarrollo
+  const isDevelopment = typeof window !== 'undefined' && 
+    (process.env.NODE_ENV === 'development' || window.location.hostname === 'localhost');
 
   if (carrito.length === 0) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8 px-4">
+      <div className="min-h-screen bg-gray-50 py-6 sm:py-8 px-4">
         <div className="max-w-2xl mx-auto text-center">
-          <ShoppingBag className="w-24 h-24 text-gray-300 mx-auto mb-6" />
-          <h1 className="text-3xl font-bold mb-4">Tu carrito está vacío</h1>
-          <p className="text-gray-600 mb-8">¡Agrega algunos productos increíbles a tu carrito!</p>
+          <ShoppingBag className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 text-gray-300 mx-auto mb-4 sm:mb-6" />
+          <h1 className="text-2xl sm:text-3xl font-bold mb-3 sm:mb-4">Tu carrito está vacío</h1>
+          <p className="text-sm sm:text-base text-gray-600 mb-6 sm:mb-8">¡Agrega algunos productos increíbles a tu carrito!</p>
           <Link href="/tienda/productos">
-            <Button size="lg" className="bg-[#00a19a] hover:bg-[#007973]">
+            <Button size="lg" className="bg-[#00a19a] hover:bg-[#007973] text-sm sm:text-base">
               Ver productos
             </Button>
           </Link>
@@ -223,10 +150,10 @@ export default function CarritoPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4">
+    <div className="min-h-screen bg-gray-50 py-4 sm:py-6 md:py-8 px-4">
       <div className="max-w-6xl mx-auto">
         {/* Breadcrumb */}
-        <div className="flex items-center gap-2 mb-6">
+        <div className="flex items-center gap-2 mb-4 sm:mb-6 text-sm">
           <Link href="/tienda/productos" className="text-[#00a19a] hover:underline">
             Productos
           </Link>
@@ -234,25 +161,27 @@ export default function CarritoPage() {
           <span className="font-medium">Carrito de compras</span>
         </div>
 
-        <h1 className="text-3xl font-bold mb-8">Tu carrito ({carrito.length} {carrito.length === 1 ? 'producto' : 'productos'})</h1>
+        <h1 className="text-xl sm:text-2xl md:text-3xl font-bold mb-4 sm:mb-6 md:mb-8">
+          Tu carrito ({carrito.length} {carrito.length === 1 ? 'producto' : 'productos'})
+        </h1>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 md:gap-8">
           {/* Lista de productos */}
           <div className="lg:col-span-2">
-            <Card className="p-6">
-              <div className="space-y-6">
+            <Card className="p-3 sm:p-4 md:p-6 overflow-hidden">
+              <div className="space-y-4 sm:space-y-6">
                 {carrito.map((item) => (
-                  <div key={item.id} className="flex items-center gap-4 border-b pb-6 last:border-b-0 last:pb-0">
+                  <div key={item.id} className="flex flex-col xs:flex-row items-start xs:items-center gap-3 sm:gap-4 border-b pb-4 sm:pb-6 last:border-b-0 last:pb-0">
                     {/* Imagen del producto */}
-                    <div className="w-20 h-20 bg-gray-200 rounded-lg flex items-center justify-center flex-shrink-0">
-                      <span className="text-2xl">📦</span>
+                    <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gray-200 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <span className="text-xl sm:text-2xl">📦</span>
                     </div>
 
                     {/* Información del producto */}
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-lg truncate">{item.nombre}</h3>
-                      <p className="text-sm text-gray-600">{item.categoria}</p>
-                      <p className="text-lg font-bold text-[#00a19a]">${item.precio.toFixed(0)}</p>
+                    <div className="flex-1 min-w-0 w-full xs:w-auto">
+                      <h3 className="font-semibold text-base sm:text-lg truncate">{item.nombre}</h3>
+                      <p className="text-xs sm:text-sm text-gray-600">{item.categoria}</p>
+                      <p className="text-base sm:text-lg font-bold text-[#00a19a]">${item.precio.toFixed(0)}</p>
                       {item.destacado && (
                         <span className="inline-block bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded-full mt-1">
                           Destacado
@@ -260,66 +189,70 @@ export default function CarritoPage() {
                       )}
                     </div>
 
-                    {/* Controles de cantidad */}
-                    <div className="flex items-center gap-3">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => actualizarCantidad(item.id, item.cantidad - 1)}
-                        className="w-8 h-8 p-0"
-                      >
-                        <Minus className="w-4 h-4" />
-                      </Button>
-                      
-                      <span className="w-8 text-center font-medium">{item.cantidad}</span>
-                      
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => actualizarCantidad(item.id, item.cantidad + 1)}
-                        disabled={item.cantidad >= item.stock}
-                        className="w-8 h-8 p-0"
-                      >
-                        <Plus className="w-4 h-4" />
-                      </Button>
-                    </div>
+                    {/* Controles de cantidad y acciones - Responsive */}
+                    <div className="flex items-center justify-between xs:justify-end w-full xs:w-auto gap-3">
+                      {/* Controles de cantidad */}
+                      <div className="flex items-center gap-2 sm:gap-3">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => actualizarCantidad(item.id, item.cantidad - 1)}
+                          className="w-7 h-7 sm:w-8 sm:h-8 p-0"
+                        >
+                          <Minus className="w-3 h-3 sm:w-4 sm:h-4" />
+                        </Button>
+                        
+                        <span className="w-6 sm:w-8 text-center font-medium text-sm sm:text-base">{item.cantidad}</span>
+                        
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => actualizarCantidad(item.id, item.cantidad + 1)}
+                          disabled={item.cantidad >= item.stock}
+                          className="w-7 h-7 sm:w-8 sm:h-8 p-0"
+                        >
+                          <Plus className="w-3 h-3 sm:w-4 sm:h-4" />
+                        </Button>
+                      </div>
 
-                    {/* Subtotal y eliminar */}
-                    <div className="text-right">
-                      <p className="font-bold text-lg">${(item.precio * item.cantidad).toFixed(0)}</p>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => eliminarProducto(item.id)}
-                        className="text-red-600 hover:text-red-800 mt-1"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                      {/* Subtotal y eliminar */}
+                      <div className="text-right">
+                        <p className="font-bold text-base sm:text-lg">${(item.precio * item.cantidad).toFixed(0)}</p>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => eliminarProducto(item.id)}
+                          className="text-red-600 hover:text-red-800 mt-1 p-1"
+                        >
+                          <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 ))}
               </div>
 
               {/* Cupón de descuento */}
-              <div className="mt-6 pt-6 border-t">
-                <h3 className="font-semibold mb-3">Código de descuento</h3>
-                <div className="flex gap-2">
+              <div className="mt-4 sm:mt-6 pt-4 sm:pt-6 border-t">
+                <h3 className="font-semibold mb-2 sm:mb-3 text-sm sm:text-base">Código de descuento</h3>
+                <div className="flex flex-col xs:flex-row gap-2">
                   <Input
                     placeholder="Ingresa tu cupón"
                     value={cuponCodigo}
                     onChange={(e) => setCuponCodigo(e.target.value.toUpperCase())}
-                    className="flex-1"
+                    className="flex-1 text-sm sm:text-base"
                   />
                   <Button 
                     onClick={aplicarCupon}
                     variant="outline"
                     disabled={!cuponCodigo.trim()}
+                    className="text-sm sm:text-base w-full xs:w-auto"
                   >
                     Aplicar
                   </Button>
                 </div>
                 {descuento > 0 && (
-                  <p className="text-green-600 text-sm mt-2">
+                  <p className="text-green-600 text-xs sm:text-sm mt-2">
                     ✅ Cupón &ldquo;{cuponCodigo}&rdquo; aplicado ({(descuento * 100).toFixed(0)}% de descuento)
                   </p>
                 )}
@@ -328,11 +261,11 @@ export default function CarritoPage() {
           </div>
 
           {/* Resumen del pedido */}
-          <div>
-            <Card className="p-6 sticky top-8">
-              <h2 className="text-xl font-semibold mb-4">Resumen del pedido</h2>
+          <div className="lg:sticky lg:top-8">
+            <Card className="p-4 sm:p-6 overflow-hidden">
+              <h2 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4">Resumen del pedido</h2>
               
-              <div className="space-y-3 mb-6">
+              <div className="space-y-2 sm:space-y-3 mb-4 sm:mb-6 text-sm sm:text-base">
                 <div className="flex justify-between">
                   <span>Subtotal:</span>
                   <span>${subtotal.toFixed(0)}</span>
@@ -347,60 +280,61 @@ export default function CarritoPage() {
                 
                 <div className="flex justify-between">
                   <span>Envío:</span>
-                  <span className={envio === 0 ? "text-green-600" : ""}>
-                    {envio === 0 ? "Gratis" : `$${envio.toFixed(0)}`}
-                  </span>
+                  <span className="text-green-600">Gratis</span>
                 </div>
                 
                 <hr />
                 
-                <div className="flex justify-between font-bold text-lg">
+                <div className="flex justify-between font-bold text-base sm:text-lg">
                   <span>Total:</span>
                   <span className="text-[#00a19a]">${total.toFixed(0)}</span>
                 </div>
               </div>
 
-              {envio === 0 && (
-                <div className="mb-6 p-3 bg-green-50 border border-green-200 rounded-lg">
-                  <p className="text-sm text-green-700">¡Felicidades! Tu pedido califica para envío gratis</p>
+              <div className="mb-4 sm:mb-6 p-2 sm:p-3 bg-green-50 border border-green-200 rounded-lg">
+                <p className="text-xs sm:text-sm text-green-700">🎉 ¡Envío gratis en todos los pedidos!</p>
+              </div>
+
+              {/* Alerta de monto mínimo solo en producción */}
+              {!isDevelopment && total < 1500 && (
+                <div className="mb-3 sm:mb-4 p-2 sm:p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <p className="text-xs sm:text-sm text-yellow-700 font-semibold">⚠️ Monto mínimo: $1,500</p>
+                  <p className="text-xs text-yellow-600 mt-1">
+                    Agrega ${(1500 - total).toFixed(0)} más para alcanzar el monto mínimo de pago
+                  </p>
+                </div>
+              )}
+
+              {/* Alerta de modo desarrollo */}
+              {isDevelopment && (
+                <div className="mb-3 sm:mb-4 p-2 sm:p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-xs sm:text-sm text-blue-700 font-semibold">🔧 Modo Desarrollo</p>
+                  <p className="text-xs text-blue-600 mt-1">
+                    Los pedidos se aprobarán automáticamente
+                  </p>
                 </div>
               )}
 
               {/* Estado del usuario */}
               {!usuario && (
-                <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                  <p className="text-sm text-yellow-700">
+                <div className="mb-3 sm:mb-4 p-2 sm:p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <p className="text-xs sm:text-sm text-yellow-700">
                     <strong>Inicia sesión</strong> para continuar con tu compra
                   </p>
                 </div>
               )}
 
               {/* Botones de acción */}
-              <div className="space-y-3">
-                <Button 
-                  onClick={procesarPagoDirecto}
-                  disabled={procesandoPago || !usuario}
-                  className="w-full bg-[#00a19a] hover:bg-[#007973]"
-                  size="lg"
-                >
-                  {procesandoPago ? (
-                    "Procesando..."
-                  ) : (
-                    <>
-                      <CreditCard className="w-4 h-4 mr-2" />
-                      Finalizar compra ${total.toFixed(0)}
-                    </>
-                  )}
-                </Button>
-
+              <div className="space-y-2 sm:space-y-3">
                 <Button 
                   onClick={() => router.push('/tienda/checkout')}
-                  variant="outline"
-                  className="w-full"
+                  disabled={!usuario || (!isDevelopment && total < 1500)}
+                  className="w-full bg-[#00a19a] hover:bg-[#007973] text-sm sm:text-base"
                   size="lg"
                 >
-                  Checkout detallado
-                  <ArrowRight className="w-4 h-4 ml-2" />
+                  <CreditCard className="w-4 h-4 mr-2" />
+                  {(!isDevelopment && total < 1500) ? 'Monto mínimo: $1,500' : 'Continuar al pago'}
+                  {(isDevelopment || total >= 1500) && <ArrowRight className="w-4 h-4 ml-2" />}
                 </Button>
               </div>
 

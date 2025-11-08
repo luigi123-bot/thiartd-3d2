@@ -319,17 +319,13 @@ export default function AdminTopbar() {
             </Link>
           </div>
         </nav>
-        {/* Modal de login/registro */}
-        {authModalOpen && (
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40">
-            <div className="bg-white rounded-xl shadow-lg p-8 w-full max-w-md">
-              <SupabaseAuth onAuth={() => setAuthModalOpen(false)} />
-              <Button variant="secondary" className="mt-4 w-full" onClick={() => setAuthModalOpen(false)}>
-                Cerrar
-              </Button>
-            </div>
-          </div>
-        )}
+        
+        {/* Modal de autenticación usando Dialog */}
+        <SupabaseAuth 
+          open={authModalOpen} 
+          onOpenChange={setAuthModalOpen}
+          onAuth={() => setAuthModalOpen(false)} 
+        />
       </header>
       {/* Espacio para el header */}
       <div className="pt-[64px] lg:pt-[60px]" />

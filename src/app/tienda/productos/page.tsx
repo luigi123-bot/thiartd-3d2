@@ -93,25 +93,42 @@ function CarritoProvider({ children }: { children: React.ReactNode }) {
 
   // Añadir producto con validación de stock y guardar en localStorage
   const addToCarrito = async (producto: CarritoItem) => {
+    console.log("🛒 Intentando agregar producto:", producto);
+    console.log("🛒 Carrito actual:", carrito);
+    
     const nuevoCarrito = [...carrito];
     const idx = nuevoCarrito.findIndex((p) => p.id === producto.id);
     let added = false;
+    
     if (idx >= 0 && nuevoCarrito[idx]) {
+      console.log("🛒 Producto ya existe en el carrito, aumentando cantidad");
       if (nuevoCarrito[idx].cantidad < nuevoCarrito[idx].stock) {
         nuevoCarrito[idx].cantidad += 1;
         added = true;
+        console.log("✅ Cantidad aumentada a:", nuevoCarrito[idx].cantidad);
+      } else {
+        console.log("❌ No hay stock suficiente");
       }
     } else {
+      console.log("🛒 Producto nuevo, agregando al carrito");
       if (producto.stock > 0) {
         nuevoCarrito.push({ ...producto, cantidad: 1 });
         added = true;
+        console.log("✅ Producto agregado con cantidad 1");
+      } else {
+        console.log("❌ Stock es 0, no se puede agregar");
       }
     }
+    
     if (added) {
+      console.log("💾 Guardando en localStorage...");
       setCarrito(nuevoCarrito);
       localStorage.setItem("carrito", JSON.stringify(nuevoCarrito));
-      console.log("Producto guardado en carrito (localStorage):", producto);
+      console.log("✅ Carrito guardado:", JSON.parse(localStorage.getItem("carrito") ?? "[]"));
+    } else {
+      console.log("❌ No se pudo agregar el producto");
     }
+    
     return added;
   };
 
@@ -234,23 +251,26 @@ function ProductosTiendaPageInner() {
       </button>
       
       {/* Modal para crear producto */}
-      <div className="flex justify-end mb-6">
+      <div className="flex justify-end mb-4 sm:mb-6 px-4 sm:px-0">
         <Button
           onClick={() => setModalOpen(true)}
-          className="bg-[#00a19a] text-white px-5 py-2 rounded font-semibold hover:bg-[#007973] transition"
+          className="bg-[#00a19a] text-white px-4 sm:px-5 py-2 rounded font-semibold hover:bg-[#007973] transition text-sm sm:text-base"
         >
-          Añadir nuevo producto
+          <span className="hidden sm:inline">Añadir nuevo producto</span>
+          <span className="sm:hidden">Añadir</span>
         </Button>
       </div>
       <CreateProductModal open={modalOpen} onOpenChangeAction={setModalOpen} onProductCreated={fetchProductos} />
       {/* Breadcrumb */}
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex items-center gap-2 mb-4 px-4 sm:px-0 text-sm sm:text-base">
         <Link href="/" className="hover:text-black">Inicio</Link>
         <span>/</span>
         <span className="font-medium text-black">Productos</span>
       </div>
-      <h1 className="text-4xl font-extrabold mb-1 text-[#222] mt-4">Nuestros Productos</h1>
-      <p className="mb-8 text-gray-500 text-lg">
+      <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold mb-1 text-[#222] mt-4 px-4 sm:px-0">
+        Nuestros Productos
+      </h1>
+      <p className="mb-6 sm:mb-8 text-gray-500 text-base sm:text-lg px-4 sm:px-0">
         Explora nuestra colección de productos 3D en diferentes tamaños
       </p>
       <div className="flex flex-col lg:flex-row gap-8">
@@ -270,7 +290,7 @@ function ProductosTiendaPageInner() {
               <X className="w-6 h-6" />
             </button>
           </div>
-          <Card className="mb-6 bg-gradient-to-br from-[#00a19a] to-[#007973] text-white shadow-lg hover:shadow-xl transition-shadow">
+          <Card className="mb-6 bg-gradient-to-br from-[#00a19a] to-[#007973] text-white shadow-lg hover:shadow-xl transition-shadow overflow-hidden">
             <CardHeader>
               <CardTitle className="text-lg font-bold">Categorías</CardTitle>
             </CardHeader>
@@ -293,7 +313,7 @@ function ProductosTiendaPageInner() {
               ))}
             </CardContent>
           </Card>
-          <Card className="mb-6 bg-gradient-to-br from-[#00a19a] to-[#007973] text-white shadow-lg hover:shadow-xl transition-shadow">
+          <Card className="mb-6 bg-gradient-to-br from-[#00a19a] to-[#007973] text-white shadow-lg hover:shadow-xl transition-shadow overflow-hidden">
             <CardHeader>
               <CardTitle className="text-lg font-bold">Tamaño</CardTitle>
             </CardHeader>
@@ -316,7 +336,7 @@ function ProductosTiendaPageInner() {
               ))}
             </CardContent>
           </Card>
-          <Card className="mb-6 bg-gradient-to-br from-[#00a19a] to-[#007973] text-white shadow-lg hover:shadow-xl transition-shadow">
+          <Card className="mb-6 bg-gradient-to-br from-[#00a19a] to-[#007973] text-white shadow-lg hover:shadow-xl transition-shadow overflow-hidden">
             <CardHeader>
               <CardTitle className="text-lg font-bold">Precio</CardTitle>
             </CardHeader>
@@ -348,18 +368,18 @@ function ProductosTiendaPageInner() {
           </Button>
         </aside>
         {/* Productos y barra superior */}
-        <section className="flex-1">
-          <div className="flex flex-col md:flex-row md:items-center gap-4 mb-6 justify-between">
-            <div className="flex gap-2 items-center">
+        <section className="flex-1 px-4 sm:px-0">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 mb-4 sm:mb-6 justify-between">
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-2 w-full sm:w-auto">
               <Input
                 type="text"
                 placeholder="Buscar productos..."
-                className="w-64"
+                className="w-full sm:w-64 text-sm sm:text-base"
                 value={filtros.buscar}
                 onChange={handleBuscar}
               />
               <select
-                className="border rounded px-3 py-2 text-base"
+                className="border rounded px-3 py-2 text-sm sm:text-base"
                 onChange={handleDestacados}
                 value={filtros.destacados ? "Destacados" : "Todos"}
                 aria-label="Filtrar por destacados"
@@ -371,13 +391,23 @@ function ProductosTiendaPageInner() {
           </div>
           {/* Grid de productos */}
           {loading ? (
-            <div className="text-center py-12">Cargando productos...</div>
+            <div className="text-center py-12 text-sm sm:text-base">Cargando productos...</div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
               {productosFiltrados.map((producto) => {
                 const enCarrito: CarritoItem | undefined = carrito.find((p: CarritoItem) => p.id === producto.id);
                 const cantidadEnCarrito = enCarrito?.cantidad ?? 0;
                 const stockDisponible = producto.stock - cantidadEnCarrito;
+                
+                // Log de depuración para ver el estado del producto
+                console.log(`📦 Producto: ${producto.nombre}`, {
+                  id: producto.id,
+                  stock: producto.stock,
+                  cantidadEnCarrito,
+                  stockDisponible,
+                  deshabilitado: stockDisponible <= 0
+                });
+                
                 return (
                   <Card key={producto.id} className="relative flex flex-col">
                     <div className="h-48 flex items-center justify-center bg-gray-100 rounded-t-xl relative overflow-hidden">
@@ -407,18 +437,18 @@ function ProductosTiendaPageInner() {
                       <CardTitle className="font-bold text-lg mb-1">{producto.nombre}</CardTitle>
                       <CardDescription className="mb-2">{producto.desc}</CardDescription>
                     </CardHeader>
-                    <CardContent className="flex flex-col flex-1">
-                      <div className="flex gap-2 mb-2">
+                    <CardContent className="flex flex-col flex-1 p-3 sm:p-6">
+                      <div className="flex gap-2 mb-2 flex-wrap">
                         <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs font-semibold">
                           {producto.categoria}
                         </span>
                       </div>
-                      <div className="flex items-center justify-between mt-auto">
-                        <span className="font-bold text-lg">${producto.precio.toFixed(2)}</span>
+                      <div className="flex items-center justify-between mt-auto mb-3">
+                        <span className="font-bold text-base sm:text-lg">${producto.precio.toFixed(2)}</span>
                       </div>
-                      <div className="flex gap-2 mt-4">
+                      <div className="flex flex-col xs:flex-row gap-2 mt-2">
                         <Button
-                          className="flex items-center gap-2 bg-[#00a19a] text-white font-bold rounded-full px-5 py-2 hover:bg-[#007973] transition"
+                          className="flex items-center justify-center gap-2 bg-[#00a19a] text-white font-bold rounded-full px-4 sm:px-5 py-2 hover:bg-[#007973] transition text-xs sm:text-sm flex-1"
                           disabled={stockDisponible <= 0}
                           onClick={async () => {
                             const ok = await addToCarrito({
@@ -438,19 +468,21 @@ function ProductosTiendaPageInner() {
                             }
                           }}
                         >
-                          <ShoppingCart className="w-4 h-4" />
-                          Añadir
+                          <ShoppingCart className="w-3 h-3 sm:w-4 sm:h-4" />
+                          <span className="hidden xs:inline">Añadir</span>
                         </Button>
                         <Button
                           variant="outline"
+                          className="text-xs sm:text-sm px-3 sm:px-4 py-2 flex-1"
                           onClick={() => router.push(`/tienda/productos/${producto.id}`)}
                         >
-                          Ver Detalles
+                          <span className="hidden xs:inline">Ver Detalles</span>
+                          <span className="xs:hidden">Ver</span>
                         </Button>
                       </div>
                       {cantidadEnCarrito > 0 && (
-                        <div className="mt-2 text-xs text-[#00a19a] font-bold">
-                          Cantidad en carrito: {cantidadEnCarrito}
+                        <div className="mt-2 text-xs text-[#00a19a] font-bold text-center xs:text-left">
+                          En carrito: {cantidadEnCarrito}
                         </div>
                       )}
                     </CardContent>

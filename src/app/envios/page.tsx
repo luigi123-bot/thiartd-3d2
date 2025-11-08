@@ -5,6 +5,8 @@ import { Badge } from "~/components/ui/badge";
 import { createClient } from "@supabase/supabase-js";
 import { Package, Truck, CheckCircle, Clock, XCircle } from "lucide-react";
 import Link from "next/link";
+import TopbarTienda from "../tienda/componentes/TopbarTienda";
+import Footer from "~/components/Footer";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
@@ -52,19 +54,38 @@ export default function EnviosPage() {
 
   useEffect(() => {
     void (async () => {
+      console.log("🔍 Fetching user and pedidos...");
+      
       // Obtener usuario actual
       const { data } = await supabase.auth.getUser();
+      console.log("👤 User data:", data?.user?.id);
+      
       if (data?.user) {
         setUsuario({ id: data.user.id });
         
         // Obtener pedidos del usuario
-        const { data: pedidosData } = await supabase
+        console.log("📦 Fetching pedidos for user:", data.user.id);
+        const { data: pedidosData, error } = await supabase
           .from("pedidos")
           .select("*")
           .eq("cliente_id", data.user.id)
           .order("created_at", { ascending: false });
-          
-        setPedidos(pedidosData ?? []);
+        
+        console.log("📊 Pedidos response:", { pedidosData, error });
+        
+        if (error) {
+          console.error("❌ Error fetching pedidos:", error);
+        }
+        
+        if (pedidosData) {
+          console.log(`✅ Pedidos encontrados: ${pedidosData.length}`);
+          setPedidos(pedidosData);
+        } else {
+          console.warn("⚠️ No pedidos data");
+          setPedidos([]);
+        }
+      } else {
+        console.warn("⚠️ No user logged in");
       }
       setLoading(false);
     })();
@@ -72,28 +93,38 @@ export default function EnviosPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8 px-4">
-        <div className="max-w-4xl mx-auto">
-          <div className="text-center py-8">Cargando pedidos...</div>
+      <div className="min-h-screen flex flex-col">
+        <TopbarTienda />
+        <div className="flex-1 bg-gray-50 py-8 px-4">
+          <div className="max-w-4xl mx-auto">
+            <div className="text-center py-8">Cargando pedidos...</div>
+          </div>
         </div>
+        <Footer />
       </div>
     );
   }
 
   if (!usuario) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8 px-4">
-        <div className="max-w-4xl mx-auto">
-          <div className="text-center py-8">
-            <h1 className="text-2xl font-bold mb-4">Inicia sesión para ver tus pedidos</h1>
+      <div className="min-h-screen flex flex-col">
+        <TopbarTienda />
+        <div className="flex-1 bg-gray-50 py-8 px-4">
+          <div className="max-w-4xl mx-auto">
+            <div className="text-center py-8">
+              <h1 className="text-2xl font-bold mb-4">Inicia sesión para ver tus pedidos</h1>
+            </div>
           </div>
         </div>
+        <Footer />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4">
+    <div className="min-h-screen flex flex-col">
+      <TopbarTienda />
+      <div className="flex-1 bg-gray-50 py-8 px-4">
       <div className="max-w-4xl mx-auto">
         <h1 className="text-3xl font-bold mb-8">Mis pedidos</h1>
         
@@ -119,8 +150,16 @@ export default function EnviosPage() {
                 }
               }
 
-              // Nota: datosContacto se parsea pero no se usa por simplicidad del componente
-              // Podrías usarlo para mostrar información adicional si fuera necesario
+              // Parsear datos de contacto
+              let datosContacto: { nombre?: string; email?: string; telefono?: string } = {};
+              if (typeof pedido.datos_contacto === "string") {
+                try {
+                  const parsed = JSON.parse(pedido.datos_contacto) as unknown;
+                  datosContacto = typeof parsed === "object" && parsed !== null ? parsed as { nombre?: string; email?: string; telefono?: string } : {};
+                } catch {
+                  datosContacto = {};
+                }
+              }
 
               return (
                 <Card key={pedido.id} className="p-6">
@@ -174,17 +213,34 @@ export default function EnviosPage() {
                   {/* Información de envío */}
                   {pedido.direccion_envio && (
                     <div className="mt-4 pt-4 border-t">
-                      <h4 className="font-semibold mb-2">Dirección de envío</h4>
-                      <div className="text-sm text-gray-600">
-                        <div>{pedido.direccion_envio}</div>
-                        <div>{pedido.ciudad_envio}, {pedido.departamento_envio}</div>
-                        {pedido.codigo_postal_envio && <div>CP: {pedido.codigo_postal_envio}</div>}
-                        {pedido.telefono_envio && <div>Tel: {pedido.telefono_envio}</div>}
-                        {pedido.notas_envio && (
-                          <div className="mt-2 text-xs">
-                            <strong>Notas:</strong> {pedido.notas_envio}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Datos de contacto */}
+                        {datosContacto.nombre && (
+                          <div>
+                            <h4 className="font-semibold mb-2">Datos de contacto</h4>
+                            <div className="text-sm text-gray-600 space-y-1">
+                              {datosContacto.nombre && <div><strong>Nombre:</strong> {datosContacto.nombre}</div>}
+                              {datosContacto.email && <div><strong>Email:</strong> {datosContacto.email}</div>}
+                              {datosContacto.telefono && <div><strong>Teléfono:</strong> {datosContacto.telefono}</div>}
+                            </div>
                           </div>
                         )}
+                        
+                        {/* Dirección de envío */}
+                        <div>
+                          <h4 className="font-semibold mb-2">Dirección de envío</h4>
+                          <div className="text-sm text-gray-600">
+                            <div>{pedido.direccion_envio}</div>
+                            <div>{pedido.ciudad_envio}, {pedido.departamento_envio}</div>
+                            {pedido.codigo_postal_envio && <div>CP: {pedido.codigo_postal_envio}</div>}
+                            {pedido.telefono_envio && <div>Tel: {pedido.telefono_envio}</div>}
+                            {pedido.notas_envio && (
+                              <div className="mt-2 text-xs italic">
+                                <strong>Notas:</strong> {pedido.notas_envio}
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -205,6 +261,8 @@ export default function EnviosPage() {
           </div>
         )}
       </div>
+      </div>
+      <Footer />
     </div>
   );
 }

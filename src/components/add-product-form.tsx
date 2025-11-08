@@ -5,6 +5,8 @@ import { Input } from "~/components/ui/input";
 import { Button } from "~/components/ui/button";
 import { Switch } from "~/components/ui/switch";
 import { Textarea } from "~/components/ui/textarea";
+import { uploadProductVideo } from "~/lib/supabase-storage";
+import { Video, Upload, X } from "lucide-react";
 
 export interface ProductFormValues {
   nombre: string;
@@ -15,6 +17,7 @@ export interface ProductFormValues {
   categoria: string;
   destacado: boolean;
   detalles?: string;
+  video_url?: string;
 }
 
 interface AddProductFormProps {
@@ -43,21 +46,34 @@ export function AddProductForm({
     categoria: "",
     destacado: false,
     detalles: "",
+    video_url: "",
   });
   const [loading, setLoading] = useState(false);
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [uploadingVideo, setUploadingVideo] = useState(false);
+  const [videoPreview, setVideoPreview] = useState<string | null>(null);
 
   useEffect(() => {
-    if (initialValues) setForm(initialValues);
-    else setForm({
-      nombre: "",
-      descripcion: "",
-      precio: 0,
-      tamaño: "",
-      stock: 0,
-      categoria: "",
-      destacado: false,
-      detalles: "",
-    });
+    if (initialValues) {
+      setForm(initialValues);
+      if (initialValues.video_url) {
+        setVideoPreview(initialValues.video_url);
+      }
+    } else {
+      setForm({
+        nombre: "",
+        descripcion: "",
+        precio: 0,
+        tamaño: "",
+        stock: 0,
+        categoria: "",
+        destacado: false,
+        detalles: "",
+        video_url: "",
+      });
+      setVideoPreview(null);
+      setVideoFile(null);
+    }
   }, [initialValues, open]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -72,16 +88,76 @@ export function AddProductForm({
     setForm((prev) => ({ ...prev, destacado: checked }));
   };
 
+  const handleVideoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validar tipo de archivo
+      const validTypes = ['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime'];
+      if (!validTypes.includes(file.type)) {
+        alert('Por favor selecciona un archivo de video válido (MP4, WebM, OGG, MOV)');
+        return;
+      }
+      
+      // Validar tamaño (100MB)
+      if (file.size > 100 * 1024 * 1024) {
+        alert('El video es demasiado grande. Máximo 100MB');
+        return;
+      }
+
+      setVideoFile(file);
+      
+      // Crear preview
+      const objectUrl = URL.createObjectURL(file);
+      setVideoPreview(objectUrl);
+    }
+  };
+
+  const handleRemoveVideo = () => {
+    setVideoFile(null);
+    setVideoPreview(null);
+    setForm((prev) => ({ ...prev, video_url: "" }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    if (onSuccess) {
-      await onSuccess(form);
-    } else if (onSubmit) {
-      onSubmit(form);
+
+    try {
+      let videoUrl = form.video_url;
+
+      // Si hay un nuevo video, subirlo primero
+      if (videoFile) {
+        setUploadingVideo(true);
+        try {
+          // Usar un ID temporal basado en el timestamp
+          const tempId = `temp_${Date.now()}`;
+          videoUrl = await uploadProductVideo(videoFile, tempId);
+          console.log('✅ Video subido:', videoUrl);
+        } catch (error) {
+          console.error('Error subiendo video:', error);
+          alert(`Error al subir el video: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+          setLoading(false);
+          setUploadingVideo(false);
+          return;
+        }
+        setUploadingVideo(false);
+      }
+
+      const formWithVideo = { ...form, video_url: videoUrl };
+
+      if (onSuccess) {
+        await onSuccess(formWithVideo);
+      } else if (onSubmit) {
+        onSubmit(formWithVideo);
+      }
+
+      onOpenChangeAction(false);
+    } catch (error) {
+      console.error('Error en submit:', error);
+      alert('Error al procesar el formulario');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-    onOpenChangeAction(false);
   };
 
   return (
@@ -148,6 +224,63 @@ export function AddProductForm({
             value={form.detalles}
             onChange={handleChange}
           />
+
+          {/* Campo de video */}
+          <div className="space-y-3">
+            <label className="text-sm font-medium flex items-center gap-2">
+              <Video className="w-4 h-4" />
+              Video del producto (opcional)
+            </label>
+            
+            {videoPreview ? (
+              <div className="relative">
+                <video
+                  src={videoPreview}
+                  controls
+                  className="w-full h-48 object-cover rounded-lg border-2 border-gray-200"
+                >
+                  Tu navegador no soporta el elemento de video.
+                </video>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="icon"
+                  onClick={handleRemoveVideo}
+                  className="absolute top-2 right-2 h-8 w-8"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+                {videoFile && (
+                  <p className="text-xs text-gray-500 mt-2">
+                    {videoFile.name} ({(videoFile.size / 1024 / 1024).toFixed(2)} MB)
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
+                <input
+                  type="file"
+                  accept="video/mp4,video/webm,video/ogg,video/quicktime"
+                  onChange={handleVideoChange}
+                  className="hidden"
+                  id="video-upload"
+                />
+                <label
+                  htmlFor="video-upload"
+                  className="cursor-pointer flex flex-col items-center gap-2"
+                >
+                  <Upload className="w-8 h-8 text-gray-400" />
+                  <span className="text-sm text-gray-600">
+                    Click para subir video
+                  </span>
+                  <span className="text-xs text-gray-400">
+                    MP4, WebM, OGG, MOV (máx. 100MB)
+                  </span>
+                </label>
+              </div>
+            )}
+          </div>
+
           <div className="flex items-center gap-2">
             <Switch
               checked={form.destacado}
@@ -156,8 +289,17 @@ export function AddProductForm({
             />
             <label htmlFor="destacado" className="text-sm">Destacado</label>
           </div>
-          <Button type="submit" className="w-full" disabled={loading}>
-            {isEditing ? "Guardar cambios" : "Agregar producto"}
+          <Button type="submit" className="w-full" disabled={loading || uploadingVideo}>
+            {uploadingVideo ? (
+              <>
+                <Upload className="w-4 h-4 mr-2 animate-spin" />
+                Subiendo video...
+              </>
+            ) : loading ? (
+              "Procesando..."
+            ) : (
+              isEditing ? "Guardar cambios" : "Agregar producto"
+            )}
           </Button>
         </form>
       </DialogContent>

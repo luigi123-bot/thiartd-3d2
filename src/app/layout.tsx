@@ -2,7 +2,6 @@ import { type Metadata } from "next";
 import {
   ClerkProvider,
 } from "@clerk/nextjs";
-import { Geist, Geist_Mono } from "next/font/google";
 import "../styles/globals.css";
 
 import { ToastProvider } from "~/components/ui/use-toast";
@@ -10,17 +9,6 @@ import SyncUser from "../components/SyncUser";
 import Footer from "~/components/Footer";
 import { UiProvider } from "~/components/providers/UiProvider";
 import ClientChatWidgetWrapper from "~/components/ClientChatWidgetWrapper";
-
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
 
 export const metadata: Metadata = {
   title: "Thiart3D",
@@ -37,8 +25,8 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <ClerkProvider>
-      <html lang="en">
-        <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+      <html lang="en" suppressHydrationWarning>
+        <body className="antialiased font-sans">
           <SyncUser />
           <ToastProvider>
             <UiProvider>

@@ -16,7 +16,16 @@ interface Model3DProps {
 
 // Detectar el tipo de archivo por la extensión
 function getFileExtension(url: string): string {
-  return url.split('.').pop()?.toLowerCase() ?? ''
+  const extension = url.split('.').pop()?.toLowerCase() ?? ''
+  console.log('🎨 Cargando modelo 3D:', {
+    url,
+    extension,
+    tipo: extension === 'stl' ? 'STL (Stereolithography)' : 
+          extension === 'glb' ? 'GLB (GLTF Binary)' : 
+          extension === 'gltf' ? 'GLTF (GL Transmission)' : 
+          'Desconocido'
+  })
+  return extension
 }
 
 function STLModel({ url, autoRotate = false }: Model3DProps) {
@@ -31,13 +40,19 @@ function STLModel({ url, autoRotate = false }: Model3DProps) {
 
   return (
     <mesh ref={meshRef} geometry={geometry}>
-      <meshStandardMaterial color="#808080" metalness={0.3} roughness={0.4} />
+      {/* Material mejorado para STL con mejor visualización */}
+      <meshStandardMaterial 
+        color="#00a19a" 
+        metalness={0.6} 
+        roughness={0.3}
+        flatShading={false}
+      />
     </mesh>
   )
 }
 
 function GLTFModel({ url, autoRotate = false }: Model3DProps) {
-  const gltf = useGLTF(url)
+  const gltf = useGLTF(url, true) // true para usar el loader con cache
   const meshRef = useRef<THREE.Group>(null)
 
   useFrame((state, delta) => {
@@ -45,6 +60,10 @@ function GLTFModel({ url, autoRotate = false }: Model3DProps) {
       meshRef.current.rotation.y += delta * 0.3
     }
   })
+
+  if (!gltf || !gltf.scene) {
+    return null
+  }
 
   return <primitive ref={meshRef} object={gltf.scene} />
 }
@@ -60,12 +79,17 @@ function Model({ url, autoRotate = false }: Model3DProps) {
     )
   }
   
-  // Por defecto, usar GLTF para .glb y .gltf
-  return (
-    <Center>
-      <GLTFModel url={url} autoRotate={autoRotate} />
-    </Center>
-  )
+  if (extension === 'glb' || extension === 'gltf') {
+    return (
+      <Center>
+        <GLTFModel url={url} autoRotate={autoRotate} />
+      </Center>
+    )
+  }
+  
+  // Si no es un formato reconocido
+  console.error('❌ Formato no soportado:', extension)
+  throw new Error(`Formato no soportado: .${extension}. Use STL, GLB o GLTF`)
 }
 
 interface Model3DViewerProps {
@@ -102,8 +126,12 @@ export function Model3DViewer({
     <div className={`relative ${className}`}>
       {/* Canvas 3D */}
       <div 
-        className={`w-full rounded-lg overflow-hidden border border-gray-200 bg-gradient-to-b from-gray-50 to-gray-100 ${height === '400px' ? 'h-[400px]' : height === '200px' ? 'h-[200px]' : ''}`}
-        style={height !== '400px' && height !== '200px' ? { height } : undefined}
+        className={`w-full rounded-lg overflow-hidden border border-gray-200 bg-gradient-to-b from-gray-50 to-gray-100 ${
+          height === '400px' ? 'h-[400px]' : 
+          height === '200px' ? 'h-[200px]' : 
+          height === '500px' ? 'h-[500px]' :
+          height === '100%' ? 'h-full' : 'h-[400px]'
+        }`}
       >
         <Canvas
           camera={{ position: [0, 0, 5], fov: 50 }}

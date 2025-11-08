@@ -12,6 +12,7 @@ export const supabase = createClient(supabaseUrl, supabaseKey)
 export enum StorageBucket {
   PRODUCTOS = 'productos',
   MODELS = 'models',
+  VIDEOS = 'videos',
   PERSONALIZACIONES = 'personalizaciones',
   AVATARES = 'avatares',
   TICKETS = 'tickets',
@@ -36,6 +37,16 @@ const BUCKET_LIMITS = {
       'application/vnd.ms-pki.stl', // otro MIME type STL
       'model/obj',               // .obj
       'text/plain'               // algunos archivos 3D como texto
+    ]
+  },
+  [StorageBucket.VIDEOS]: { 
+    maxSize: 200 * 1024 * 1024, // 200MB
+    types: [
+      'video/mp4',
+      'video/webm',
+      'video/ogg',
+      'video/quicktime', // .mov
+      'video/x-msvideo', // .avi
     ]
   },
   [StorageBucket.PERSONALIZACIONES]: { maxSize: 50 * 1024 * 1024, types: ['model/stl', 'model/obj', 'application/octet-stream'] },
@@ -519,3 +530,68 @@ export async function optimizeImage(file: File, maxWidth = 1200): Promise<File> 
     reader.onerror = () => reject(new Error('Error al leer archivo'))
   })
 }
+
+/**
+ * Subir video de producto (público)
+ */
+export async function uploadProductVideo(file: File, productId: string): Promise<string> {
+  try {
+    console.log('📤 Iniciando upload de video:', {
+      fileName: file.name,
+      fileSize: file.size,
+      fileType: file.type,
+      productId
+    })
+
+    const validation = validateFile(file, StorageBucket.VIDEOS)
+    if (!validation.valid) {
+      console.error('❌ Validación falló:', validation.error)
+      throw new Error(validation.error)
+    }
+
+    const fileName = generateFileName(productId, file.name)
+    console.log('📝 Nombre de archivo generado:', fileName)
+    
+    const { data, error } = await supabase.storage
+      .from(StorageBucket.VIDEOS)
+      .upload(fileName, file, {
+        cacheControl: '3600',
+        upsert: false
+      })
+
+    if (error) {
+      console.error('❌ Error de Supabase Storage:', {
+        message: error.message,
+        name: error.name,
+        error: error
+      })
+      
+      if (error.message?.includes('not found')) {
+        throw new Error('El bucket "videos" no existe. Debe crearse en Supabase Storage.')
+      }
+      if (error.message?.includes('policy')) {
+        throw new Error('Faltan políticas RLS para el bucket de videos.')
+      }
+      if (error.message?.includes('size')) {
+        throw new Error('El video es demasiado grande. Máximo 100MB.')
+      }
+      
+      throw new Error(`Error al subir video: ${error.message || 'Error desconocido'}`)
+    }
+
+    console.log('✅ Video subido exitosamente:', data)
+
+    // Obtener URL pública
+    const { data: { publicUrl } } = supabase.storage
+      .from(StorageBucket.VIDEOS)
+      .getPublicUrl(fileName)
+
+    console.log('🔗 URL pública generada:', publicUrl)
+
+    return publicUrl
+  } catch (err) {
+    console.error('❌ Error crítico en uploadProductVideo:', err)
+    throw err
+  }
+}
+

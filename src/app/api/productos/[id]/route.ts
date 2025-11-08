@@ -16,6 +16,7 @@ interface ProductoBody {
   destacado?: boolean;
   image_url?: string;
   model_url?: string;
+  video_url?: string;
 }
 
 interface Producto extends ProductoBody {
