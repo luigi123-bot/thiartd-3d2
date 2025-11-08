@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { Card } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { createClient } from "@supabase/supabase-js";
-import { DetallePedidoModal } from "./DetallePedidoModal";
+import { DetallePedidoModal } from "../../../components/DetallePedidoModal";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "TU_SUPABASE_URL";
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "TU_SUPABASE_ANON_KEY";

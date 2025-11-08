@@ -18,10 +18,22 @@ export const products = pgTable("productos_3d", {
   category: varchar("category", { length: 50 }),            // Opcional
   featured: boolean("featured").default(false),             // Opcional (default false)
   details: text("details"),                                 // Opcional
-  image_url: text("image_url"),                             // Opcional
+  image_url: text("image_url"),                             // Opcional (deprecated - usar producto_imagenes)
   model_url: text("model_url"),                             // Opcional - URL del modelo 3D (GLB/GLTF)
   video_url: text("video_url"),                             // Opcional - URL del video del producto
   user_id: uuid("user_id").references(() => usuario.id).notNull(), // OBLIGATORIO
+});
+
+// Nueva tabla para múltiples imágenes por producto
+export const productoImagenes = pgTable("producto_imagenes", {
+  id: serial("id").primaryKey(),
+  producto_id: integer("producto_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
+  image_url: text("image_url").notNull(),
+  orden: integer("orden").default(0).notNull(),
+  es_portada: boolean("es_portada").default(false),
+  alt_text: varchar("alt_text", { length: 255 }),
+  created_at: timestamp("created_at").defaultNow(),
+  updated_at: timestamp("updated_at").defaultNow(),
 });
 
 export const personalizaciones = pgTable("personalizaciones", {
