@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import {  Plus, Minus, Trash2 } from "lucide-react";
+import {  Plus, Minus, Trash2 } from  "react-feather";
 
 interface CarritoProducto {
   id: number;

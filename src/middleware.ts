@@ -1,75 +1,53 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { jwtDecode } from 'jwt-decode';
+import { createClient } from '@supabase/supabase-js';
 
-interface DecodedToken {
-  role?: string;
-  user_metadata?: {
-    role?: string;
-  };
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '';
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+async function getUserRoleFromDB(userId: string): Promise<string | null> {
+  const { data } = await supabase
+    .from('usuarios')
+    .select('role')
+    .eq('id', userId)
+    .single();
+  return typeof data?.role === 'string' ? data.role : null;
 }
 
-function isValidToken(token: unknown): token is DecodedToken {
-  return (
-    typeof token === 'object' &&
-    token !== null &&
-    (
-      typeof (token as DecodedToken).role === 'string' ||
-      typeof (token as DecodedToken).user_metadata?.role === 'string'
-    )
-  );
-}
-
-function decodeToken(token: string): DecodedToken | null {
-  try {
-    const decoded: unknown = jwtDecode(token);
-    if (isValidToken(decoded)) return decoded;
-    return null;
-  } catch {
-    return null;
+export async function middleware(req: NextRequest) {
+  const accessToken = req.cookies.get('sb-access-token')?.value;
+  if (!accessToken) {
+    return NextResponse.redirect(new URL('/', req.url));
   }
-}
 
-function getUserRoleFromRequest(req: NextRequest): string | null {
-  const token = req.cookies.get('token')?.value;
-  if (!token) return null;
+  interface DecodedToken {
+    sub?: string;
+    user_id?: string;
+    [key: string]: unknown;
+  }
 
-  const decoded = decodeToken(token);
-  if (!decoded) return null;
+  let userId: string | null = null;
+  try {
+    const decoded = jwtDecode<DecodedToken>(accessToken);
+    userId = decoded.sub ?? decoded.user_id ?? null;
+  } catch {
+    return NextResponse.redirect(new URL('/', req.url));
+  }
 
-  return decoded.role ?? decoded.user_metadata?.role ?? null;
-}
+  if (!userId) {
+    return NextResponse.redirect(new URL('/', req.url));
+  }
 
-// Rutas protegidas con roles permitidos
-const protectedRoutes: Record<string, string[]> = {
-  '/admin': ['admin'], // Solo administradores
-};
-
-export function middleware(req: NextRequest) {
-  const { pathname } = req.nextUrl;
-
-  // Revisión de rutas protegidas
-  for (const route in protectedRoutes) {
-    if (pathname.startsWith(route)) {
-      const allowedRoles = protectedRoutes[route];
-      if (!allowedRoles) continue;
-
-      const userRole = getUserRoleFromRequest(req);
-
-      console.log(`[Middleware] Intento de acceso a ${pathname} con rol: ${userRole}`);
-
-      if (!userRole || !allowedRoles.includes(userRole)) {
-        console.warn(`[Middleware] Acceso denegado para ${userRole}. Redirigiendo a /`);
-        const url = req.nextUrl.clone();
-        url.pathname = '/';
-        return NextResponse.redirect(url);
-      }
-    }
+  const role = await getUserRoleFromDB(userId);
+  if (req.nextUrl.pathname.startsWith('/admin') && role !== 'admin') {
+    return NextResponse.redirect(new URL('/', req.url));
   }
 
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ['/admin/:path*'], // Protege todo lo que empiece con /admin
+  matcher: ['/admin/:path*'],
 };
