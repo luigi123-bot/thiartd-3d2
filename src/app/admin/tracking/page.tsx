@@ -5,7 +5,14 @@ import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { createClient } from "@supabase/supabase-js";
 import { useToast } from "~/components/ui/use-toast";
+import type { ComponentType } from "react";
 import { Package, Truck, MapPin, Clock, CheckCircle } from "lucide-react";
+
+const LucideIcon = Package as ComponentType<{ className?: string }>;
+const LucideTruck = Truck as ComponentType<{ className?: string }>;
+const LucideMapPin = MapPin as ComponentType<{ className?: string }>;
+const LucideClock = Clock as ComponentType<{ className?: string }>;
+const LucideCheckCircle = CheckCircle as ComponentType<{ className?: string }>;
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
@@ -47,14 +54,24 @@ interface EstadoInfo {
 }
 
 const estadosEnvio: EstadoInfo[] = [
-  { value: "pendiente_pago", label: "Pendiente de pago", icon: Clock, color: "text-yellow-600" },
-  { value: "pagado", label: "Pagado", icon: CheckCircle, color: "text-green-600" },
-  { value: "en_preparacion", label: "En preparación", icon: Package, color: "text-blue-600" },
-  { value: "en_envio", label: "En envío", icon: Truck, color: "text-purple-600" },
-  { value: "en_transito", label: "En tránsito", icon: MapPin, color: "text-orange-600" },
-  { value: "entregado", label: "Entregado", icon: CheckCircle, color: "text-green-600" },
-  { value: "problema_entrega", label: "Problema entrega", icon: Package, color: "text-red-600" },
+  { value: "pendiente_pago", label: "Pendiente de pago", icon: LucideClock, color: "text-yellow-600" },
+  { value: "pagado", label: "Pagado", icon: LucideCheckCircle, color: "text-green-600" },
+  { value: "en_preparacion", label: "En preparación", icon: LucideIcon, color: "text-blue-600" },
+  { value: "en_envio", label: "En envío", icon: LucideTruck, color: "text-purple-600" },
+  { value: "en_transito", label: "En tránsito", icon: LucideMapPin, color: "text-orange-600" },
+  { value: "entregado", label: "Entregado", icon: LucideCheckCircle, color: "text-green-600" },
+  { value: "problema_entrega", label: "Problema entrega", icon: LucideIcon, color: "text-red-600" },
 ];
+
+// Define el tipo para el formulario de tracking
+interface FormTracking {
+  estado: string;
+  descripcion: string;
+  ubicacion: string;
+  numero_tracking: string;
+  empresa_envio: string;
+  fecha_estimada_entrega: string;
+}
 
 export default function TrackingAdminPage() {
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
@@ -64,7 +81,8 @@ export default function TrackingAdminPage() {
   const [actualizandoTracking, setActualizandoTracking] = useState(false);
   const { toast } = useToast();
 
-  const [formTracking, setFormTracking] = useState({
+  // Tipado explícito para evitar asignación de any
+  const [formTracking, setFormTracking] = useState<FormTracking>({
     estado: "",
     descripcion: "",
     ubicacion: "",
@@ -83,7 +101,7 @@ export default function TrackingAdminPage() {
         .neq("estado", "pendiente_pago")
         .order("created_at", { ascending: false });
       
-      setPedidos(data ?? []);
+      setPedidos((data ?? []) as Pedido[]);
       setLoading(false);
     };
 

@@ -10,7 +10,7 @@ export async function enviarEmailConfirmacionNodemailer({
   html: string;
 }) {
   // Configura el transporter con tus credenciales de Gmail
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+   
   const transporter: Transporter = nodemailer.createTransport({
     service: "gmail",
     auth: {

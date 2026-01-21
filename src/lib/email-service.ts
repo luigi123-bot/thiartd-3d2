@@ -10,7 +10,7 @@ interface SendPasswordResetEmailParams {
 
 // Crear transporter de Gmail
 const createTransporter = (): Transporter => {
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+   
   return nodemailer.createTransport({
     service: 'gmail',
     auth: {
@@ -26,7 +26,7 @@ export async function sendPasswordResetEmail({
   userName = "Usuario",
 }: SendPasswordResetEmailParams): Promise<{ success: true; data: SentMessageInfo } | { success: false; error: string }> {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+     
     const transporter: Transporter = createTransporter();
 
     const mailOptions: SendMailOptions = {
@@ -113,7 +113,7 @@ export async function sendPasswordResetEmail({
       `,
     };
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const info: SentMessageInfo = await transporter.sendMail(mailOptions);
 
     console.log('✅ Correo enviado exitosamente:', info.messageId);

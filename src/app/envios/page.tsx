@@ -38,13 +38,19 @@ interface ProductoPedido {
 }
 
 
-const estadoConfig = {
-  pendiente_pago: { label: "Pendiente de pago", color: "bg-yellow-100 text-yellow-800", icon: Clock },
-  pagado: { label: "Pagado", color: "bg-blue-100 text-blue-800", icon: CheckCircle },
-  en_preparacion: { label: "En preparación", color: "bg-purple-100 text-purple-800", icon: Package },
-  en_envio: { label: "En envío", color: "bg-green-100 text-green-800", icon: Truck },
-  entregado: { label: "Entregado", color: "bg-green-100 text-green-800", icon: CheckCircle },
-  cancelado: { label: "Cancelado", color: "bg-red-100 text-red-800", icon: XCircle },
+type EstadoConfig = {
+  label: string;
+  color: string;
+  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+};
+
+const estadoConfig: Record<string, EstadoConfig> = {
+  pendiente_pago: { label: "Pendiente de pago", color: "bg-yellow-100 text-yellow-800", icon: Clock as React.ComponentType<React.SVGProps<SVGSVGElement>> },
+  pagado: { label: "Pagado", color: "bg-blue-100 text-blue-800", icon: CheckCircle as React.ComponentType<React.SVGProps<SVGSVGElement>> },
+  en_preparacion: { label: "En preparación", color: "bg-purple-100 text-purple-800", icon: Package as React.ComponentType<React.SVGProps<SVGSVGElement>> },
+  en_envio: { label: "En envío", color: "bg-green-100 text-green-800", icon: Truck as React.ComponentType<React.SVGProps<SVGSVGElement>> },
+  entregado: { label: "Entregado", color: "bg-green-100 text-green-800", icon: CheckCircle as React.ComponentType<React.SVGProps<SVGSVGElement>> },
+  cancelado: { label: "Cancelado", color: "bg-red-100 text-red-800", icon: XCircle as React.ComponentType<React.SVGProps<SVGSVGElement>> },
 };
 
 export default function EnviosPage() {
@@ -79,7 +85,7 @@ export default function EnviosPage() {
         
         if (pedidosData) {
           console.log(`✅ Pedidos encontrados: ${pedidosData.length}`);
-          setPedidos(pedidosData);
+          setPedidos(pedidosData as Pedido[]);
         } else {
           console.warn("⚠️ No pedidos data");
           setPedidos([]);
@@ -137,14 +143,14 @@ export default function EnviosPage() {
         ) : (
           <div className="space-y-6">
             {pedidos.map((pedido) => {
-              const estado = estadoConfig[pedido.estado as keyof typeof estadoConfig] ?? estadoConfig.pendiente_pago;
-              const IconComponent = estado.icon;
+              const safeEstado: EstadoConfig = estadoConfig[pedido.estado] ?? estadoConfig.pendiente_pago!;
+              const IconComponent: React.ComponentType<React.SVGProps<SVGSVGElement>> = safeEstado?.icon ?? CheckCircle;
               
               let productos: ProductoPedido[] = [];
               if (typeof pedido.productos === "string") {
                 try {
                   const parsed = JSON.parse(pedido.productos) as unknown;
-                  productos = Array.isArray(parsed) ? parsed as ProductoPedido[] : [];
+                  productos = Array.isArray(parsed) ? (parsed as ProductoPedido[]) : [];
                 } catch {
                   productos = [];
                 }
@@ -155,7 +161,7 @@ export default function EnviosPage() {
               if (typeof pedido.datos_contacto === "string") {
                 try {
                   const parsed = JSON.parse(pedido.datos_contacto) as unknown;
-                  datosContacto = typeof parsed === "object" && parsed !== null ? parsed as { nombre?: string; email?: string; telefono?: string } : {};
+                  datosContacto = (typeof parsed === "object" && parsed !== null) ? (parsed as { nombre?: string; email?: string; telefono?: string }) : {};
                 } catch {
                   datosContacto = {};
                 }
@@ -176,8 +182,8 @@ export default function EnviosPage() {
                     </div>
                     <div className="flex items-center gap-2">
                       <IconComponent className="w-5 h-5" />
-                      <Badge className={estado.color}>
-                        {estado.label}
+                      <Badge className={safeEstado.color}>
+                        {safeEstado.label}
                       </Badge>
                     </div>
                   </div>

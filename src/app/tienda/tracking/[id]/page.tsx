@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { Card } from "~/components/ui/card";
 import { Package, Truck, MapPin, CheckCircle, AlertTriangle } from "lucide-react";
+
 import { createClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
@@ -37,18 +38,24 @@ interface DatosContacto {
   telefono?: string;
 }
 
-const estadosConfig = {
-  pendiente_pago: { label: "Pendiente de pago", color: "text-yellow-600", icon: AlertTriangle },
-  pagado: { label: "Pagado", color: "text-blue-600", icon: CheckCircle },
-  en_preparacion: { label: "En preparación", color: "text-purple-600", icon: Package },
-  en_envio: { label: "En envío", color: "text-orange-600", icon: Truck },
-  en_transito: { label: "En tránsito", color: "text-orange-600", icon: MapPin },
-  entregado: { label: "Entregado", color: "text-green-600", icon: CheckCircle },
-  problema_entrega: { label: "Problema entrega", color: "text-red-600", icon: AlertTriangle },
+type EstadoConfig = {
+  label: string;
+  color: string;
+  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+};
+
+const estadosConfig: Record<string, EstadoConfig> = {
+  pendiente_pago: { label: "Pendiente de pago", color: "text-yellow-600", icon: AlertTriangle as React.ComponentType<React.SVGProps<SVGSVGElement>> },
+  pagado: { label: "Pagado", color: "text-blue-600", icon: CheckCircle as React.ComponentType<React.SVGProps<SVGSVGElement>> },
+  en_preparacion: { label: "En preparación", color: "text-purple-600", icon: Package as React.ComponentType<React.SVGProps<SVGSVGElement>> },
+  en_envio: { label: "En envío", color: "text-orange-600", icon: Truck as React.ComponentType<React.SVGProps<SVGSVGElement>> },
+  en_transito: { label: "En tránsito", color: "text-orange-600", icon: MapPin as React.ComponentType<React.SVGProps<SVGSVGElement>> },
+  entregado: { label: "Entregado", color: "text-green-600", icon: CheckCircle as React.ComponentType<React.SVGProps<SVGSVGElement>> },
+  problema_entrega: { label: "Problema entrega", color: "text-red-600", icon: AlertTriangle as React.ComponentType<React.SVGProps<SVGSVGElement>> },
 };
 
 export default function TrackingPage() {
-  const params = useParams();
+  const params = useParams<{ id: string }>();
   const [pedido, setPedido] = useState<Pedido | null>(null);
   const [historial, setHistorial] = useState<HistorialItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -57,7 +64,7 @@ export default function TrackingPage() {
   useEffect(() => {
     const fetchPedido = async () => {
       try {
-        const pedidoId = params.id as string;
+        const pedidoId = params.id;
         
         // Obtener datos del pedido
         const { data: pedidoData, error: pedidoError } = await supabase
@@ -94,7 +101,7 @@ export default function TrackingPage() {
   }, [params.id]);
 
   const getEstadoInfo = (estado: string) => {
-    return estadosConfig[estado as keyof typeof estadosConfig] ?? estadosConfig.pendiente_pago;
+    return (estadosConfig[estado] ?? estadosConfig.pendiente_pago)!;
   };
 
   const parseDatosContacto = (datosContacto?: string): DatosContacto => {
