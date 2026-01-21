@@ -206,34 +206,6 @@ function NotificacionesMensajes() {
 }
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const [usuario, setUsuario] = useState<{ id?: string; rol?: string } | null>(null);
-  const router = useRouter();
-
-  useEffect(() => {
-    // Obtén el usuario actual de Supabase Auth
-    void (async () => {
-      const { data } = await supabase.auth.getUser();
-      if (data?.user) {
-        // Busca el usuario en la tabla usuarios por su correo y rol
-        const { data: usuarioData } = await supabase
-          .from("usuarios")
-          .select("id, rol")
-          .eq("correo", data.user.email)
-          .single();
-        setUsuario(usuarioData ?? null);
-        if (!usuarioData || usuarioData.rol !== "admin") {
-          router.replace("/");
-        }
-      } else {
-        router.replace("/");
-      }
-    })();
-  }, [router]);
-
-  if (!usuario || usuario.rol !== "admin") {
-    return null;
-  }
-
   return (
     <div className="flex min-h-screen bg-gray-50">
       <AdminSidebar />

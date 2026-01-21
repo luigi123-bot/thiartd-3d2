@@ -54,36 +54,36 @@ export default function Footer() {
               </Link>
             </li>
             <li>
-              <a
+              <Link
                 href="/tienda/productos"
                 className="hover:underline"
               >
                 Productos
-              </a>
+              </Link>
             </li>
             <li>
-              <a
+              <Link
                 href="/tienda/personalizar"
                 className="hover:underline"
               >
                 Personalizar
-              </a>
+              </Link>
             </li>
             <li>
-              <a
+              <Link
                 href="/tienda/sobre-nosotros"
                 className="hover:underline"
               >
                 Sobre Nosotros
-              </a>
+              </Link>
             </li>
             <li>
-              <a
+              <Link
                 href="/tienda/contacto"
                 className="hover:underline"
               >
                 Contacto
-              </a>
+              </Link>
             </li>
           </ul>
         </div>

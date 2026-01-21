@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { BadgeDollarSign, ChevronLeft, ChevronRight, ShoppingCart, Eye } from "lucide-react";
 import clsx from "clsx";
@@ -63,6 +64,7 @@ const mockProductos: Producto[] = [
 ];
 
 export default function ProductosCarrusel({ soloDestacados = false }: ProductosCarruselProps) {
+  const router = useRouter();
   const [productos, setProductos] = useState<Producto[]>([]);
   const [loading, setLoading] = useState(true);
   const [current, setCurrent] = useState(0);
@@ -183,7 +185,7 @@ export default function ProductosCarrusel({ soloDestacados = false }: ProductosC
 
   // Funcionalidad de botones
   const handleVerDetalles = (producto: Producto) => {
-    alert(`Detalles de: ${producto.nombre}\n${producto.descripcion}`);
+    router.push(`/tienda/productos/${producto.id}`);
   };
   const handleAnadir = (producto: Producto) => {
     alert(`Añadido al carrito: ${producto.nombre}`);
@@ -245,21 +247,17 @@ export default function ProductosCarrusel({ soloDestacados = false }: ProductosC
         <div
           ref={scrollRef}
           className="flex overflow-x-auto scroll-smooth no-scrollbar snap-x snap-mandatory gap-4 px-2"
-          style={{ scrollBehavior: "smooth" }}
         >
           {productos.map((prod, i) => (
             <div
               key={prod.id + "-" + i}
               className={clsx(
-                "relative flex flex-col items-center bg-white rounded-xl shadow-md transition-all duration-500 ease-in-out group/card",
+                "relative flex flex-col items-center bg-white rounded-xl shadow-md transition-all duration-500 ease-in-out group/card overflow-hidden",
                 "min-w-[90vw] max-w-[90vw] sm:min-w-[340px] sm:max-w-[340px] lg:min-w-[270px] lg:max-w-[270px] snap-center",
-                "hover:z-10"
+                "hover:z-10 min-h-[340px]",
+                i === 0 && "ml-auto",
+                i === productos.length - 1 && "mr-auto"
               )}
-              style={{
-                minHeight: 340,
-                marginLeft: i === 0 ? "auto" : undefined,
-                marginRight: i === productos.length - 1 ? "auto" : undefined,
-              }}
               onMouseEnter={() => setIsPaused(true)}
               onMouseLeave={() => setIsPaused(false)}
             >
@@ -330,12 +328,11 @@ export default function ProductosCarrusel({ soloDestacados = false }: ProductosC
             <button
               key={idx}
               className={clsx(
-                "h-2 w-2 rounded-full transition-all duration-300",
+                "h-2 rounded-full transition-all duration-300",
                 current === idx
-                  ? "bg-black w-6"
-                  : "bg-gray-300 w-2"
+                  ? "bg-black w-6 min-w-[24px]"
+                  : "bg-gray-300 w-2 min-w-[8px]"
               )}
-              style={{ minWidth: current === idx ? 24 : 8 }}
               onClick={() => setCurrent(idx)}
               aria-label={`Ir a la página ${idx + 1}`}
             />

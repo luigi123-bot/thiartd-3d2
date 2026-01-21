@@ -58,3 +58,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
   }
 }
+
+// Ejemplo de login con verificación de email
+export async function loginUsuario(email: string, password: string) {
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) {
+    // Si el error es de email no confirmado
+    if (error.message?.toLowerCase().includes("email not confirmed") || error.message?.toLowerCase().includes("correo no confirmado")) {
+      return { error: "Debes confirmar tu correo antes de iniciar sesión. Revisa tu bandeja de entrada." };
+    }
+    return { error: error.message };
+  }
+  // Si el usuario está logueado pero no confirmado
+  if (data?.user && !data.user.confirmed_at) {
+    return { error: "Debes confirmar tu correo antes de iniciar sesión. Revisa tu bandeja de entrada." };
+  }
+  return { user: data.user };
+}

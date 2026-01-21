@@ -1,0 +1,874 @@
+"use client";
+import { useEffect, useState } from "react";
+import { Card } from "~/components/ui/card";
+import { Button } from "~/components/ui/button";
+import { createClient } from "@supabase/supabase-js";
+import { Dialog, DialogContent, DialogFooter } from "~/components/ui/dialog";
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "TU_SUPABASE_URL";
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "TU_SUPABASE_ANON_KEY";
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+interface Producto {
+  id: string;
+  titulo?: string;
+  nombre?: string;
+  producto_id?: string;
+  cantidad: number;
+  precio_unitario: number;
+  descripcion?: string;
+}
+
+interface DatosContacto {
+  nombre?: string;
+  email?: string;
+}
+
+interface Pedido {
+  id: number;
+  cliente_id: string;
+  estado: string;
+  created_at: string;
+  total: number;
+  subtotal?: number;
+  costo_envio?: number;
+  productos: string;
+  datos_contacto?: string;
+  // Información de envío
+  direccion_envio?: string;
+  ciudad_envio?: string;
+  departamento_envio?: string;
+  codigo_postal_envio?: string;
+  telefono_envio?: string;
+  notas_envio?: string;
+  payment_id?: string;
+  payment_method?: string;
+}
+
+export default function AdminPedidosPage() {
+  const [pedidos, setPedidos] = useState<Pedido[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [detallePedido, setDetallePedido] = useState<Pedido | null>(null);
+  const [procesandoPago, setProcesandoPago] = useState<number | null>(null);
+
+  const fetchPedidos = async () => {
+    setLoading(true);
+    console.log("🔍 Fetching pedidos from Supabase...");
+    
+    const { data, error } = await supabase
+      .from("pedidos")
+      .select("*")
+      .order("created_at", { ascending: false });
+    
+    console.log("📊 Supabase response:", { data, error });
+    
+    if (error) {
+      console.error("❌ Error fetching pedidos:", error);
+    }
+    
+    if (!error && Array.isArray(data)) {
+      console.log(`✅ Pedidos encontrados: ${data.length}`);
+      setPedidos(data);
+    } else {
+      console.warn("⚠️ No se encontraron pedidos o hubo un error");
+      setPedidos([]);
+    }
+    
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    void fetchPedidos();
+  }, []);
+
+  // Función para simular pago aprobado (solo en desarrollo)
+  const simularPagoAprobado = async (pedidoId: number) => {
+    setProcesandoPago(pedidoId);
+    try {
+      const response = await fetch('/api/pedidos', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pedidoId,
+          estado: 'pagado',
+          payment_id: `DEV-TEST-${Date.now()}`,
+          payment_method: 'CARD',
+        }),
+      });
+
+      if (response.ok) {
+        alert('✅ Pago simulado correctamente');
+        await fetchPedidos();
+        if (detallePedido?.id === pedidoId) {
+          const response = await supabase
+            .from("pedidos")
+            .select("*")
+            .eq("id", pedidoId)
+            .single();
+          if (!response.error && response.data) setDetallePedido(response.data as Pedido);
+        }
+      } else {
+        alert('❌ Error al simular el pago');
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      alert('❌ Error al simular el pago');
+    } finally {
+      setProcesandoPago(null);
+    }
+  };
+
+  return (
+    <div className="p-8 bg-gray-50 min-h-screen">
+      <div className="max-w-7xl mx-auto">
+        <div className="mb-8">
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">Gestión de Pedidos</h1>
+          <p className="text-gray-600">Administra y visualiza todos los pedidos de tu tienda</p>
+        </div>
+
+        {loading ? (
+          <Card className="p-12">
+            <div className="flex flex-col items-center justify-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#007973] mb-4"></div>
+              <p className="text-gray-600">Cargando pedidos...</p>
+            </div>
+          </Card>
+        ) : pedidos.length === 0 ? (
+          <Card className="p-12">
+            <div className="text-center">
+              <div className="text-6xl mb-4">📦</div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">No hay pedidos registrados</h3>
+              <p className="text-gray-500">Los pedidos aparecerán aquí cuando los clientes realicen compras</p>
+            </div>
+          </Card>
+        ) : (
+          <Card className="overflow-hidden shadow-lg">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-gradient-to-r from-[#007973] to-[#00a19a] text-white">
+                    <th className="px-6 py-4 text-left text-sm font-semibold">Cliente</th>
+                    <th className="px-6 py-4 text-left text-sm font-semibold">Ubicación</th>
+                    <th className="px-6 py-4 text-left text-sm font-semibold">Estado</th>
+                    <th className="px-6 py-4 text-left text-sm font-semibold">Fecha</th>
+                    <th className="px-6 py-4 text-right text-sm font-semibold">Total</th>
+                    <th className="px-6 py-4 text-center text-sm font-semibold">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {pedidos.map((p) => {
+                    let productosArr: Producto[] = [];
+                    if (typeof p.productos === "string") {
+                      try {
+                        const parsed = JSON.parse(p.productos) as unknown;
+                        productosArr = Array.isArray(parsed) ? parsed as Producto[] : [];
+                      } catch {
+                        productosArr = [];
+                      }
+                    } else if (Array.isArray(p.productos)) {
+                      productosArr = p.productos as Producto[];
+                    } else {
+                      productosArr = [];
+                    }
+                    
+                    let datosContactoObj: DatosContacto = {};
+                    if (typeof p.datos_contacto === "string") {
+                      try {
+                        const parsed = JSON.parse(p.datos_contacto) as unknown;
+                        datosContactoObj = typeof parsed === "object" && parsed !== null ? parsed as DatosContacto : {};
+                      } catch {
+                        datosContactoObj = {};
+                      }
+                    } else if (typeof p.datos_contacto === "object" && p.datos_contacto !== null) {
+                      datosContactoObj = p.datos_contacto as DatosContacto;
+                    }
+                    
+                    const estadoBadge = p.estado === 'pagado' 
+                      ? 'bg-green-100 text-green-800 border-green-200'
+                      : p.estado === 'pendiente_pago'
+                      ? 'bg-yellow-100 text-yellow-800 border-yellow-200'
+                      : p.estado === 'pago_rechazado' || p.estado === 'pago_cancelado'
+                      ? 'bg-red-100 text-red-800 border-red-200'
+                      : 'bg-gray-100 text-gray-800 border-gray-200';
+                    
+                    const estadoIcon = p.estado === 'pagado' 
+                      ? '✅'
+                      : p.estado === 'pendiente_pago'
+                      ? '⏳'
+                      : p.estado === 'pago_rechazado'
+                      ? '❌'
+                      : '📋';
+                    
+                    return (
+                      <tr key={p.id} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-6 py-4">
+                          <div className="flex items-center">
+                            <div className="flex-shrink-0 h-10 w-10 bg-[#007973] rounded-full flex items-center justify-center text-white font-semibold">
+                              {(datosContactoObj.nombre ?? 'U').charAt(0).toUpperCase()}
+                            </div>
+                            <div className="ml-4">
+                              <div className="text-sm font-medium text-gray-900">
+                                {datosContactoObj.nombre ?? 'Usuario'}
+                              </div>
+                              <div className="text-sm text-gray-500">
+                                {datosContactoObj.email ?? '-'}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-sm text-gray-900">
+                            {p.ciudad_envio ?? '-'}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {p.departamento_envio ?? '-'}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border ${estadoBadge}`}>
+                            <span className="mr-1">{estadoIcon}</span>
+                            {p.estado.replace(/_/g, ' ').toUpperCase()}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-sm text-gray-900">
+                            {new Date(p.created_at).toLocaleDateString('es-ES', { 
+                              day: '2-digit', 
+                              month: 'short', 
+                              year: 'numeric' 
+                            })}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {new Date(p.created_at).toLocaleTimeString('es-ES', { 
+                              hour: '2-digit', 
+                              minute: '2-digit' 
+                            })}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="text-lg font-bold text-[#007973]">
+                            ${Number(p.total).toLocaleString('es-CO')}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {productosArr.length} producto{productosArr.length !== 1 ? 's' : ''}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex flex-col gap-2 items-center">
+                            <Button 
+                              size="sm" 
+                              onClick={() => setDetallePedido(p)}
+                              className="w-full bg-[#007973] hover:bg-[#006060] text-white"
+                            >
+                              📄 Ver Detalle
+                            </Button>
+                            {p.estado === 'pendiente_pago' && (
+                              <Button 
+                                size="sm" 
+                                onClick={() => simularPagoAprobado(p.id)}
+                                disabled={procesandoPago === p.id}
+                                className="w-full bg-green-600 hover:bg-green-700 text-white"
+                              >
+                                {procesandoPago === p.id ? '⏳ Procesando...' : '✓ Aprobar'}
+                              </Button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        )}
+      </div>
+      
+      {/* Modal de detalle de pedido - Vista pantalla completa */}
+      <Dialog open={!!detallePedido} onOpenChange={(v) => { if (!v) setDetallePedido(null); }}>
+        <DialogContent className="w-screen h-screen max-w-none p-0 gap-0 overflow-hidden bg-gradient-to-br from-slate-50 via-blue-50 to-emerald-50">
+          {detallePedido && (() => {
+            const pedido = detallePedido;
+            
+            // Parse datos de contacto
+            let datosContactoObj: DatosContacto = {};
+            if (typeof pedido.datos_contacto === "string") {
+              try {
+                const parsed = JSON.parse(pedido.datos_contacto || '{}') as unknown;
+                datosContactoObj = typeof parsed === "object" && parsed !== null ? parsed as DatosContacto : {};
+              } catch {
+                datosContactoObj = {};
+              }
+            } else if (typeof pedido.datos_contacto === "object" && pedido.datos_contacto !== null) {
+              datosContactoObj = pedido.datos_contacto as DatosContacto;
+            }
+            
+            // Parse productos
+            let productosArr: Producto[] = [];
+            if (typeof pedido.productos === "string") {
+              try {
+                const parsed = JSON.parse(pedido.productos) as unknown;
+                productosArr = Array.isArray(parsed) ? parsed as Producto[] : [];
+              } catch {
+                productosArr = [];
+              }
+            } else if (Array.isArray(pedido.productos)) {
+              productosArr = pedido.productos as unknown as Producto[];
+            }
+            
+            // Construir dirección completa para el mapa
+            const direccionCompleta = [
+              pedido.direccion_envio,
+              pedido.ciudad_envio,
+              pedido.departamento_envio,
+              'Colombia'
+            ].filter(Boolean).join(', ');
+            
+            const mapUrl = direccionCompleta 
+              ? `https://www.google.com/maps/embed/v1/place?key=AIzaSyBFw0Qbyq9zTFTd-tUY6dZWTgaQzuU17R8&q=${encodeURIComponent(direccionCompleta)}`
+              : null;
+            
+            const estadoBadgeClass = pedido.estado === 'pagado' 
+              ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+              : pedido.estado === 'pendiente_pago'
+              ? 'bg-amber-100 text-amber-800 border-amber-300'
+              : pedido.estado === 'pago_rechazado' || pedido.estado === 'pago_cancelado'
+              ? 'bg-rose-100 text-rose-800 border-rose-300'
+              : 'bg-slate-100 text-slate-800 border-slate-300';
+            
+            return (
+              <div className="h-full flex flex-col overflow-hidden">
+                {/* Header - Barra superior con información clave */}
+                <div className="flex-shrink-0 bg-gradient-to-r from-[#007973] to-[#00a19a] px-8 py-6 shadow-xl">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-6">
+                      <div>
+                        <h1 className="text-3xl font-bold text-white mb-1">Pedido #{pedido.id}</h1>
+                        <p className="text-sm text-white/80">
+                          {new Date(pedido.created_at).toLocaleDateString('es-ES', { 
+                            weekday: 'long',
+                            day: 'numeric',
+                            month: 'long',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </p>
+                      </div>
+                      <span className={`px-4 py-2 rounded-full text-sm font-semibold border-2 ${estadoBadgeClass}`}>
+                        {pedido.estado === 'pagado' && '✅ '}
+                        {pedido.estado === 'pendiente_pago' && '⏳ '}
+                        {(pedido.estado === 'pago_rechazado' || pedido.estado === 'pago_cancelado') && '❌ '}
+                        {pedido.estado.replace(/_/g, ' ').toUpperCase()}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-6">
+                      <div className="text-right">
+                        <p className="text-sm text-white/80 mb-1">Total del Pedido</p>
+                        <p className="text-4xl font-bold text-white">
+                          ${Number(pedido.total).toLocaleString('es-CO')}
+                        </p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setDetallePedido(null)}
+                        className="text-white hover:bg-white/20 rounded-full h-10 w-10"
+                      >
+                        ✕
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Contenido principal - Grid sin scroll */}
+                <div className="flex-1 overflow-hidden px-8 py-6">
+                  {/* Fila superior - 3 columnas */}
+                  <div className="grid grid-cols-3 gap-6 h-[60%] mb-6">
+                    {/* Columna 1: Información del Cliente */}
+                    <Card className="rounded-2xl shadow-md p-6 bg-white/80 backdrop-blur-sm flex flex-col overflow-hidden">
+                      <div className="flex items-center gap-3 pb-4 border-b border-slate-200">
+                        <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center text-white text-xl font-bold shadow-md">
+                          {(datosContactoObj.nombre ?? 'U').charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-semibold text-slate-900">Cliente</h3>
+                          <p className="text-xs text-slate-500">Información de contacto</p>
+                        </div>
+                      </div>
+                      <div className="flex-1 overflow-y-auto mt-4 space-y-4">
+                        <div>
+                          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Nombre</p>
+                          <p className="text-sm font-medium text-slate-900">{datosContactoObj.nombre ?? 'No especificado'}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Email</p>
+                          <p className="text-sm font-medium text-slate-900 break-all">{datosContactoObj.email ?? 'No especificado'}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Teléfono</p>
+                          <p className="text-sm font-medium text-slate-900">{pedido.telefono_envio ?? 'No especificado'}</p>
+                        </div>
+                      </div>
+                    </Card>
+
+                    {/* Columna 2: Productos */}
+                    <Card className="rounded-2xl shadow-md p-6 bg-white/80 backdrop-blur-sm flex flex-col overflow-hidden">
+                      <div className="flex items-center gap-3 pb-4 border-b border-slate-200">
+                        <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center text-2xl shadow-md">
+                          🛍️
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-semibold text-slate-900">Productos</h3>
+                          <p className="text-xs text-slate-500">{productosArr.length} artículo{productosArr.length !== 1 ? 's' : ''}</p>
+                        </div>
+                      </div>
+                      <div className="flex-1 overflow-y-auto mt-4 space-y-3">
+                        {productosArr.map((prod: Producto, idx: number) => (
+                          <div key={idx} className="bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 rounded-xl p-4">
+                            <div className="flex justify-between items-start mb-2">
+                              <h4 className="font-semibold text-slate-900 text-sm flex-1">{prod.titulo ?? prod.nombre ?? prod.producto_id}</h4>
+                              <span className="bg-[#007973] text-white text-xs px-2 py-1 rounded-full font-bold ml-2">
+                                x{prod.cantidad}
+                              </span>
+                            </div>
+                            {prod.descripcion && (
+                              <p className="text-xs text-slate-600 mb-2">{prod.descripcion}</p>
+                            )}
+                            <div className="flex justify-between items-center text-xs pt-2 border-t border-slate-300">
+                              <span className="text-slate-600">Precio unitario</span>
+                              <span className="font-semibold">${Number(prod.precio_unitario).toLocaleString('es-CO')}</span>
+                            </div>
+                            <div className="flex justify-between items-center text-sm pt-1 font-bold">
+                              <span className="text-slate-700">Subtotal</span>
+                              <span className="text-[#007973]">${(prod.cantidad * prod.precio_unitario).toLocaleString('es-CO')}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </Card>
+
+                    {/* Columna 3: Dirección y Mapa */}
+                    <Card className="rounded-2xl shadow-md p-6 bg-white/80 backdrop-blur-sm flex flex-col overflow-hidden">
+                      <div className="flex items-center gap-3 pb-4 border-b border-slate-200">
+                        <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center text-2xl shadow-md">
+                          📍
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-semibold text-slate-900">Dirección de Envío</h3>
+                          <p className="text-xs text-slate-500">Ubicación de entrega</p>
+                        </div>
+                      </div>
+                      <div className="flex-1 overflow-y-auto mt-4 space-y-3">
+                        <div>
+                          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Dirección</p>
+                          <p className="text-sm font-medium text-slate-900">{pedido.direccion_envio ?? 'No especificada'}</p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Ciudad</p>
+                            <p className="text-sm font-medium text-slate-900">{pedido.ciudad_envio ?? '-'}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Departamento</p>
+                            <p className="text-sm font-medium text-slate-900">{pedido.departamento_envio ?? '-'}</p>
+                          </div>
+                        </div>
+                        {pedido.codigo_postal_envio && (
+                          <div>
+                            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Código Postal</p>
+                            <p className="text-sm font-medium text-slate-900">{pedido.codigo_postal_envio}</p>
+                          </div>
+                        )}
+                        {pedido.notas_envio && (
+                          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                            <p className="text-xs font-semibold text-amber-700 uppercase mb-1">📝 Notas</p>
+                            <p className="text-xs text-amber-900">{pedido.notas_envio}</p>
+                          </div>
+                        )}
+                        {mapUrl && (
+                          <div className="rounded-xl overflow-hidden border-2 border-slate-300 shadow-sm mt-3">
+                            <iframe
+                              title={`Mapa: ${direccionCompleta}`}
+                              width="100%"
+                              height="180"
+                              className="border-0"
+                              loading="lazy"
+                              allowFullScreen
+                              referrerPolicy="no-referrer-when-downgrade"
+                              src={mapUrl}
+                            ></iframe>
+                          </div>
+                        )}
+                      </div>
+                    </Card>
+                  </div>
+
+                  {/* Fila inferior - 2 columnas */}
+                  <div className="grid grid-cols-2 gap-6 h-[calc(40%-1.5rem)]">
+                    {/* Resumen del Pedido */}
+                    <Card className="rounded-2xl shadow-md p-6 bg-white/80 backdrop-blur-sm flex flex-col">
+                      <div className="flex items-center gap-3 pb-4 border-b border-slate-200">
+                        <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl flex items-center justify-center text-2xl shadow-md">
+                          💰
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-semibold text-slate-900">Resumen del Pedido</h3>
+                          <p className="text-xs text-slate-500">Desglose de costos</p>
+                        </div>
+                      </div>
+                      <div className="flex-1 flex flex-col justify-center space-y-4 mt-4">
+                        <div className="flex justify-between items-center py-3 border-b border-slate-200">
+                          <span className="text-sm font-medium text-slate-700">Subtotal</span>
+                          <span className="text-lg font-bold text-slate-900">
+                            ${Number(pedido.subtotal ?? pedido.total).toLocaleString('es-CO')}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center py-3 border-b border-slate-200">
+                          <span className="text-sm font-medium text-slate-700">Costo de envío</span>
+                          <span className="text-lg font-bold text-slate-900">
+                            ${Number(pedido.costo_envio ?? 0).toLocaleString('es-CO')}
+                          </span>
+                        </div>
+                        <div className="bg-gradient-to-r from-[#007973] to-[#00a19a] rounded-xl p-6 shadow-lg">
+                          <div className="flex justify-between items-center">
+                            <span className="text-lg font-bold text-white">Total</span>
+                            <span className="text-4xl font-bold text-white">
+                              ${Number(pedido.total).toLocaleString('es-CO')}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </Card>
+
+                    {/* Información de Pago */}
+                    <Card className="rounded-2xl shadow-md p-6 bg-white/80 backdrop-blur-sm flex flex-col">
+                      <div className="flex items-center gap-3 pb-4 border-b border-slate-200">
+                        <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center text-2xl shadow-md">
+                          💳
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-semibold text-slate-900">Información de Pago</h3>
+                          <p className="text-xs text-slate-500">Detalles de transacción</p>
+                        </div>
+                      </div>
+                      <div className="flex-1 flex flex-col justify-center space-y-4 mt-4">
+                        {pedido.payment_method ? (
+                          <>
+                            <div>
+                              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Método de Pago</p>
+                              <p className="text-base font-bold text-slate-900 uppercase">{pedido.payment_method}</p>
+                            </div>
+                            {pedido.payment_id && (
+                              <div>
+                                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">ID de Transacción</p>
+                                <code className="text-xs bg-slate-100 px-3 py-2 rounded-lg border border-slate-300 inline-block font-mono text-slate-900 break-all">
+                                  {pedido.payment_id}
+                                </code>
+                              </div>
+                            )}
+                            {pedido.estado === 'pendiente_pago' && (
+                              <Button 
+                                onClick={() => simularPagoAprobado(pedido.id)}
+                                disabled={procesandoPago === pedido.id}
+                                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-6 rounded-xl shadow-lg"
+                              >
+                                {procesandoPago === pedido.id ? '⏳ Procesando...' : '✓ Aprobar Pago'}
+                              </Button>
+                            )}
+                          </>
+                        ) : (
+                          <div className="flex items-center justify-center h-full">
+                            <p className="text-sm text-slate-500 italic">No hay información de pago disponible</p>
+                          </div>
+                        )}
+                      </div>
+                    </Card>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+        </DialogContent>
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between text-white gap-4">
+                    <div className="flex-1">
+                      <h2 className="text-3xl font-bold mb-2">Pedido #{pedido.id}</h2>
+                      <p className="text-sm opacity-90">
+                        {new Date(pedido.created_at).toLocaleDateString('es-ES', { 
+                          weekday: 'long',
+                          day: 'numeric',
+                          month: 'long',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </p>
+                    </div>
+                    <div className="text-left md:text-right bg-white/10 backdrop-blur-sm rounded-lg p-4">
+                      <div className="text-sm opacity-90 mb-1">Total del pedido</div>
+                      <div className="text-4xl font-bold">${Number(pedido.total).toLocaleString('es-CO')}</div>
+                    </div>
+                  </div>
+                  <div className="mt-6">
+                    <span className={`inline-flex items-center px-5 py-2.5 rounded-full text-sm font-semibold border-2 ${estadoBadgeClass}`}>
+                      {pedido.estado === 'pagado' && '✅ '}
+                      {pedido.estado === 'pendiente_pago' && '⏳ '}
+                      {(pedido.estado === 'pago_rechazado' || pedido.estado === 'pago_cancelado') && '❌ '}
+                      {pedido.estado.replace(/_/g, ' ').toUpperCase()}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 px-2">
+                  {/* Columna izquierda */}
+                  <div className="space-y-6">
+                    {/* Información del cliente */}
+                    <Card className="p-6 border-2 border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+                      <div className="flex items-center gap-4 mb-6 pb-4 border-b border-gray-200">
+                        <div className="w-14 h-14 bg-gradient-to-br from-[#007973] to-[#00a19a] rounded-full flex items-center justify-center text-white text-xl font-bold shadow-md">
+                          {(datosContactoObj.nombre ?? 'U').charAt(0).toUpperCase()}
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="text-lg font-bold text-gray-900">Información del Cliente</h3>
+                          <p className="text-sm text-gray-500">Datos de contacto</p>
+                        </div>
+                      </div>
+                      <div className="space-y-5">
+                        <div className="flex items-start gap-4">
+                          <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                            <span className="text-xl">👤</span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-1">Nombre completo</p>
+                            <p className="font-medium text-gray-900 text-base break-words">{datosContactoObj.nombre ?? 'No especificado'}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-start gap-4">
+                          <div className="w-10 h-10 bg-purple-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                            <span className="text-xl">📧</span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-1">Correo electrónico</p>
+                            <p className="font-medium text-gray-900 text-base break-words">{datosContactoObj.email ?? 'No especificado'}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-start gap-4">
+                          <div className="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                            <span className="text-xl">📱</span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-1">Teléfono de contacto</p>
+                            <p className="font-medium text-gray-900 text-base">{pedido.telefono_envio ?? 'No especificado'}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </Card>
+
+                    {/* Información de envío con mapa */}
+                    <Card className="p-6 border-2 border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+                      <div className="flex items-center gap-4 mb-6 pb-4 border-b border-gray-200">
+                        <div className="w-14 h-14 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0">
+                          <span className="text-2xl">📦</span>
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="text-lg font-bold text-gray-900">Dirección de Envío</h3>
+                          <p className="text-sm text-gray-500">Ubicación de entrega</p>
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-5 mb-6">
+                        <div className="flex items-start gap-4">
+                          <div className="w-10 h-10 bg-red-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                            <span className="text-lg">🏠</span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-1">Dirección completa</p>
+                            <p className="font-medium text-gray-900 text-base break-words">{pedido.direccion_envio ?? 'No especificada'}</p>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="flex items-start gap-3">
+                            <div className="w-10 h-10 bg-indigo-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                              <span className="text-lg">🏙️</span>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-1">Ciudad</p>
+                              <p className="font-medium text-gray-900 text-sm break-words">{pedido.ciudad_envio ?? '-'}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-start gap-3">
+                            <div className="w-10 h-10 bg-teal-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                              <span className="text-lg">🗺️</span>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-1">Departamento</p>
+                              <p className="font-medium text-gray-900 text-sm break-words">{pedido.departamento_envio ?? '-'}</p>
+                            </div>
+                          </div>
+                        </div>
+                        {pedido.codigo_postal_envio && (
+                          <div className="flex items-start gap-4">
+                            <div className="w-10 h-10 bg-yellow-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                              <span className="text-lg">📮</span>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-1">Código Postal</p>
+                              <p className="font-medium text-gray-900 text-base">{pedido.codigo_postal_envio}</p>
+                            </div>
+                          </div>
+                        )}
+                        {pedido.notas_envio && (
+                          <div className="bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-200 rounded-xl p-4 mt-4">
+                            <div className="flex items-start gap-3">
+                              <span className="text-2xl">📝</span>
+                              <div className="flex-1">
+                                <p className="text-xs text-amber-700 uppercase tracking-wide font-bold mb-2">Notas especiales</p>
+                                <p className="text-sm text-amber-900 leading-relaxed">{pedido.notas_envio}</p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Mapa de Google */}
+                      {mapUrl && (
+                        <div className="mt-6 rounded-xl overflow-hidden border-2 border-gray-300 shadow-md">
+                          <iframe
+                            title={`Mapa de ubicación: ${direccionCompleta}`}
+                            width="100%"
+                            height="280"
+                            className="border-0"
+                            loading="lazy"
+                            allowFullScreen
+                            referrerPolicy="no-referrer-when-downgrade"
+                            src={mapUrl}
+                          ></iframe>
+                        </div>
+                      )}
+                    </Card>
+
+                    {/* Información de pago */}
+                    {(pedido.payment_id ?? pedido.payment_method) && (
+                      <Card className="p-6 border-2 border-blue-300 bg-gradient-to-br from-blue-50 to-indigo-50 shadow-sm hover:shadow-md transition-shadow">
+                        <div className="flex items-center gap-4 mb-6 pb-4 border-b border-blue-200">
+                          <div className="w-14 h-14 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                            <span className="text-2xl">💳</span>
+                          </div>
+                          <div className="flex-1">
+                            <h3 className="text-lg font-bold text-blue-900">Información de Pago</h3>
+                            <p className="text-sm text-blue-700">Detalles de la transacción</p>
+                          </div>
+                        </div>
+                        <div className="space-y-5">
+                          {pedido.payment_method && (
+                            <div className="flex items-start gap-4">
+                              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                                <span className="text-lg">💰</span>
+                              </div>
+                              <div className="flex-1">
+                                <p className="text-xs text-blue-700 uppercase tracking-wide font-semibold mb-1">Método de Pago</p>
+                                <p className="font-bold text-blue-900 uppercase text-base">{pedido.payment_method}</p>
+                              </div>
+                            </div>
+                          )}
+                          {pedido.payment_id && (
+                            <div className="flex items-start gap-4">
+                              <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                                <span className="text-lg">🔑</span>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs text-blue-700 uppercase tracking-wide font-semibold mb-2">ID de Transacción</p>
+                                <code className="text-xs bg-white px-3 py-2 rounded-lg border border-blue-300 inline-block font-mono text-blue-900 break-all">
+                                  {pedido.payment_id}
+                                </code>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </Card>
+                    )}
+                  </div>
+
+                  {/* Columna derecha */}
+                  <div className="space-y-6">
+                    {/* Productos */}
+                    <Card className="p-6 border-2 border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+                      <div className="flex items-center gap-4 mb-6 pb-4 border-b border-gray-200">
+                        <div className="w-14 h-14 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
+                          <span className="text-2xl">🛍️</span>
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="text-lg font-bold text-gray-900">Productos</h3>
+                          <p className="text-sm text-gray-500">{productosArr.length} artículo{productosArr.length !== 1 ? 's' : ''}</p>
+                        </div>
+                      </div>
+                      <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
+                        {productosArr.map((prod: Producto, idx: number) => (
+                          <div key={idx} className="bg-gradient-to-br from-gray-50 to-gray-100 border-2 border-gray-200 rounded-xl p-5 hover:shadow-lg hover:border-[#007973] transition-all">
+                            <div className="flex justify-between items-start mb-3">
+                              <h4 className="font-bold text-gray-900 text-base flex-1 pr-3">{prod.titulo ?? prod.nombre ?? prod.producto_id}</h4>
+                              <span className="bg-gradient-to-r from-[#007973] to-[#00a19a] text-white text-sm px-3 py-1.5 rounded-full font-bold shadow-sm">
+                                x{prod.cantidad}
+                              </span>
+                            </div>
+                            {prod.descripcion && (
+                              <p className="text-sm text-gray-600 mb-4 leading-relaxed">{prod.descripcion}</p>
+                            )}
+                            <div className="space-y-2">
+                              <div className="flex justify-between items-center text-sm py-2 border-t border-gray-300">
+                                <span className="text-gray-600 font-medium">Precio unitario</span>
+                                <span className="font-semibold text-gray-900">${Number(prod.precio_unitario).toLocaleString('es-CO')}</span>
+                              </div>
+                              <div className="flex justify-between items-center text-sm py-2 border-t-2 border-gray-400">
+                                <span className="font-bold text-gray-900">Subtotal</span>
+                                <span className="font-bold text-xl text-[#007973]">
+                                  ${(prod.cantidad * prod.precio_unitario).toLocaleString('es-CO')}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </Card>
+
+                    {/* Resumen del pedido */}
+                    <Card className="p-6 border-2 border-[#007973] bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50 shadow-md">
+                      <div className="flex items-center gap-3 mb-6 pb-4 border-b-2 border-[#007973]">
+                        <div className="w-12 h-12 bg-gradient-to-br from-[#007973] to-[#00a19a] rounded-full flex items-center justify-center text-white text-xl font-bold shadow-md">
+                          💰
+                        </div>
+                        <h3 className="text-xl font-bold text-gray-900">Resumen del Pedido</h3>
+                      </div>
+                      <div className="space-y-4">
+                        <div className="flex justify-between items-center py-3 border-b border-gray-300">
+                          <span className="text-gray-700 font-medium">Subtotal</span>
+                          <span className="font-bold text-gray-900 text-lg">
+                            ${Number(pedido.subtotal ?? pedido.total).toLocaleString('es-CO')}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center py-3 border-b border-gray-300">
+                          <span className="text-gray-700 font-medium">Costo de envío</span>
+                          <span className="font-bold text-gray-900 text-lg">
+                            ${Number(pedido.costo_envio ?? 0).toLocaleString('es-CO')}
+                          </span>
+                        </div>
+                        <div className="bg-gradient-to-r from-[#007973] to-[#00a19a] rounded-xl p-5 shadow-lg">
+                          <div className="flex justify-between items-center">
+                            <span className="text-white font-bold text-lg">Total del Pedido</span>
+                            <span className="text-4xl font-bold text-white">
+                              ${Number(pedido.total).toLocaleString('es-CO')}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </Card>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

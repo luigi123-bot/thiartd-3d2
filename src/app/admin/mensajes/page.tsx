@@ -298,18 +298,8 @@ export default function AdminMensajesPage() {
 							</div>
 							{/* Área de mensajes con scroll y tamaño fijo */}
 							<div
-								className="flex-1 overflow-y-auto mb-4"
+								className="flex-1 overflow-y-auto mb-4 min-h-0 max-h-[420px] h-[420px] rounded-xl bg-white border border-gray-100 p-2"
 								ref={chatRef}
-								style={{
-									minHeight: 0,
-									maxHeight: 420,
-									height: 420,
-									borderRadius: 12,
-									background: "#fff",
-									border: "1px solid #f3f4f6",
-									padding: "0.5rem",
-									marginBottom: "1rem",
-								}}
 							>
 								<div className="flex flex-col gap-2">
 									{mensajes.map((m, idx) => (
@@ -353,8 +343,7 @@ export default function AdminMensajesPage() {
 							</div>
 							{/* Input fijo abajo */}
 							<form
-								className="flex items-center gap-2 flex-shrink-0"
-								style={{ background: "#fff", borderRadius: 12 }}
+								className="flex items-center gap-2 flex-shrink-0 bg-white rounded-xl"
 								onSubmit={async (e) => {
 									e.preventDefault();
 									if (!msg.trim() || !convId) return;
@@ -406,12 +395,12 @@ export default function AdminMensajesPage() {
 							</form>
 						</>
 					) : (
-									<div className="flex-1 flex items-center justify-center text-gray-400">
-										Selecciona una conversación para ver los mensajes.
-									</div>
-								)}
+						<div className="flex-1 flex items-center justify-center text-gray-400">
+							Selecciona una conversación para ver los mensajes.
 						</div>
-					</div>
+					)}
+				</div>
+			</div>
 			{/* Modal de perfil y pedidos */}
 			<Dialog open={!!modalUser} onOpenChange={(v) => !v && setModalUser(null)}>
 				<DialogContent>

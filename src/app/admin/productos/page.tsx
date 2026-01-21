@@ -27,6 +27,7 @@ interface Producto {
   stock: number;
   precio: number;
   destacado: boolean;
+  image_url?: string;
 }
 
 export default function AdminProductosPage() {
@@ -206,6 +207,7 @@ export default function AdminProductosPage() {
             <div className="relative w-full sm:w-auto">
               <Filter className="absolute left-3 top-2.5 text-gray-400 w-4 h-4" />
               <select
+                aria-label="Ordenar productos por"
                 className="pl-9 pr-6 py-2 rounded-full border border-gray-200 bg-white shadow-sm text-sm w-full sm:w-40"
                 value={orden}
                 onChange={(e) => setOrden(e.target.value)}
@@ -228,13 +230,7 @@ export default function AdminProductosPage() {
         ) : (
           <>
             <div
-              className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-8 sm:gap-10"
-              style={{
-                maxWidth: "1920px",
-                marginLeft: "auto",
-                marginRight: "auto",
-                width: "100%",
-              }}
+              className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-8 sm:gap-10 productos-grid"
             >
               {productosPagina.map((producto) => (
                 <Card
@@ -244,8 +240,8 @@ export default function AdminProductosPage() {
                   {/* Imagen centrada */}
                   <div className="flex items-center justify-center w-full mb-4">
                     <Image
-                      src="/Logo%20Thiart%20Tiktok.png"
-                      alt="Logo producto"
+                      src={producto.image_url ?? "/Logo%20Thiart%20Tiktok.png"}
+                      alt={producto.nombre}
                       width={120}
                       height={120}
                       className="object-cover w-24 h-24 rounded-xl shadow"

@@ -92,23 +92,35 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
+    // 1. Crear usuario en Supabase Auth
+    const { data: authData, error: authError } = await supabase.auth.signUp({ email, password });
+    if (authError || !authData?.user) {
+      return NextResponse.json({ error: "Error al crear usuario en Auth: " + (authError?.message ?? "Desconocido") }, { status: 500 });
+    }
+    const auth_id = authData.user.id;
+    // 2. Guardar usuario en tu tabla personalizada
     interface Usuario {
       id?: number;
-      clerk_id: string | null;
+      clerk_id?: string;
+      auth_id?: string;
       email: string;
       nombre: string;
       password?: string | null;
     }
     const result = await supabase
       .from("usuarios")
-      .insert([{ nombre, email, password, clerk_id: null }])
+      .insert([{ nombre, email, password, auth_id }])
       .select()
       .single<Usuario>();
-    const data = result.data;
+    const data: Usuario | null = result.data;
     const error = result.error;
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
-    return NextResponse.json({ usuario: data });
+    // Mostrar mensaje de confirmación
+    return NextResponse.json({
+      usuario: data,
+      message: "Usuario creado correctamente. Revisa tu correo para confirmar tu cuenta antes de iniciar sesión."
+    });
   }
 }

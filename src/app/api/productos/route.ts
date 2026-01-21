@@ -24,10 +24,13 @@ export async function POST(req: Request) {
       stock: number;
       detalles?: string;
       destacado?: boolean;
+      image_url?: string;
+      model_url?: string;
+      video_url?: string;
     };
     const body = (await req.json()) as ProductoBody;
     // Ajusta los campos según tu tabla productos
-    const { nombre, precio, descripcion, tamano, categoria, stock, detalles, destacado } = body;
+    const { nombre, precio, descripcion, tamano, categoria, stock, detalles, destacado, image_url, model_url, video_url } = body;
     if (!nombre || precio === undefined || !descripcion || !tamano || !categoria || stock === undefined) {
       return NextResponse.json(
         { error: "Todos los campos son obligatorios." },
@@ -35,7 +38,7 @@ export async function POST(req: Request) {
       );
     }
     // Log para depuración
-    console.log("Insertando producto:", { nombre, precio, descripcion, tamano, categoria, stock, detalles, destacado });
+    console.log("Insertando producto:", { nombre, precio, descripcion, tamano, categoria, stock, detalles, destacado, image_url, model_url, video_url });
 
     interface Producto {
       id?: number;
@@ -47,6 +50,9 @@ export async function POST(req: Request) {
       stock: number;
       detalles?: string;
       destacado?: boolean;
+      image_url?: string;
+      model_url?: string;
+      video_url?: string;
       // Agrega aquí otros campos si existen en la tabla
     }
 
@@ -61,6 +67,9 @@ export async function POST(req: Request) {
         stock,
         detalles,
         destacado,
+        image_url,
+        model_url,
+        video_url,
       }])
       .select()
       .single();

@@ -19,6 +19,7 @@ import SupabaseAuth from "~/components/SupabaseAuth";
 import { UserCircle } from "lucide-react";
 import Image from "next/image";
 import { Button } from "~/components/ui/button";
+import { Truck } from "lucide-react";
 
 const MENU = [
   { href: "/admin/productos", label: "Productos", icon: FiBox },
@@ -309,19 +310,22 @@ export default function AdminTopbar() {
               <FiHome className="w-5 h-5" />
               Ir a la tienda
             </Link>
+            <Link
+              href="/admin/tracking"
+              className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors"
+            >
+              <Truck className="w-5 h-5 text-gray-600" />
+              <span>Tracking de Envíos</span>
+            </Link>
           </div>
         </nav>
-        {/* Modal de login/registro */}
-        {authModalOpen && (
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40">
-            <div className="bg-white rounded-xl shadow-lg p-8 w-full max-w-md">
-              <SupabaseAuth onAuth={() => setAuthModalOpen(false)} />
-              <Button variant="secondary" className="mt-4 w-full" onClick={() => setAuthModalOpen(false)}>
-                Cerrar
-              </Button>
-            </div>
-          </div>
-        )}
+        
+        {/* Modal de autenticación usando Dialog */}
+        <SupabaseAuth 
+          open={authModalOpen} 
+          onOpenChange={setAuthModalOpen}
+          onAuth={() => setAuthModalOpen(false)} 
+        />
       </header>
       {/* Espacio para el header */}
       <div className="pt-[64px] lg:pt-[60px]" />

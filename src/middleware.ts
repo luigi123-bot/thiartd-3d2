@@ -1,53 +1,39 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { jwtDecode } from 'jwt-decode';
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '';
-const supabase = createClient(supabaseUrl, supabaseKey);
-
-async function getUserRoleFromDB(userId: string): Promise<string | null> {
-  const { data } = await supabase
-    .from('usuarios')
-    .select('role')
-    .eq('id', userId)
-    .single();
-  return typeof data?.role === 'string' ? data.role : null;
-}
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 export async function middleware(req: NextRequest) {
-  const accessToken = req.cookies.get('sb-access-token')?.value;
-  if (!accessToken) {
-    return NextResponse.redirect(new URL('/', req.url));
-  }
+  // Obtener el token del usuario (puede variar según tu auth)
+  const authHeader = req.headers.get('authorization');
+  if (!authHeader) return NextResponse.next();
 
-  interface DecodedToken {
-    sub?: string;
-    user_id?: string;
-    [key: string]: unknown;
-  }
+  // Obtener el usuario desde Supabase
+  const supabase = createClient(supabaseUrl!, supabaseKey!);
+  const jwt = authHeader.replace('Bearer ', '');
+  const { data: userData, error } = await supabase.auth.getUser(jwt);
+  if (error || !userData?.user) return NextResponse.next();
 
-  let userId: string | null = null;
-  try {
-    const decoded = jwtDecode<DecodedToken>(accessToken);
-    userId = decoded.sub ?? decoded.user_id ?? null;
-  } catch {
-    return NextResponse.redirect(new URL('/', req.url));
-  }
+  // Buscar el usuario en la tabla personalizada y obtener su role
+  const { data: usuario } = await supabase
+    .from('usuarios')
+    .select('role')
+    .eq('id', userData.user.id)
+    .single();
 
-  if (!userId) {
-    return NextResponse.redirect(new URL('/', req.url));
+  // Redireccionar según el role
+  if (usuario?.role === 'admin' && req.nextUrl.pathname.startsWith('/admin')) {
+    return NextResponse.next(); // acceso permitido
   }
-
-  const role = await getUserRoleFromDB(userId);
-  if (req.nextUrl.pathname.startsWith('/admin') && role !== 'admin') {
-    return NextResponse.redirect(new URL('/', req.url));
+  if (usuario?.role === 'user' && req.nextUrl.pathname.startsWith('/user')) {
+    return NextResponse.next(); // acceso permitido
   }
-
-  return NextResponse.next();
+  // Si no tiene role o no coincide, redirigir a home
+  return NextResponse.redirect(new URL('/', req.url));
 }
 
 export const config = {
-  matcher: ['/admin/:path*'],
+  matcher: ['/admin/:path*', '/user/:path*'],
 };

@@ -130,82 +130,91 @@ export default function AdminDashboardPage() {
   };
 
   return (
-    <div className="min-h-screen p-6 md:p-10 bg-gray-50">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+    <div className="min-h-screen p-4 sm:p-6 md:p-8 lg:p-10 bg-gray-50">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
         <div>
-          <h1 className="text-3xl font-bold">Dashboard de Plataforma</h1>
-          <p className="text-gray-500">Resumen y métricas globales</p>
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold">Dashboard de Plataforma</h1>
+          <p className="text-sm sm:text-base text-gray-500">Resumen y métricas globales</p>
         </div>
-        <Button onClick={exportarCSV}>Exportar informe CSV</Button>
+        <Button onClick={exportarCSV} className="text-sm sm:text-base w-full sm:w-auto">
+          <span className="hidden xs:inline">Exportar informe CSV</span>
+          <span className="xs:hidden">Exportar CSV</span>
+        </Button>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-        <Card className="p-4 flex flex-col items-center">
-          <div className="text-2xl font-bold text-[#00a19a]">{resumen.ingresos?.toLocaleString("es-CL", { style: "currency", currency: "CLP" }) || "-"}</div>
-          <div className="text-gray-500 text-sm">Ingresos</div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
+        <Card className="p-3 sm:p-4 flex flex-col items-center overflow-hidden">
+          <div className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold text-[#00a19a] text-center">
+            {resumen.ingresos?.toLocaleString("es-CL", { style: "currency", currency: "CLP" }) || "-"}
+          </div>
+          <div className="text-gray-500 text-xs sm:text-sm text-center">Ingresos</div>
         </Card>
-        <Card className="p-4 flex flex-col items-center">
-          <div className="text-2xl font-bold text-[#ef4444]">{resumen.egresos?.toLocaleString("es-CL", { style: "currency", currency: "CLP" }) || "-"}</div>
-          <div className="text-gray-500 text-sm">Egresos</div>
+        <Card className="p-3 sm:p-4 flex flex-col items-center overflow-hidden">
+          <div className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold text-[#ef4444] text-center">
+            {resumen.egresos?.toLocaleString("es-CL", { style: "currency", currency: "CLP" }) || "-"}
+          </div>
+          <div className="text-gray-500 text-xs sm:text-sm text-center">Egresos</div>
         </Card>
-        <Card className="p-4 flex flex-col items-center">
-          <div className="text-2xl font-bold text-[#10b981]">{resumen.utilidad?.toLocaleString("es-CL", { style: "currency", currency: "CLP" }) || "-"}</div>
-          <div className="text-gray-500 text-sm">Utilidad</div>
+        <Card className="p-3 sm:p-4 flex flex-col items-center overflow-hidden">
+          <div className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold text-[#10b981] text-center">
+            {resumen.utilidad?.toLocaleString("es-CL", { style: "currency", currency: "CLP" }) || "-"}
+          </div>
+          <div className="text-gray-500 text-xs sm:text-sm text-center">Utilidad</div>
         </Card>
-        <Card className="p-4 flex flex-col items-center">
-          <div className="text-2xl font-bold">{resumen.usuarios || "-"}</div>
-          <div className="text-gray-500 text-sm">Usuarios</div>
+        <Card className="p-3 sm:p-4 flex flex-col items-center overflow-hidden">
+          <div className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold text-center">{resumen.usuarios || "-"}</div>
+          <div className="text-gray-500 text-xs sm:text-sm text-center">Usuarios</div>
         </Card>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-        <Card className="p-4">
-          <div className="font-semibold mb-2">Ventas por mes</div>
-          <ResponsiveContainer width="100%" height={250}>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5 md:gap-6 mb-6 sm:mb-8">
+        <Card className="p-3 sm:p-4 overflow-hidden">
+          <div className="font-semibold mb-2 text-sm sm:text-base">Ventas por mes</div>
+          <ResponsiveContainer width="100%" height={200}>
             <BarChart data={ventasPorMes}>
-              <XAxis dataKey="mes" />
-              <YAxis />
+              <XAxis dataKey="mes" tick={{ fontSize: 12 }} />
+              <YAxis tick={{ fontSize: 12 }} />
               <Tooltip />
               <Bar dataKey="total" fill="#00a19a" />
             </BarChart>
           </ResponsiveContainer>
         </Card>
-        <Card className="p-4">
-          <div className="font-semibold mb-2">Productos por categoría</div>
-          <ResponsiveContainer width="100%" height={250}>
+        <Card className="p-3 sm:p-4 overflow-hidden">
+          <div className="font-semibold mb-2 text-sm sm:text-base">Productos por categoría</div>
+          <ResponsiveContainer width="100%" height={200}>
             <PieChart>
-              <Pie data={productosPorCategoria} dataKey="value" nameKey="categoria" cx="50%" cy="50%" outerRadius={80} label>
+              <Pie data={productosPorCategoria} dataKey="value" nameKey="categoria" cx="50%" cy="50%" outerRadius={60} label={(entry) => entry.value}>
                 {productosPorCategoria.map((entry, idx) => (
                   <Cell key={`cell-${idx}`} fill={COLORS[idx % COLORS.length]} />
                 ))}
               </Pie>
               <Tooltip />
-              <Legend />
+              <Legend wrapperStyle={{ fontSize: '12px' }} />
             </PieChart>
           </ResponsiveContainer>
         </Card>
-        <Card className="p-4">
-          <div className="font-semibold mb-2">Usuarios registrados por mes</div>
-          <ResponsiveContainer width="100%" height={250}>
+        <Card className="p-3 sm:p-4 overflow-hidden">
+          <div className="font-semibold mb-2 text-sm sm:text-base">Usuarios registrados por mes</div>
+          <ResponsiveContainer width="100%" height={200}>
             <LineChart data={usuariosPorMes}>
-              <XAxis dataKey="mes" />
-              <YAxis />
+              <XAxis dataKey="mes" tick={{ fontSize: 12 }} />
+              <YAxis tick={{ fontSize: 12 }} />
               <Tooltip />
               <Line type="monotone" dataKey="value" stroke="#007973" strokeWidth={2} />
             </LineChart>
           </ResponsiveContainer>
         </Card>
-        <Card className="p-4">
-          <div className="font-semibold mb-2">Pedidos totales</div>
-          <div className="text-4xl font-bold text-[#00a19a]">{resumen.pedidos || "-"}</div>
+        <Card className="p-3 sm:p-4 overflow-hidden">
+          <div className="font-semibold mb-2 text-sm sm:text-base">Pedidos totales</div>
+          <div className="text-2xl sm:text-3xl md:text-4xl font-bold text-[#00a19a]">{resumen.pedidos || "-"}</div>
         </Card>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card className="p-4">
-          <div className="font-semibold mb-2">Mensajes totales</div>
-          <div className="text-3xl font-bold">{resumen.mensajes || "-"}</div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5 md:gap-6">
+        <Card className="p-3 sm:p-4 overflow-hidden">
+          <div className="font-semibold mb-2 text-sm sm:text-base">Mensajes totales</div>
+          <div className="text-2xl sm:text-3xl font-bold">{resumen.mensajes || "-"}</div>
         </Card>
-        <Card className="p-4">
-          <div className="font-semibold mb-2">Notificaciones totales</div>
-          <div className="text-3xl font-bold">{resumen.notificaciones || "-"}</div>
+        <Card className="p-3 sm:p-4 overflow-hidden">
+          <div className="font-semibold mb-2 text-sm sm:text-base">Notificaciones totales</div>
+          <div className="text-2xl sm:text-3xl font-bold">{resumen.notificaciones || "-"}</div>
         </Card>
       </div>
     </div>
