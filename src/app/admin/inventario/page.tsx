@@ -34,6 +34,7 @@ export default function AdminInventarioPage() {
 		stock: number;
 		precio: number;
 		destacado: boolean;
+		image_url?: string; // Añadido para evitar error de propiedad inexistente
 	}
 
 	const [productos, setProductos] = useState<Producto[]>([]);
@@ -226,29 +227,31 @@ export default function AdminInventarioPage() {
 							{productosPagina.map((producto) => (
 								<div
 									key={producto.id}
-									className="flex flex-col items-center bg-white rounded-xl shadow-sm hover:shadow-lg transition-all w-full max-w-[250px] mx-auto p-4 animate-fadeIn"
+									className="flex flex-col items-center bg-white rounded-xl shadow-sm hover:shadow-lg transition-all w-full max-w-[250px] mx-auto p-4 animate-fadeIn overflow-hidden"
 								>
 									{/* Imagen */}
 									<div className="w-full flex justify-center mb-3">
-										<div className="bg-gradient-to-br from-cyan-50 to-white rounded-xl shadow p-1 transition-transform duration-200 hover:scale-105">
+										<div className="bg-gradient-to-br from-cyan-50 to-white rounded-xl shadow p-1 transition-transform duration-200 hover:scale-105 flex items-center justify-center" style={{ width: 120, height: 120 }}>
+											{/** Usar image_url real si existe; mantener proporción y cubrir sin salirse del card */}
 											<Image
-												src="/Logo%20Thiart%20Tiktok.png"
-												alt="Logo producto"
-												width={80}
-												height={80}
-												className="object-contain w-20 h-20 rounded-xl shadow"
+												src={producto.image_url ?? "/Logo%20Thiart%20Tiktok.png"}
+												alt={producto.nombre}
+												width={120}
+												height={120}
+												className="object-cover w-[120px] h-[120px] rounded-xl shadow"
+												priority={false}
 											/>
 										</div>
 									</div>
 									{/* Datos */}
 									<div className="flex flex-col w-full space-y-1">
 										<div className="flex items-center gap-2">
-											<span className="font-bold text-lg text-gray-900">{producto.nombre}</span>
+											<span className="font-bold text-lg text-gray-900 truncate" style={{ maxWidth: 140 }}>{producto.nombre}</span>
 											{producto.destacado && (
 												<FiStar className="w-5 h-5 text-yellow-400" title="Producto recomendado" />
 											)}
 										</div>
-										<div className="text-gray-500 text-sm line-clamp-2">{producto.descripcion}</div>
+										<div className="text-gray-500 text-sm line-clamp-2 truncate" style={{ maxWidth: 200 }}>{producto.descripcion}</div>
 										<div className="flex flex-wrap gap-2 mt-1">
 											<span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">{producto.categoria}</span>
 											<span className="px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700">{producto.tamano}</span>
@@ -373,7 +376,7 @@ export default function AdminInventarioPage() {
 						setModalOpen(open);
 						if (!open) setEditProduct(null);
 					}}
-					onProductCreated={handleProductCreated}
+					onProductCreatedAction={handleProductCreated}
 					product={
 						editProduct
 							? {

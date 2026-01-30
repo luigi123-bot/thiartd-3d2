@@ -13,6 +13,8 @@ export default function AdminUsuariosPage() {
     email?: string;
     clerk_id?: string;
     creado_en?: string;
+    role?: string;
+    rol?: string;
   }
 
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
@@ -65,7 +67,7 @@ export default function AdminUsuariosPage() {
               <TableRow>
                 <TableHead>Nombre</TableHead>
                 <TableHead>Email</TableHead>
-                <TableHead>Clerk ID</TableHead>
+                <TableHead>Rol</TableHead>
                 <TableHead>Fecha de registro</TableHead>
               </TableRow>
             </TableHeader>
@@ -87,6 +89,7 @@ export default function AdminUsuariosPage() {
                   <TableRow key={usuario.id ?? usuario.email}>
                     <TableCell>{usuario.nombre ?? "-"}</TableCell>
                     <TableCell>{usuario.email ?? "-"}</TableCell>
+                    <TableCell>{usuario.role ?? usuario.rol ?? "-"}</TableCell>
                     <TableCell>{usuario.clerk_id ?? "-"}</TableCell>
                     <TableCell>
                       {usuario.creado_en && typeof usuario.creado_en === "string"

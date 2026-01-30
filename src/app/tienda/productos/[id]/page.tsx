@@ -78,6 +78,7 @@ interface ProductoData {
   detalles: string | null;
   image_url: string | null;
   modelo_url: string | null;
+  model_url?: string | null; // Algunos lugares usan `model_url` (inglés). Soporte ambos nombres.
   video_url: string | null;
 }
 
@@ -107,12 +108,17 @@ export default function ProductoDetallePage() {
         if (error) throw error;
 
         if (data) {
-          const isValid = hasValidModel(data.modelo_url);
+          // Compatibilidad: la DB/otros endpoints pueden usar `modelo_url` o `model_url`.
+          const resolvedModelUrl = (data.modelo_url ?? data.model_url) ?? undefined;
+          const isValid = hasValidModel(resolvedModelUrl);
           console.log('📦 Datos del producto:', {
             id: data.id,
             nombre: data.nombre,
             modelo_url: data.modelo_url,
+            model_url: data.model_url,
+            resolvedModelUrl,
             modelo_url_type: typeof data.modelo_url,
+            resolved_type: typeof resolvedModelUrl,
             modelo_url_length: data.modelo_url?.length,
             hasValidModel: isValid,
             video_url: data.video_url,
@@ -138,9 +144,11 @@ export default function ProductoDetallePage() {
             destacado: data.destacado ?? false,
             detalles: data.detalles ?? "",
             image_url: data.image_url ?? "",
-            modelo_url: data.modelo_url ?? undefined,
+            // Guardamos la URL resuelta (soporta ambos nombres de campo)
+            modelo_url: resolvedModelUrl,
             video_url: data.video_url ?? undefined,
           });
+
         }
       } catch (err) {
         console.error("Error al cargar producto:", err);
@@ -279,6 +287,7 @@ export default function ProductoDetallePage() {
                     )}
 
                     {/* Miniatura: Video */}
+
                     {producto.video_url && (
                       <button
                         onClick={() => {
@@ -303,7 +312,7 @@ export default function ProductoDetallePage() {
                   {/* Visor principal */}
                   <div className="flex-1">
                     <div 
-                      className="relative aspect-square bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl overflow-hidden"
+                      className={`relative ${showModel ? 'h-[500px]' : 'aspect-square'} bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl overflow-hidden`}
                       onMouseEnter={() => !showModel && !showVideo && setImageZoom(true)}
                       onMouseLeave={() => setImageZoom(false)}
                     >
@@ -344,7 +353,7 @@ export default function ProductoDetallePage() {
                               >
                                 <Model3DViewer 
                                   modelUrl={producto.modelo_url!}
-                                  height="100%"
+                                  height="500px"
                                   showControls={true}
                                   autoRotate={true}
                                 />

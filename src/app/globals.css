@@ -1,5 +1,75 @@
-/* ...existing code... */
+/* Existing global styles (kept) */
 [class^="cl-internal"], [class*=" cl-internal"] {
   display: none !important;
 }
-/* ...existing code... */
+
+/* Design tokens (HSL parts) */
+:root {
+  --primary: 168 76% 32%;
+  --primary-foreground: 0 0% 100%;
+  --background: 0 0% 98%;
+  --foreground: 180 10% 15%;
+  --card: 0 0% 100%;
+  --secondary: 168 30% 94%;
+  --muted: 180 10% 96%;
+  --muted-foreground: 180 8% 45%;
+  --accent: 168 50% 90%;
+  --border: 180 15% 88%;
+  --destructive: 0 84% 60%;
+  --success: 160 84% 39%;
+  --radius: 0.75rem;
+
+  /* Derived full HSL values for easier usage */
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-card: hsl(var(--card));
+  --color-secondary: hsl(var(--secondary));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-border: hsl(var(--border));
+  --color-destructive: hsl(var(--destructive));
+  --color-success: hsl(var(--success));
+}
+
+/* Utility classes and component helpers */
+.gradient-primary {
+  background: linear-gradient(135deg, var(--color-primary) 0%, hsl(168 76% 40%) 100%);
+}
+
+.shadow-soft { box-shadow: 0 4px 20px -4px rgb(var(--primary) / 0.15); }
+.shadow-card { box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 10px 30px -10px rgb(var(--primary) / 0.1); }
+
+/* Component helpers using Tailwind @apply where useful */
+.form-card { @apply bg-white rounded-xl shadow-card border; padding: 1.5rem; }
+.form-section { @apply rounded-lg; background-color: rgba(168, 237, 231, 0.15); padding: 1rem; border: 1px solid rgba(0,0,0,0.04); }
+.input-label { @apply text-sm font-medium text-gray-700 mb-1.5 block; }
+.input-hint { @apply text-xs text-gray-500 mt-1; }
+
+/* Animations */
+@keyframes slide-in-right {
+  from { opacity: 0; transform: translateX(30px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes slide-in-left {
+  from { opacity: 0; transform: translateX(-30px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.animate-slide-in-right { animation: slide-in-right 0.3s ease-out; }
+.animate-slide-in-left { animation: slide-in-left 0.3s ease-out; }
+
+/* Semantic color utility shortcuts (optional) */
+.bg-primary { background-color: var(--color-primary); }
+.text-primary { color: var(--color-primary); }
+.bg-card { background-color: var(--color-card); }
+.border-default { border-color: var(--color-border); }
+
+/* Radius token */
+.rounded-default { border-radius: var(--radius); }
+
+/* Ensure images and media within form scale properly */
+.product-media img, .product-media video { max-width: 100%; height: auto; display: block; }
+
+/* End of design tokens and utilities */

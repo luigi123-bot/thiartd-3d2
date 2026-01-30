@@ -7,7 +7,7 @@ export default function ClientChatWidgetWrapper({
 }: {
   usuario?: { id?: string; nombre?: string; email?: string };
 }) {
-  const clienteId = usuario?.id ?? "anon";
+  const clienteId = usuario?.id ?? undefined;
   const clienteNombre = usuario?.nombre ?? "Invitado";
   const clienteEmail = usuario?.email ?? "sin-email@thiart3d.com";
 

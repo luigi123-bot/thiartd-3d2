@@ -18,7 +18,7 @@ export default function ReportarErrorModal({
 }: {
   open: boolean;
   onOpenChangeAction: (v: boolean) => void;
-  clienteId: string;
+  clienteId?: string;
 }) {
   const [form, setForm] = useState({
     titulo: "",
@@ -43,7 +43,8 @@ export default function ReportarErrorModal({
     if (form.imagen) {
       // Subir imagen a Supabase Storage (bucket: tickets)
       const fileExt = form.imagen.name.split(".").pop();
-      const fileName = `ticket-${clienteId}-${Date.now()}.${fileExt}`;
+      const safeId = clienteId ?? "anon";
+      const fileName = `ticket-${safeId}-${Date.now()}.${fileExt}`;
       const { data, error } = await supabase.storage
         .from("tickets")
         .upload(fileName, form.imagen);
@@ -54,7 +55,7 @@ export default function ReportarErrorModal({
     // Guardar ticket en la base de datos de Supabase con la URL de la imagen
     await supabase.from("tickets").insert([
       {
-        usuario_id: clienteId,
+        usuario_id: clienteId ?? null,
         titulo: form.titulo,
         descripcion: form.descripcion,
         categoria: form.categoria,

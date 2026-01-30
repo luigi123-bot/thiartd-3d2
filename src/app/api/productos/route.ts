@@ -6,7 +6,7 @@ const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 export async function GET() {
-  const { data: productos, error } = await supabase.from("productos").select("*");
+  const { data: productos, error } = await supabase.from("productos_3d").select("*");
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -27,18 +27,19 @@ export async function POST(req: Request) {
       image_url?: string;
       model_url?: string;
       video_url?: string;
+      user_id?: string;
     };
     const body = (await req.json()) as ProductoBody;
     // Ajusta los campos según tu tabla productos
-    const { nombre, precio, descripcion, tamano, categoria, stock, detalles, destacado, image_url, model_url, video_url } = body;
-    if (!nombre || precio === undefined || !descripcion || !tamano || !categoria || stock === undefined) {
+    const { nombre, precio, descripcion, tamano, categoria, stock, detalles, destacado, image_url, model_url, video_url, user_id } = body;
+    if (!nombre || precio === undefined || !descripcion || !tamano || !categoria || stock === undefined || !user_id) {
       return NextResponse.json(
         { error: "Todos los campos son obligatorios." },
         { status: 400 }
       );
     }
     // Log para depuración
-    console.log("Insertando producto:", { nombre, precio, descripcion, tamano, categoria, stock, detalles, destacado, image_url, model_url, video_url });
+    console.log("Insertando producto:", { nombre, precio, descripcion, tamano, categoria, stock, detalles, destacado, image_url, model_url, video_url, user_id });
 
     interface Producto {
       id?: number;
@@ -53,11 +54,12 @@ export async function POST(req: Request) {
       image_url?: string;
       model_url?: string;
       video_url?: string;
+      user_id?: string;
       // Agrega aquí otros campos si existen en la tabla
     }
 
     const insertResult = await supabase
-      .from("productos")
+      .from("productos_3d")
       .insert([{
         nombre,
         precio,
@@ -70,6 +72,7 @@ export async function POST(req: Request) {
         image_url,
         model_url,
         video_url,
+        user_id,
       }])
       .select()
       .single();

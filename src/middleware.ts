@@ -16,18 +16,51 @@ export async function middleware(req: NextRequest) {
   const { data: userData, error } = await supabase.auth.getUser(jwt);
   if (error || !userData?.user) return NextResponse.next();
 
+  // DEBUG: log del id de usuario obtenido desde el JWT (temporal)
+  try {
+    // eslint-disable-next-line no-console
+    console.log('[middleware] supabase auth.getUser -> user id:', userData.user.id);
+  } catch (e) {
+    // ignore
+  }
+
+  // --- TEMPORARY DEV BYPASS ---
+  // Durante desarrollo local, permitir acceso a rutas protegidas si el token
+  // es válido y devuelve un usuario. Esto evita bloqueos por falta de fila
+  // en la tabla `usuario` mientras se depura. NO dejar en producción.
+  if (process.env.NODE_ENV !== 'production' && userData.user) {
+    try {
+      // eslint-disable-next-line no-console
+      console.log('[middleware] DEV BYPASS: allowing access to protected route for user', userData.user.id);
+    } catch (e) {}
+    return NextResponse.next();
+  }
+
   // Buscar el usuario en la tabla personalizada y obtener su role
-  const { data: usuario } = await supabase
-    .from('usuarios')
-    .select('role')
-    .eq('id', userData.user.id)
+  type Usuario = { role?: string; rol?: string; auth_id?: string };
+  // En la base de datos el archivo de helpers usa la tabla `usuario` (singular)
+  // y guarda el id del proveedor en `auth_id`. Buscar por ese campo.
+  const { data } = await supabase
+    .from('usuario')
+    // Algunas filas pueden tener `role` o `rol` — solicitar ambos campos
+    .select('role, rol, auth_id')
+    .eq('auth_id', userData.user.id)
     .single();
+  const usuario = data as Usuario | null;
+  // DEBUG: log resultado de la consulta a la tabla 'usuario' (temporal)
+  try {
+    // eslint-disable-next-line no-console
+    console.log('[middleware] usuario row:', usuario);
+  } catch (e) {
+    // ignore
+  }
 
   // Redireccionar según el role
-  if (usuario?.role === 'admin' && req.nextUrl.pathname.startsWith('/admin')) {
+  const userRole: string | undefined = usuario?.role ?? usuario?.rol;
+  if (userRole === 'admin' && req.nextUrl.pathname.startsWith('/admin')) {
     return NextResponse.next(); // acceso permitido
   }
-  if (usuario?.role === 'user' && req.nextUrl.pathname.startsWith('/user')) {
+  if ((usuario?.role === 'user' || usuario?.rol === 'user') && req.nextUrl.pathname.startsWith('/user')) {
     return NextResponse.next(); // acceso permitido
   }
   // Si no tiene role o no coincide, redirigir a home

@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "~/components/u
 import { Input } from "~/components/ui/input";
 import { Button } from "~/components/ui/button";
 import { useToast } from "~/components/ui/use-toast";
+import { useEffect } from "react";
 
 interface CreateUserModalProps {
   open: boolean;
@@ -18,6 +19,8 @@ export function CreateUserModal({ open, onOpenChangeAction, onUserCreated }: Cre
     email: "",
     password: "",
   });
+  const [role, setRole] = useState<string>("cliente");
+  const [rolesOptions, setRolesOptions] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<{ nombre?: string; email?: string; password?: string }>({});
 
@@ -43,11 +46,17 @@ export function CreateUserModal({ open, onOpenChangeAction, onUserCreated }: Cre
     setLoading(true);
 
     try {
-      console.log("Enviando body a /api/crear-usuario:", form);
+      const getLabelForValue = (val: string) => {
+        const found = rolesOptions.find((rv) => rv.split("|")[1] === val);
+        if (!found) return val;
+        return found.split("|")[0];
+      };
+      const payload = { ...form, role, role_label: getLabelForValue(role) };
+      console.log("Enviando body a /api/crear-usuario:", payload);
       const res = await fetch("/api/crear-usuario", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       });
 
       let data: { error?: string } = {};
@@ -62,6 +71,7 @@ export function CreateUserModal({ open, onOpenChangeAction, onUserCreated }: Cre
       if (res.ok) {
         toast({ title: "Usuario creado", description: "El usuario fue creado correctamente." });
         setForm({ nombre: "", email: "", password: "" });
+        setRole("cliente");
         setErrors({});
         onOpenChangeAction(false);
         onUserCreated?.();
@@ -77,6 +87,50 @@ export function CreateUserModal({ open, onOpenChangeAction, onUserCreated }: Cre
       toast({ title: "Error", description: "Error de red o inesperado.", variant: "destructive" });
     }
   };
+
+  useEffect(() => {
+    const loadRoles = async () => {
+      try {
+        const res = await fetch('/api/admin/roles');
+        if (!res.ok) return setRolesOptions(['cliente','creador','admin']);
+        const json = await res.json() as unknown;
+        type RoleRow = {
+          id?: string;
+          key?: string;
+          role?: string;
+          name?: string;
+          label?: string;
+          title?: string;
+          nombre?: string;
+        };
+        type RoleOption = { label: string; value: string };
+
+        const maybe = (json as { roles?: unknown }).roles;
+        const parsedRoles: RoleOption[] = [];
+        if (Array.isArray(maybe)) {
+          for (const item of maybe) {
+            if (typeof item === 'object' && item !== null) {
+              // support both normalized {id,label} from server and legacy rows
+              const row = item as RoleRow & { id?: string; label?: string };
+              const label = String(row.label ?? row.name ?? row.title ?? row.role ?? row.key ?? row.id ?? 'rol');
+              const value = String(row.id ?? row.key ?? row.role ?? row.name ?? '');
+              parsedRoles.push({ label, value });
+            }
+          }
+        }
+
+        if (parsedRoles.length === 0) {
+          setRolesOptions(['cliente','creador','admin']);
+        } else {
+          setRolesOptions(parsedRoles.map((r) => `${r.label}|${r.value}`));
+          if (role === 'cliente' && parsedRoles[0]) setRole(parsedRoles[0].value);
+        }
+      } catch {
+        setRolesOptions(['cliente','creador','admin']);
+      }
+    };
+    if (open) void loadRoles();
+  }, [open, role]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChangeAction}>
@@ -116,6 +170,28 @@ export function CreateUserModal({ open, onOpenChangeAction, onUserCreated }: Cre
               required
             />
             {errors.password && <span className="text-xs text-red-600">{errors.password}</span>}
+          </div>
+          <div>
+            <label className="text-sm font-medium">Rol</label>
+            <select
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+              className="w-full border rounded px-3 py-2 mt-1"
+            >
+              {rolesOptions.length === 0 ? (
+                <>
+                  <option value="cliente">Cliente</option>
+                  <option value="creador">Creador</option>
+                  <option value="admin">Admin</option>
+                </>
+              ) : (
+                  rolesOptions.map((rv) => {
+                    const [labelRaw, value] = rv.split("|");
+                    const label = labelRaw ?? "";
+                    return <option key={value} value={value}>{label}</option>;
+                  })
+              )}
+            </select>
           </div>
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "Creando..." : "Crear usuario"}

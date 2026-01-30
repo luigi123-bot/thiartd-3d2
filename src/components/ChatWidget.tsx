@@ -14,7 +14,7 @@ export default function ChatWidget({
   clienteNombre,
   clienteEmail,
 }: {
-  clienteId: string;
+  clienteId?: string;
   clienteNombre: string;
   clienteEmail: string;
 }) {
@@ -50,7 +50,7 @@ export default function ChatWidget({
       const { data: conv } = await supabase
         .from("conversaciones")
         .select("*")
-        .eq("cliente_id", clienteId)
+        .eq("cliente_id", clienteId!)
         .single<Conv>();
       let conversation = conv;
       if (!conversation) {

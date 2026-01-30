@@ -51,8 +51,40 @@ export default function AdminProductosPage() {
   const stockTotal = productos.reduce((acc, p) => acc + (p.stock || 0), 0);
   const sinStock = productos.filter((p) => p.stock === 0).length;
 
-  // Validación de rol
-  const isAdmin = user?.publicMetadata?.role === "admin";
+  // Validación de rol: primero intentar con Clerk `publicMetadata`,
+  // si no está definido consultamos la tabla `usuario` en Supabase.
+  const [isAdmin, setIsAdmin] = useState<boolean>(false);
+
+  useEffect(() => {
+    let mounted = true;
+    async function checkRole() {
+      // Si Clerk tiene publicMetadata.role y es admin, usarlo.
+      if (user?.publicMetadata?.role === 'admin') {
+        if (mounted) setIsAdmin(true);
+        return;
+      }
+      if (!user) {
+        if (mounted) setIsAdmin(false);
+        return;
+      }
+      // Fallback: consultar la tabla `usuario` por auth_id
+      try {
+        const { data: u } = await supabase
+          .from('usuario')
+          .select('role, rol')
+          .eq('auth_id', user.id)
+          .single();
+        type UsuarioRow = { role?: string; rol?: string };
+        const usuario = u as UsuarioRow | null;
+        const role = usuario?.role ?? usuario?.rol;
+        if (mounted) setIsAdmin(role === 'admin');
+      } catch {
+        if (mounted) setIsAdmin(false);
+      }
+    }
+    void checkRole();
+    return () => { mounted = false; };
+  }, [user]);
 
   const fetchProductos = async () => {
     setLoading(true);
@@ -362,7 +394,7 @@ export default function AdminProductosPage() {
             setModalOpen(open);
             if (!open) setEditProduct(null);
           }}
-          onProductCreated={handleProductCreated}
+          onProductCreatedAction={handleProductCreated}
           product={
             editProduct
               ? {
