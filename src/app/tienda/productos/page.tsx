@@ -1,6 +1,6 @@
 "use client";
 import { createContext, useContext, useEffect, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription} from "~/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { ShoppingCart, X, Filter } from "lucide-react";
@@ -26,16 +26,22 @@ const rangosPrecio = [
 const tamanos = ["Pequeño", "Mediano", "Grande"]; // Define aquí los tamaños disponibles
 
 type Product = {
-  id: string;
-  nombre: string;
-  desc: string;
-  categoria: string;
-  tamano: string;
-  precio: number;
-  destacado: boolean;
+  id: string | number;
+  nombre?: string;
+  name?: string; // API variant
+  descripcion?: string;
+  description?: string; // API variant
+  categoria?: string;
+  category?: string; // API variant
+  tamano?: string;
+  size?: string; // API variant
+  precio?: number;
+  price?: number; // API variant
+  destacado?: boolean;
+  featured?: boolean; // API variant
   stock: number;
   image_url?: string;
-  // agrega aquí otros campos si tu producto tiene más propiedades
+  details?: string;
 };
 
 // --- Contexto de Carrito ---
@@ -95,11 +101,11 @@ function CarritoProvider({ children }: { children: React.ReactNode }) {
   const addToCarrito = async (producto: CarritoItem) => {
     console.log("🛒 Intentando agregar producto:", producto);
     console.log("🛒 Carrito actual:", carrito);
-    
+
     const nuevoCarrito = [...carrito];
     const idx = nuevoCarrito.findIndex((p) => p.id === producto.id);
     let added = false;
-    
+
     if (idx >= 0 && nuevoCarrito[idx]) {
       console.log("🛒 Producto ya existe en el carrito, aumentando cantidad");
       if (nuevoCarrito[idx].cantidad < nuevoCarrito[idx].stock) {
@@ -119,7 +125,7 @@ function CarritoProvider({ children }: { children: React.ReactNode }) {
         console.log("❌ Stock es 0, no se puede agregar");
       }
     }
-    
+
     if (added) {
       console.log("💾 Guardando en localStorage...");
       setCarrito(nuevoCarrito);
@@ -128,7 +134,7 @@ function CarritoProvider({ children }: { children: React.ReactNode }) {
     } else {
       console.log("❌ No se pudo agregar el producto");
     }
-    
+
     return added;
   };
 
@@ -216,23 +222,40 @@ function ProductosTiendaPageInner() {
   const limpiarFiltros = () =>
     setFiltros({ categoria: [], tamano: [], precio: [], buscar: "", destacados: false });
 
+  // Helper para obtener valores normalizados
+  const getProductData = (p: Product) => ({
+    nombre: p.nombre ?? p.name ?? "Sin nombre",
+    desc: p.descripcion ?? p.description ?? "",
+    categoria: p.categoria ?? p.category ?? "Otros",
+    tamano: p.tamano ?? p.size ?? "N/A",
+    precio: p.precio ?? p.price ?? 0,
+    destacado: p.destacado ?? p.featured ?? false,
+  });
+
   // Filtrado de productos
   const productosFiltrados = productos.filter((p) => {
+    const data = getProductData(p);
+
     const matchCategoria =
-      filtros.categoria.length === 0 || filtros.categoria.includes(p.categoria);
+      filtros.categoria.length === 0 || filtros.categoria.includes(data.categoria);
+
     const matchTamano =
-      filtros.tamano.length === 0 || filtros.tamano.includes(p.categoria);
+      filtros.tamano.length === 0 || filtros.tamano.includes(data.tamano); // Note: Original code checked category for size filter? Fixing this to check size.
+
     const matchPrecio =
       filtros.precio.length === 0 ||
       filtros.precio.some((r) => {
         const rango = rangosPrecio.find((x) => x.label === r);
-        return rango ? p.precio >= rango.min && p.precio <= rango.max : true;
+        return rango ? data.precio >= rango.min && data.precio <= rango.max : true;
       });
+
     const matchBuscar =
       !filtros.buscar ||
-      p.nombre.toLowerCase().includes(filtros.buscar.toLowerCase()) ||
-      p.desc.toLowerCase().includes(filtros.buscar.toLowerCase());
-    const matchDestacado = !filtros.destacados || p.destacado;
+      data.nombre.toLowerCase().includes(filtros.buscar.toLowerCase()) ||
+      data.desc.toLowerCase().includes(filtros.buscar.toLowerCase());
+
+    const matchDestacado = !filtros.destacados || data.destacado;
+
     return matchCategoria && matchTamano && matchPrecio && matchBuscar && matchDestacado;
   });
 
@@ -241,15 +264,14 @@ function ProductosTiendaPageInner() {
     <div className="bg-white min-h-screen px-4 md:px-8 py-8">
       {/* Botón flotante para mostrar filtros en móvil */}
       <button
-        className={`fixed left-4 top-1/2 transform -translate-y-1/2 bg-[#00a19a] text-white p-3 rounded-full shadow-lg hover:bg-[#007973] transition-all z-50 flex items-center justify-center lg:hidden ${
-          mostrarFiltros ? "rotate-45" : "rotate-0"
-        }`}
+        className={`fixed left-4 top-1/2 transform -translate-y-1/2 bg-[#00a19a] text-white p-3 rounded-full shadow-lg hover:bg-[#007973] transition-all z-50 flex items-center justify-center lg:hidden ${mostrarFiltros ? "rotate-45" : "rotate-0"
+          }`}
         onClick={() => setMostrarFiltros(!mostrarFiltros)}
         aria-label={mostrarFiltros ? "Cerrar filtros" : "Abrir filtros"}
       >
         {mostrarFiltros ? <X className="w-6 h-6" /> : <Filter className="w-6 h-6" />}
       </button>
-      
+
       {/* Modal para crear producto */}
       <div className="flex justify-end mb-4 sm:mb-6 px-4 sm:px-0">
         <Button
@@ -260,7 +282,7 @@ function ProductosTiendaPageInner() {
           <span className="sm:hidden">Añadir</span>
         </Button>
       </div>
-      <CreateProductModal open={modalOpen} onOpenChangeAction={setModalOpen} onProductCreated={fetchProductos} />
+      <CreateProductModal open={modalOpen} onOpenChangeAction={setModalOpen} onProductCreatedAction={fetchProductos} />
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 mb-4 px-4 sm:px-0 text-sm sm:text-base">
         <Link href="/" className="hover:text-black">Inicio</Link>
@@ -276,9 +298,8 @@ function ProductosTiendaPageInner() {
       <div className="flex flex-col lg:flex-row gap-8">
         {/* Filtros */}
         <aside
-          className={`w-full lg:w-64 min-w-[220px] bg-white lg:bg-transparent lg:relative lg:translate-x-0 lg:shadow-none lg:transition-none ${
-            mostrarFiltros ? "fixed top-0 left-0 w-full h-full bg-white z-40 p-4 shadow-lg overflow-y-auto" : "hidden lg:block"
-          }`}
+          className={`w-full lg:w-64 min-w-[220px] bg-white lg:bg-transparent lg:relative lg:translate-x-0 lg:shadow-none lg:transition-none ${mostrarFiltros ? "fixed top-0 left-0 w-full h-full bg-white z-40 p-4 shadow-lg overflow-y-auto" : "hidden lg:block"
+            }`}
         >
           <div className="flex justify-between items-center mb-4 lg:hidden">
             <h2 className="text-xl font-bold">Filtros</h2>
@@ -298,9 +319,8 @@ function ProductosTiendaPageInner() {
               {categorias.map((cat) => (
                 <label
                   key={cat}
-                  className={`flex items-center gap-2 cursor-pointer hover:scale-105 transition-transform ${
-                    filtros.categoria.includes(cat) ? "bg-[#007973] text-white rounded-lg px-2 py-1" : ""
-                  }`}
+                  className={`flex items-center gap-2 cursor-pointer hover:scale-105 transition-transform ${filtros.categoria.includes(cat) ? "bg-[#007973] text-white rounded-lg px-2 py-1" : ""
+                    }`}
                 >
                   <input
                     type="checkbox"
@@ -321,9 +341,8 @@ function ProductosTiendaPageInner() {
               {tamanos.map((t) => (
                 <label
                   key={t}
-                  className={`flex items-center gap-2 cursor-pointer hover:scale-105 transition-transform ${
-                    filtros.tamano.includes(t) ? "bg-[#007973] text-white rounded-lg px-2 py-1" : ""
-                  }`}
+                  className={`flex items-center gap-2 cursor-pointer hover:scale-105 transition-transform ${filtros.tamano.includes(t) ? "bg-[#007973] text-white rounded-lg px-2 py-1" : ""
+                    }`}
                 >
                   <input
                     type="checkbox"
@@ -344,9 +363,8 @@ function ProductosTiendaPageInner() {
               {rangosPrecio.map((r) => (
                 <label
                   key={r.label}
-                  className={`flex items-center gap-2 cursor-pointer hover:scale-105 transition-transform ${
-                    filtros.precio.includes(r.label) ? "bg-[#007973] text-white rounded-lg px-2 py-1" : ""
-                  }`}
+                  className={`flex items-center gap-2 cursor-pointer hover:scale-105 transition-transform ${filtros.precio.includes(r.label) ? "bg-[#007973] text-white rounded-lg px-2 py-1" : ""
+                    }`}
                 >
                   <input
                     type="checkbox"
@@ -395,26 +413,18 @@ function ProductosTiendaPageInner() {
           ) : (
             <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
               {productosFiltrados.map((producto) => {
-                const enCarrito: CarritoItem | undefined = carrito.find((p: CarritoItem) => p.id === producto.id);
+                const data = getProductData(producto);
+                const enCarrito: CarritoItem | undefined = carrito.find((p: CarritoItem) => p.id === String(producto.id));
                 const cantidadEnCarrito = enCarrito?.cantidad ?? 0;
                 const stockDisponible = producto.stock - cantidadEnCarrito;
-                
-                // Log de depuración para ver el estado del producto
-                console.log(`📦 Producto: ${producto.nombre}`, {
-                  id: producto.id,
-                  stock: producto.stock,
-                  cantidadEnCarrito,
-                  stockDisponible,
-                  deshabilitado: stockDisponible <= 0
-                });
-                
+
                 return (
                   <Card key={producto.id} className="relative flex flex-col">
                     <div className="h-48 flex items-center justify-center bg-gray-100 rounded-t-xl relative overflow-hidden">
                       {producto.image_url ? (
                         <Image
                           src={producto.image_url}
-                          alt={producto.nombre}
+                          alt={data.nombre}
                           fill
                           className="object-cover"
                           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
@@ -422,7 +432,7 @@ function ProductosTiendaPageInner() {
                       ) : (
                         <span className="text-gray-400 text-4xl">🖼️</span>
                       )}
-                      {producto.destacado && (
+                      {data.destacado && (
                         <span className="absolute top-3 right-3 bg-black text-white text-xs px-3 py-1 rounded-full font-semibold z-10">
                           Destacado
                         </span>
@@ -434,17 +444,20 @@ function ProductosTiendaPageInner() {
                       )}
                     </div>
                     <CardHeader>
-                      <CardTitle className="font-bold text-lg mb-1">{producto.nombre}</CardTitle>
-                      <CardDescription className="mb-2">{producto.desc}</CardDescription>
+                      <CardTitle className="font-bold text-lg mb-1">{data.nombre}</CardTitle>
+                      <CardDescription className="mb-2 line-clamp-2">{data.desc}</CardDescription>
                     </CardHeader>
                     <CardContent className="flex flex-col flex-1 p-3 sm:p-6">
                       <div className="flex gap-2 mb-2 flex-wrap">
                         <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs font-semibold">
-                          {producto.categoria}
+                          {data.categoria}
+                        </span>
+                        <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs font-semibold">
+                          {data.tamano}
                         </span>
                       </div>
                       <div className="flex items-center justify-between mt-auto mb-3">
-                        <span className="font-bold text-base sm:text-lg">${producto.precio.toFixed(2)}</span>
+                        <span className="font-bold text-base sm:text-lg">${data.precio.toFixed(2)}</span>
                       </div>
                       <div className="flex flex-col xs:flex-row gap-2 mt-2">
                         <Button
@@ -452,14 +465,14 @@ function ProductosTiendaPageInner() {
                           disabled={stockDisponible <= 0}
                           onClick={async () => {
                             const ok = await addToCarrito({
-                              id: producto.id,
-                              nombre: producto.nombre,
-                              precio: producto.precio,
+                              id: String(producto.id),
+                              nombre: data.nombre,
+                              precio: data.precio,
                               imagen: producto.image_url ?? "/Logo%20Thiart%20Tiktok.png",
                               cantidad: cantidadEnCarrito,
                               stock: producto.stock,
-                              categoria: producto.categoria,
-                              destacado: producto.destacado,
+                              categoria: data.categoria,
+                              destacado: data.destacado,
                             });
                             if (ok) {
                               showToast("Producto agregado al carrito ✅", true);
@@ -492,7 +505,7 @@ function ProductosTiendaPageInner() {
             </div>
           )}
         </section>
-      </div>
-    </div>
+      </div >
+    </div >
   );
 }

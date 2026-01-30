@@ -15,16 +15,6 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "TU_SUPABASE_URL";
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "TU_SUPABASE_ANON_KEY";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-const SIZES = [
-	{ label: "Pequeño", desc: "5–10 cm", value: "pequeno" },
-	{ label: "Mediano", desc: "10–20 cm", value: "mediano" },
-	{ label: "Grande", desc: "20–30 cm", value: "grande" },
-	{ label: "Personalizado", desc: "Elige tu tamaño", value: "personalizado" },
-];
-
-const MATERIALES = ["PLA", "ABS", "PETG", "Resina", "Otro"];
-const COLORES = ["Blanco", "Negro", "Rojo", "Azul", "Verde", "Personalizado"];
-const ACABADOS = ["Mate", "Brillante", "Texturizado", "Sin acabado"];
 const PRESUPUESTOS = [
 	"Menos de $20.000",
 	"$20.000 – $50.000",
@@ -32,55 +22,28 @@ const PRESUPUESTOS = [
 	"Más de $100.000",
 	"A convenir",
 ];
-const PLAZOS = [
-	"1 semana",
-	"2 semanas",
-	"3 semanas",
-	"1 mes",
-	"A convenir",
-];
-
-const FAQS = [
-	{
-		q: "¿Cuánto tiempo tarda en completarse un pedido personalizado?",
-		a: "El tiempo depende de la complejidad y tamaño, pero normalmente entre 1 y 3 semanas.",
-	},
-	{
-		q: "¿Puedo enviar mis propios diseños o ideas?",
-		a: "¡Por supuesto! Puedes adjuntar imágenes de referencia o bocetos en el formulario.",
-	},
-	{
-		q: "¿Qué materiales y colores están disponibles?",
-		a: "Trabajamos con PLA, ABS, PETG y resina en una amplia gama de colores.",
-	},
-	{
-		q: "¿Cómo se realiza el pago?",
-		a: "Te enviaremos un presupuesto y los métodos de pago disponibles tras revisar tu solicitud.",
-	},
-];
 
 interface CarritoProducto {
-  id: string;
-  nombre: string;
-  precio: number;
-  imagen?: string;
-  cantidad: number;
-  stock: number;
-  categoria: string;
-  destacado: boolean;
-  descripcion?: string;
-  tamano?: string;
-  detalles?: string;
+	id: string;
+	nombre: string;
+	precio: number;
+	imagen?: string;
+	cantidad: number;
+	stock: number;
+	categoria: string;
+	destacado: boolean;
+	descripcion?: string;
+	tamano?: string;
+	detalles?: string;
 }
 
 export default function PersonalizarPage() {
-	const [tab, setTab] = useState<"nuevo" | "modificar">("nuevo");
-	const [size, setSize] = useState("pequeno");
-	const [material, setMaterial] = useState(MATERIALES[0]);
-	const [color, setColor] = useState(COLORES[0]);
-	const [acabado, setAcabado] = useState(ACABADOS[0]);
+	const [nombre, setNombre] = useState("");
+	const [email, setEmail] = useState("");
+	const [tipoProyecto, setTipoProyecto] = useState("");
 	const [presupuesto, setPresupuesto] = useState(PRESUPUESTOS[0]);
-	const [plazo, setPlazo] = useState(PLAZOS[0]);
+	const [descripcion, setDescripcion] = useState("");
+
 	const [mensaje, setMensaje] = useState("");
 	const [loading, setLoading] = useState(false);
 	const [showPago, setShowPago] = useState(false);
@@ -204,28 +167,74 @@ export default function PersonalizarPage() {
 		localStorage.setItem("carrito", "[]");
 	}
 
-	// Manejar envío de personalización
+	// Manejar envío de personalización con integración a API de Pedidos
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
 		setLoading(true);
-		// Guarda los datos personalizados en el carrito local (no en productos)
-		const personalizado = {
-			nombre: "Producto Personalizado",
-			descripcion: (document.querySelector("textarea"))?.value ?? "",
-			categoria: "Personalizado",
-			precio: 0,
-			stock: 1,
-			tamano: size,
-			detalles: `Material: ${material}, Color: ${color}, Acabado: ${acabado}, Presupuesto: ${presupuesto}, Plazo: ${plazo}`,
-			destacado: false,
-		};
-		addToCarritoLocal({
-			id: Date.now().toString(), // ID temporal solo para el carrito
-			...personalizado,
-			cantidad: 1,
-		});
-		setLoading(false);
-		setShowPago(true);
+		setMensaje("");
+
+		if (!usuario) {
+			setMensaje("Debes iniciar sesión para enviar una solicitud. Por favor, inicia sesión e inténtalo de nuevo.");
+			setLoading(false);
+			return;
+		}
+
+		try {
+			// Construimos el cuerpo del pedido para "Cotización"
+			const orderPayload = {
+				cliente_id: usuario.id,
+				productos: [
+					{
+						nombre: `Cotización: ${tipoProyecto || "Proyecto Personalizado"}`,
+						cantidad: 1,
+						precio_unitario: 0,
+						categoria: "Cotización",
+					}
+				],
+				total: 0,
+				costo_envio: 0,
+				estado: "pendiente_cotizacion", // Estado especial para identificar cotizaciones
+				datos_contacto: {
+					nombre: nombre,
+					email: email,
+					telefono: ""
+				},
+				datos_envio: {
+					direccion: "Solicitud Digital",
+					ciudad: "N/A",
+					departamento: "N/A",
+					codigoPostal: "000000",
+					telefono: "",
+					notas: `[Cotización]
+Tipo: ${tipoProyecto}
+Presupuesto: ${presupuesto}
+Descripción: ${descripcion}`
+				}
+			};
+
+			const res = await fetch("/api/pedidos", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify(orderPayload),
+			});
+
+			const data = await res.json();
+
+			if (res.ok) {
+				setMensaje("¡Solicitud enviada con éxito! Revisa 'Mis Pedidos' para ver el estado.");
+				// Limpiar formulario
+				setDescripcion("");
+				setTipoProyecto("");
+				setPresupuesto(PRESUPUESTOS[0]);
+			} else {
+				setMensaje(`Error al enviar: ${data.error || "Inténtalo de nuevo."}`);
+			}
+		} catch (error) {
+			console.error("Error enviando cotización:", error);
+			setMensaje("Ocurrió un error al conectar con el servidor.");
+		} finally {
+			setLoading(false);
+		}
 	};
 
 	// Simular pago y crear producto + pedido
@@ -288,162 +297,130 @@ export default function PersonalizarPage() {
 	};
 
 	return (
-		<div className="bg-white min-h-screen flex flex-col">
+		<div className="bg-gray-50 min-h-screen flex flex-col font-sans items-center justify-center py-12 md:py-20">
 			{/* Header */}
-			<header className="py-6 sm:py-8 md:py-12 px-4 text-center">
-				<h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extrabold mb-2 sm:mb-3">Crea tu Producto Personalizado</h1>
-				<p className="text-sm sm:text-base md:text-lg text-gray-600 max-w-2xl mx-auto px-2">
-					Diseñamos y fabricamos productos 3D únicos según tus especificaciones. Cuéntanos tu idea y la haremos realidad.
+			<header className="px-4 text-center mb-10 w-full max-w-4xl">
+				<h1 className="text-3xl md:text-5xl font-extrabold mb-4 text-[#0f172a] tracking-tight leading-tight">
+					Cuéntanos tu idea y la <span className="text-[#009688]">hacemos<br className="hidden md:block" />realidad</span>
+				</h1>
+				<p className="text-lg text-gray-500 max-w-2xl mx-auto font-medium">
+					Completa el formulario y te enviaremos una cotización personalizada.
 				</p>
 			</header>
 
-			{/* Tabs */}
-			<div className="flex justify-center mb-6 sm:mb-8 px-4">
-				<div className="inline-flex bg-gray-100 rounded-full p-1">
-					<button
-						className={`px-4 sm:px-6 py-1.5 sm:py-2 rounded-full text-sm sm:text-base font-semibold transition ${tab === "nuevo" ? "bg-black text-white shadow" : "text-gray-700"}`}
-						onClick={() => setTab("nuevo")}
-					>
-						<span className="hidden xs:inline">Nuevo Diseño</span>
-						<span className="xs:hidden">Nuevo</span>
-					</button>
-					<button
-						className={`px-4 sm:px-6 py-1.5 sm:py-2 rounded-full text-sm sm:text-base font-semibold transition ${tab === "modificar" ? "bg-black text-white shadow" : "text-gray-700"}`}
-						onClick={() => setTab("modificar")}
-					>
-						<span className="hidden xs:inline">Modificar Existente</span>
-						<span className="xs:hidden">Modificar</span>
-					</button>
-				</div>
-			</div>
-
 			{/* Formulario */}
-			<main className="flex-1 flex flex-col items-center px-4">
-				<div className="w-full max-w-2xl bg-white rounded-xl sm:rounded-2xl shadow p-4 sm:p-6 md:p-8 mb-8 sm:mb-12">
-					<h2 className="text-lg sm:text-xl md:text-2xl font-bold mb-4 sm:mb-6 text-center">
-						{tab === "nuevo" ? "Solicitud de Nuevo Diseño" : "Modificar Producto Existente"}
-					</h2>
-					<form className="flex flex-col gap-3 sm:gap-4 md:gap-5" onSubmit={handleSubmit}>
-						<div className="flex flex-col xs:flex-row gap-3 sm:gap-4">
-							<Input placeholder="Nombre" className="rounded-lg text-sm sm:text-base" required />
-							<Input placeholder="Correo electrónico" type="email" className="rounded-lg text-sm sm:text-base" required />
+			<main className="w-full max-w-5xl px-4">
+				<div className="bg-white rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.05)] border border-gray-100 p-8 md:p-12">
+					<form className="flex flex-col gap-8" onSubmit={handleSubmit}>
+						<div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+							<div className="space-y-2.5">
+								<label className="text-sm font-bold text-gray-800">Nombre *</label>
+								<Input
+									placeholder="Tu nombre completo"
+									className="h-12 rounded-xl border-gray-200 bg-white px-4 text-base focus:ring-2 focus:ring-[#009688] focus:border-transparent transition-all placeholder:text-gray-400"
+									value={nombre}
+									onChange={(e) => setNombre(e.target.value)}
+									required
+								/>
+							</div>
+							<div className="space-y-2.5">
+								<label className="text-sm font-bold text-gray-800">Correo electrónico *</label>
+								<Input
+									type="email"
+									placeholder="tu@email.com"
+									className="h-12 rounded-xl border-gray-200 bg-white px-4 text-base focus:ring-2 focus:ring-[#009688] focus:border-transparent transition-all placeholder:text-gray-400"
+									value={email}
+									onChange={(e) => setEmail(e.target.value)}
+									required
+								/>
+							</div>
 						</div>
-						<Input placeholder="Título del proyecto" className="rounded-lg text-sm sm:text-base" required />
 
-						{/* Selector de tamaño */}
-						<div>
-							<div className="mb-2 text-sm sm:text-base font-medium">Tamaño</div>
-							<div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3">
-								{SIZES.map((s) => (
-									<button
-										type="button"
-										key={s.value}
-										className={`rounded-lg sm:rounded-xl border-2 p-2 sm:p-3 md:p-4 flex flex-col items-center transition font-semibold text-xs sm:text-sm ${
-											size === s.value
-												? "border-black bg-gray-100 shadow"
-												: "border-gray-200 bg-white hover:border-black"
-										}`}
-										onClick={() => setSize(s.value)}
+						<div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+							<div className="space-y-2.5">
+								<label className="text-sm font-bold text-gray-800">Tipo de proyecto *</label>
+								<div className="relative">
+									<select
+										className="w-full h-12 rounded-xl border border-gray-200 bg-white px-4 py-2 text-base text-gray-700 focus:ring-2 focus:ring-[#009688] focus:border-transparent transition-all outline-none appearance-none cursor-pointer"
+										value={tipoProyecto}
+										onChange={(e) => setTipoProyecto(e.target.value)}
+										required
 									>
-										<span>{s.label}</span>
-										<span className="text-[10px] sm:text-xs text-gray-500">{s.desc}</span>
-									</button>
-								))}
+										<option value="" disabled>Selecciona una opción</option>
+										<option value="impresion_3d">Impresión 3D</option>
+										<option value="modelado_3d">Modelado 3D</option>
+										<option value="prototipado">Prototipado</option>
+										<option value="otro">Otro</option>
+									</select>
+									<div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-400">
+										<svg className="h-5 w-5 fill-current" viewBox="0 0 20 20">
+											<path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" fillRule="evenodd"></path>
+										</svg>
+									</div>
+								</div>
+							</div>
+							<div className="space-y-2.5">
+								<label className="text-sm font-bold text-gray-800">Presupuesto aproximado</label>
+								<div className="relative">
+									<select
+										className="w-full h-12 rounded-xl border border-gray-200 bg-white px-4 py-2 text-base text-gray-700 focus:ring-2 focus:ring-[#009688] focus:border-transparent transition-all outline-none appearance-none cursor-pointer"
+										value={presupuesto}
+										onChange={(e) => setPresupuesto(e.target.value)}
+									>
+										<option value="" disabled>Selecciona un rango</option>
+										{PRESUPUESTOS.map(p => <option key={p} value={p}>{p}</option>)}
+									</select>
+									<div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-400">
+										<svg className="h-5 w-5 fill-current" viewBox="0 0 20 20">
+											<path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" fillRule="evenodd"></path>
+										</svg>
+									</div>
+								</div>
 							</div>
 						</div>
 
-						{/* Material, color, acabado */}
-						<div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-							<div>
-								<label htmlFor="material-select" className="block mb-1 text-xs sm:text-sm font-medium">Material</label>
-								<select
-									id="material-select"
-									className="w-full border rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-sm sm:text-base"
-									value={material}
-									onChange={e => setMaterial(e.target.value)}
-								>
-									{MATERIALES.map((m) => <option key={m}>{m}</option>)}
-								</select>
-							</div>
-							<div>
-								<label htmlFor="color-select" className="block mb-1 text-xs sm:text-sm font-medium">Color</label>
-								<select
-									id="color-select"
-									className="w-full border rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-sm sm:text-base"
-									value={color}
-									onChange={e => setColor(e.target.value)}
-								>
-									{COLORES.map((c) => <option key={c}>{c}</option>)}
-								</select>
-							</div>
-							<div>
-								<label htmlFor="acabado-select" className="block mb-1 text-xs sm:text-sm font-medium">Acabado</label>
-								<select
-									id="acabado-select"
-									className="w-full border rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-sm sm:text-base"
-									value={acabado}
-									onChange={e => setAcabado(e.target.value)}
-								>
-									{ACABADOS.map((a) => <option key={a}>{a}</option>)}
-								</select>
-							</div>
-						</div>
-
-						{/* Descripción */}
-						<div>
-							<label className="block mb-1 text-xs sm:text-sm font-medium">Descripción del Proyecto</label>
+						<div className="space-y-2.5">
+							<label className="text-sm font-bold text-gray-800">Descripción de la idea *</label>
 							<textarea
-								className="w-full border rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-sm sm:text-base min-h-[80px] sm:min-h-[100px]"
-								placeholder="Describe tu idea, detalles, medidas, funcionalidades, etc."
+								className="w-full rounded-xl border border-gray-200 bg-white p-4 text-base text-gray-700 min-h-[140px] focus:ring-2 focus:ring-[#009688] focus:border-transparent transition-all outline-none resize-none placeholder:text-gray-400"
+								placeholder="Cuéntanos qué quieres crear, para qué lo necesitas, cantidad aproximada, etc."
+								value={descripcion}
+								onChange={(e) => setDescripcion(e.target.value)}
 								required
 							/>
 						</div>
 
-						{/* Presupuesto y plazo */}
-						<div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-							<div>
-								<label htmlFor="presupuesto-select" className="block mb-1 text-xs sm:text-sm font-medium">Presupuesto aproximado</label>
-								<select
-									id="presupuesto-select"
-									className="w-full border rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-sm sm:text-base"
-									value={presupuesto}
-									onChange={e => setPresupuesto(e.target.value)}
-								>
-									{PRESUPUESTOS.map((p) => <option key={p}>{p}</option>)}
-								</select>
+						{mensaje && (
+							<div className="p-4 bg-emerald-50 text-emerald-700 rounded-xl text-sm font-medium text-center animate-fade-in border border-emerald-100">
+								{mensaje}
 							</div>
-							<div>
-								<label htmlFor="plazo-select" className="block mb-1 text-xs sm:text-sm font-medium">Plazo de entrega deseado</label>
-								<select
-									id="plazo-select"
-									className="w-full border rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-sm sm:text-base"
-									value={plazo}
-									onChange={e => setPlazo(e.target.value)}
-								>
-									{PLAZOS.map((p) => <option key={p}>{p}</option>)}
-								</select>
-							</div>
-						</div>
+						)}
 
-						<Button type="submit" className="w-full mt-3 sm:mt-4 rounded-lg font-semibold text-sm sm:text-base" disabled={loading}>
-							{loading ? "Enviando..." : "Enviar solicitud"}
-						</Button>
-						{mensaje && <div className="text-green-600 text-center mt-2 text-sm sm:text-base">{mensaje}</div>}
+						<div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+							<Button
+								type="submit"
+								className="w-full bg-[#009688] hover:bg-[#00897b] text-white font-bold h-14 rounded-2xl text-lg shadow-lg shadow-[#009688]/20 transition-all transform hover:scale-[1.01] flex items-center justify-center gap-2.5"
+								disabled={loading}
+							>
+								<FiSend className="w-5 h-5" />
+								{loading ? "Enviando..." : "Enviar y cotizar mi proyecto"}
+							</Button>
+
+							<a
+								href="https://wa.me/573000000000"
+								target="_blank"
+								rel="noopener noreferrer"
+								className="w-full bg-[#25D366] hover:bg-[#22bf5b] text-white font-bold h-14 rounded-2xl text-lg shadow-lg shadow-[#25D366]/20 transition-all transform hover:scale-[1.01] flex items-center justify-center gap-2.5"
+							>
+								{/* WhatsApp Icon */}
+								<svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
+									<path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.008-.57-.008-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
+								</svg>
+								Prefiero escribir por WhatsApp
+							</a>
+						</div>
 					</form>
 				</div>
-
-				{/* FAQ */}
-				<section className="w-full max-w-3xl mb-12 sm:mb-16">
-					<h3 className="text-lg sm:text-xl font-bold mb-3 sm:mb-4 text-center">Preguntas Frecuentes</h3>
-					<div className="grid sm:grid-cols-2 gap-3 sm:gap-4">
-						{FAQS.map((faq, idx) => (
-							<div key={idx} className="bg-gray-100 rounded-lg sm:rounded-xl p-4 sm:p-5 shadow-sm">
-								<div className="font-semibold mb-2 text-sm sm:text-base">{faq.q}</div>
-								<div className="text-gray-600 text-xs sm:text-sm">{faq.a}</div>
-							</div>
-						))}
-					</div>
-				</section>
 			</main>
 			{/* Modal de pago */}
 			<Dialog open={showPago} onOpenChange={setShowPago}>
@@ -497,11 +474,10 @@ export default function PersonalizarPage() {
 									className={`flex ${m.remitente === "cliente" ? "justify-end" : "justify-start"}`}
 								>
 									<div
-										className={`rounded-lg px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm max-w-[80%] sm:max-w-[70%] ${
-											m.remitente === "cliente"
-												? "bg-black text-white rounded-br-none"
-												: "bg-gray-100 text-gray-900 rounded-bl-none"
-										}`}
+										className={`rounded-lg px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm max-w-[80%] sm:max-w-[70%] ${m.remitente === "cliente"
+											? "bg-black text-white rounded-br-none"
+											: "bg-gray-100 text-gray-900 rounded-bl-none"
+											}`}
 									>
 										{m.texto}
 										<div className="text-[10px] sm:text-xs text-gray-400 text-right mt-1">{m.hora}</div>

@@ -38,7 +38,7 @@ export default function TopbarTienda() {
   const [role, setRole] = useState<string | null>(null);
   const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
-  
+
   const router = useRouter();
   const sidebarRef = useRef<HTMLDivElement>(null);
   const avatarMenuRef = useRef<HTMLDivElement>(null);
@@ -124,65 +124,49 @@ export default function TopbarTienda() {
         <div className="max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16 lg:h-20">
             {/* Logo */}
-            <div className="flex items-center gap-2 sm:gap-3 min-w-max">
-              <Link href="/" className="flex items-center gap-2">
-                <span className="bg-[#00a19a] rounded-full p-1 shadow-md">
-                  <Image
-                    src="/IG%20Foto%20de%20Perfil.png"
-                    alt="Logo Thiart3D"
-                    width={40}
-                    height={40}
-                    className="h-8 w-8 sm:h-9 sm:w-9 lg:h-10 lg:w-10 rounded-full object-cover"
-                  />
-                </span>
-                <span className="font-extrabold text-lg sm:text-xl lg:text-2xl text-white font-sans">
-                  Thiart3D
-                </span>
-              </Link>
-            </div>
+            <Link href="/" className="flex items-center gap-2 min-w-max">
+              <span className="bg-[#00a19a] rounded-full p-1 shadow-md">
+                <Image
+                  src="/IG%20Foto%20de%20Perfil.png"
+                  alt="Logo Thiart3D"
+                  width={40}
+                  height={40}
+                  className="h-8 w-8 sm:h-9 sm:w-9 lg:h-10 lg:w-10 rounded-full object-cover"
+                />
+              </span>
+              <span className="font-extrabold text-lg sm:text-xl lg:text-2xl text-white font-sans">
+                Thiart3D
+              </span>
+            </Link>
+
 
             {/* Desktop Navigation - Hidden on mobile/tablet */}
             <div className="hidden xl:flex flex-1 items-center justify-center gap-6 2xl:gap-8">
-              <div className="flex gap-4 2xl:gap-6">
-                <Link
-                  href="/"
-                  className="text-white hover:text-gray-100 font-bold font-sans transition-colors text-sm 2xl:text-base whitespace-nowrap"
-                >
-                  Inicio
-                </Link>
-                <Link
-                  href="/tienda/productos"
-                  className="text-white hover:text-gray-100 font-bold font-sans transition-colors text-sm 2xl:text-base whitespace-nowrap"
-                >
-                  Productos
-                </Link>
-                <Link
-                  href="/tienda/personalizar"
-                  className="text-white hover:text-gray-100 font-bold font-sans transition-colors text-sm 2xl:text-base whitespace-nowrap"
-                >
-                  Personalizar
-                </Link>
-                <Link
-                  href="/tienda/sobre-nosotros"
-                  className="text-white hover:text-gray-100 font-bold font-sans transition-colors text-sm 2xl:text-base whitespace-nowrap"
-                >
-                  Sobre Nosotros
-                </Link>
-                <Link
-                  href="/tienda/contacto"
-                  className="text-white hover:text-gray-100 font-bold font-sans transition-colors text-sm 2xl:text-base whitespace-nowrap"
-                >
-                  Contacto
-                </Link>
-              </div>
-              <div className="ml-4">
-                <Input
-                  placeholder="Buscar productos..."
-                  className="w-56 2xl:w-72 rounded-full border border-gray-200 shadow-sm text-black placeholder:text-gray-700 px-4 py-2 focus:ring-2 focus:ring-[#00a19a] transition"
-                />
-              </div>
+              <Link
+                href="/"
+                className="text-white hover:text-gray-100 font-bold font-sans transition-colors text-sm 2xl:text-base whitespace-nowrap"
+              >
+                Inicio
+              </Link>
+              <Link
+                href="/tienda/personalizar"
+                className="text-white hover:text-gray-100 font-bold font-sans transition-colors text-sm 2xl:text-base whitespace-nowrap"
+              >
+                Personalizar
+              </Link>
+              <Link
+                href="/tienda/productos"
+                className="text-white hover:text-gray-100 font-bold font-sans transition-colors text-sm 2xl:text-base whitespace-nowrap"
+              >
+                Productos
+              </Link>
+              <Link
+                href="/tienda/sobre-nosotros"
+                className="text-white hover:text-gray-100 font-bold font-sans transition-colors text-sm 2xl:text-base whitespace-nowrap"
+              >
+                Nosotros
+              </Link>
             </div>
-
             {/* Right side icons */}
             <div className="flex items-center gap-1 sm:gap-2 lg:gap-3">
               {/* Search icon - visible on mobile/tablet, hidden on desktop */}
@@ -220,6 +204,14 @@ export default function TopbarTienda() {
               {/* Desktop Auth Buttons or User Menu */}
               {!usuario ? (
                 <div className="hidden lg:flex items-center gap-2">
+                  <Link href="/tienda/personalizar">
+                    <Button
+                      variant="default"
+                      className="bg-[#00796b] hover:bg-[#004d40] text-white text-sm font-bold shadow-lg transition-transform transform hover:scale-105"
+                    >
+                      Cotizar proyecto 3D
+                    </Button>
+                  </Link>
                   <Button
                     variant="outline"
                     onClick={() => setAuthModalOpen(true)}
@@ -236,7 +228,15 @@ export default function TopbarTienda() {
                   </Button>
                 </div>
               ) : (
-                <div className="hidden lg:block relative" ref={avatarMenuRef}>
+                <div className="hidden lg:flex items-center gap-4 relative" ref={avatarMenuRef}>
+                  <Link href="/tienda/personalizar">
+                    <Button
+                      variant="default"
+                      className="bg-[#00796b] hover:bg-[#004d40] text-white text-sm font-bold shadow-lg transition-transform transform hover:scale-105"
+                    >
+                      Cotizar proyecto 3D
+                    </Button>
+                  </Link>
                   <button
                     className="flex items-center gap-2 xl:gap-3 p-2 rounded-full hover:bg-white/10 transition-colors focus:outline-none focus:ring-2 focus:ring-white/30"
                     onClick={(e) => {
@@ -270,7 +270,7 @@ export default function TopbarTienda() {
                     </div>
                     <IoMdArrowDropdown className="hidden xl:block w-4 h-4 text-white" />
                   </button>
-                  
+
                   {/* Desktop User Dropdown Menu */}
                   {avatarMenuOpen && (
                     <div className="absolute right-0 top-full mt-2 w-64 bg-white border border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden animate-fade-in">
@@ -410,211 +410,219 @@ export default function TopbarTienda() {
             />
           </div>
         )}
-      </nav>
+      </nav >
 
       {/* Mobile/Tablet Sidebar Menu */}
-      {menuOpen && (
-        <div
-          className="fixed inset-0 z-50 xl:hidden"
-          onClick={() => setMenuOpen(false)}
-        >
-          {/* Overlay */}
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity" />
-
-          {/* Sidebar */}
+      {
+        menuOpen && (
           <div
-            ref={sidebarRef}
-            tabIndex={0}
-            className="absolute top-0 left-0 h-full w-4/5 max-w-sm bg-white shadow-2xl flex flex-col overflow-y-auto animate-slide-in-left"
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-label="Menú de navegación"
+            className="fixed inset-0 z-50 xl:hidden"
+            onClick={() => setMenuOpen(false)}
           >
-            {/* Header */}
-            <div className="flex items-center justify-between px-4 py-4 bg-[#00a19a] border-b border-[#007973]">
-              <div className="flex items-center gap-2">
-                <span className="bg-white rounded-full p-1 shadow-md">
-                  <Image
-                    src="/IG%20Foto%20de%20Perfil.png"
-                    alt="Logo Thiart3D"
-                    width={36}
-                    height={36}
-                    className="h-9 w-9 rounded-full object-cover"
-                  />
-                </span>
-                <span className="font-extrabold text-xl text-white font-sans">
-                  Thiart3D
-                </span>
-              </div>
-              <button
-                aria-label="Cerrar menú"
-                className="text-white hover:bg-white/20 rounded-full p-2 transition"
-                onClick={() => setMenuOpen(false)}
-              >
-                <IoMdClose className="w-6 h-6" />
-              </button>
-            </div>
+            {/* Overlay */}
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity" />
 
-            {/* User Section (if logged in) */}
-            {usuario && (
-              <div className="p-4 bg-gradient-to-r from-[#00a19a]/10 to-[#007973]/10 border-b border-gray-200">
-                <div className="flex items-center gap-3">
-                  <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-[#00a19a] bg-white flex items-center justify-center shadow-sm">
-                    {usuario.avatar_url ? (
-                      <Image
-                        src={usuario.avatar_url}
-                        alt="Perfil"
-                        width={56}
-                        height={56}
-                        className="object-cover w-full h-full"
-                      />
-                    ) : (
-                      <IoMdPerson className="w-8 h-8 text-[#00a19a]" />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-gray-900 truncate">
-                      {usuario.nombre ?? usuario.email?.split("@")[0] ?? "Usuario"}
+            {/* Sidebar */}
+            <div
+              ref={sidebarRef}
+              tabIndex={0}
+              className="absolute top-0 left-0 h-full w-4/5 max-w-sm bg-white shadow-2xl flex flex-col overflow-y-auto animate-slide-in-left"
+              onClick={(e) => e.stopPropagation()}
+              role="dialog"
+              aria-label="Menú de navegación"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between px-4 py-4 bg-[#00a19a] border-b border-[#007973]">
+                <div className="flex items-center gap-2">
+                  <span className="bg-white rounded-full p-1 shadow-md">
+                    <Image
+                      src="/IG%20Foto%20de%20Perfil.png"
+                      alt="Logo Thiart3D"
+                      width={36}
+                      height={36}
+                      className="h-9 w-9 rounded-full object-cover"
+                    />
+                  </span>
+                  <span className="font-extrabold text-xl text-white font-sans">
+                    Thiart3D
+                  </span>
+                </div>
+                <button
+                  aria-label="Cerrar menú"
+                  className="text-white hover:bg-white/20 rounded-full p-2 transition"
+                  onClick={() => setMenuOpen(false)}
+                >
+                  <IoMdClose className="w-6 h-6" />
+                </button>
+              </div>
+
+              {/* User Section (if logged in) */}
+              {usuario && (
+                <div className="p-4 bg-gradient-to-r from-[#00a19a]/10 to-[#007973]/10 border-b border-gray-200">
+                  <div className="flex items-center gap-3">
+                    <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-[#00a19a] bg-white flex items-center justify-center shadow-sm">
+                      {usuario.avatar_url ? (
+                        <Image
+                          src={usuario.avatar_url}
+                          alt="Perfil"
+                          width={56}
+                          height={56}
+                          className="object-cover w-full h-full"
+                        />
+                      ) : (
+                        <IoMdPerson className="w-8 h-8 text-[#00a19a]" />
+                      )}
                     </div>
-                    <div className="text-sm text-gray-600 truncate">
-                      {usuario.email}
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-gray-900 truncate">
+                        {usuario.nombre ?? usuario.email?.split("@")[0] ?? "Usuario"}
+                      </div>
+                      <div className="text-sm text-gray-600 truncate">
+                        {usuario.email}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Navigation Links */}
-            <nav className="flex-1 px-4 py-4">
-              <div className="space-y-1">
-                <Link
-                  href="/"
-                  className="flex items-center gap-3 rounded-lg px-3 py-3 text-gray-700 hover:bg-[#e0f2f1] hover:text-[#00a19a] transition font-semibold"
-                  onClick={() => setMenuOpen(false)}
-                >
-                  <IoIosHome className="w-6 h-6" />
-                  <span>Inicio</span>
-                </Link>
-                <Link
-                  href="/tienda/productos"
-                  className="flex items-center gap-3 rounded-lg px-3 py-3 text-gray-700 hover:bg-[#e0f2f1] hover:text-[#00a19a] transition font-semibold"
-                  onClick={() => setMenuOpen(false)}
-                >
-                  <IoIosCube className="w-6 h-6" />
-                  <span>Productos</span>
-                </Link>
-                <Link
-                  href="/tienda/personalizar"
-                  className="flex items-center gap-3 rounded-lg px-3 py-3 text-gray-700 hover:bg-[#e0f2f1] hover:text-[#00a19a] transition font-semibold"
-                  onClick={() => setMenuOpen(false)}
-                >
-                  <IoIosColorPalette className="w-6 h-6" />
-                  <span>Personalizar</span>
-                </Link>
-                <Link
-                  href="/tienda/sobre-nosotros"
-                  className="flex items-center gap-3 rounded-lg px-3 py-3 text-gray-700 hover:bg-[#e0f2f1] hover:text-[#00a19a] transition font-semibold"
-                  onClick={() => setMenuOpen(false)}
-                >
-                  <IoIosPeople className="w-6 h-6" />
-                  <span>Sobre Nosotros</span>
-                </Link>
-                <Link
-                  href="/tienda/contacto"
-                  className="flex items-center gap-3 rounded-lg px-3 py-3 text-gray-700 hover:bg-[#e0f2f1] hover:text-[#00a19a] transition font-semibold"
-                  onClick={() => setMenuOpen(false)}
-                >
-                  <IoIosMail className="w-6 h-6" />
-                  <span>Contacto</span>
-                </Link>
-              </div>
+              {/* Navigation Links */}
+              <nav className="flex-1 px-4 py-4">
+                {/* Search Bar in Sidebar */}
+                <div className="mb-6">
+                  <Input
+                    placeholder="Buscar productos..."
+                    className="w-full rounded-full border border-gray-300 shadow-sm text-black placeholder:text-gray-500 px-4 py-2 focus:ring-2 focus:ring-[#00a19a] transition"
+                  />
+                </div>
 
-              {/* User Actions */}
-              {usuario && (
-                <>
-                  <div className="my-4 border-t border-gray-200"></div>
-                  <div className="space-y-1">
-                    <button
-                      className="w-full flex items-center gap-3 rounded-lg px-3 py-3 text-gray-700 hover:bg-[#e0f2f1] hover:text-[#00a19a] transition font-semibold text-left"
-                      onClick={() => {
-                        setMenuOpen(false);
-                        router.push("/tienda/mi-perfil");
-                      }}
-                    >
-                      <IoMdPerson className="w-6 h-6" />
-                      <span>Mi Perfil</span>
-                    </button>
-                    <button
-                      className="w-full flex items-center gap-3 rounded-lg px-3 py-3 text-gray-700 hover:bg-[#e0f2f1] hover:text-[#00a19a] transition font-semibold text-left"
-                      onClick={() => {
-                        setMenuOpen(false);
-                        router.push("/envios");
-                      }}
-                    >
-                      <IoIosCube className="w-6 h-6" />
-                      <span>Mis Pedidos</span>
-                    </button>
-                    {/* Solo mostrar Panel Admin en mobile si el role es admin */}
-                    {role === "admin" && (
+                <Link href="/tienda/personalizar" onClick={() => setMenuOpen(false)}>
+                  <Button className="w-full bg-[#00796b] hover:bg-[#004d40] text-white font-bold mb-4 shadow-md">
+                    Cotizar proyecto 3D
+                  </Button>
+                </Link>
+
+                <div className="space-y-1">
+                  <Link
+                    href="/"
+                    className="flex items-center gap-3 rounded-lg px-3 py-3 text-gray-700 hover:bg-[#e0f2f1] hover:text-[#00a19a] transition font-semibold"
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    <IoIosHome className="w-6 h-6" />
+                    <span>Inicio</span>
+                  </Link>
+                  <Link
+                    href="/tienda/personalizar"
+                    className="flex items-center gap-3 rounded-lg px-3 py-3 text-gray-700 hover:bg-[#e0f2f1] hover:text-[#00a19a] transition font-semibold"
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    <IoIosColorPalette className="w-6 h-6" />
+                    <span>Personalizar</span>
+                  </Link>
+                  <Link
+                    href="/tienda/productos"
+                    className="flex items-center gap-3 rounded-lg px-3 py-3 text-gray-700 hover:bg-[#e0f2f1] hover:text-[#00a19a] transition font-semibold"
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    <IoIosCube className="w-6 h-6" />
+                    <span>Productos</span>
+                  </Link>
+                  <Link
+                    href="/tienda/sobre-nosotros"
+                    className="flex items-center gap-3 rounded-lg px-3 py-3 text-gray-700 hover:bg-[#e0f2f1] hover:text-[#00a19a] transition font-semibold"
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    <IoIosPeople className="w-6 h-6" />
+                    <span>Nosotros</span>
+                  </Link>
+                </div>
+
+                {/* User Actions */}
+                {usuario && (
+                  <>
+                    <div className="my-4 border-t border-gray-200"></div>
+                    <div className="space-y-1">
                       <button
                         className="w-full flex items-center gap-3 rounded-lg px-3 py-3 text-gray-700 hover:bg-[#e0f2f1] hover:text-[#00a19a] transition font-semibold text-left"
                         onClick={() => {
                           setMenuOpen(false);
-                          router.push("/admin");
+                          router.push("/tienda/mi-perfil");
                         }}
                       >
-                        <FiSettings className="w-6 h-6" />
-                        <span>Panel Admin</span>
+                        <IoMdPerson className="w-6 h-6" />
+                        <span>Mi Perfil</span>
                       </button>
-                    )}
-                  </div>
-                </>
-              )}
-            </nav>
+                      <button
+                        className="w-full flex items-center gap-3 rounded-lg px-3 py-3 text-gray-700 hover:bg-[#e0f2f1] hover:text-[#00a19a] transition font-semibold text-left"
+                        onClick={() => {
+                          setMenuOpen(false);
+                          router.push("/envios");
+                        }}
+                      >
+                        <IoIosCube className="w-6 h-6" />
+                        <span>Mis Pedidos</span>
+                      </button>
+                      {/* Solo mostrar Panel Admin en mobile si el role es admin */}
+                      {role === "admin" && (
+                        <button
+                          className="w-full flex items-center gap-3 rounded-lg px-3 py-3 text-gray-700 hover:bg-[#e0f2f1] hover:text-[#00a19a] transition font-semibold text-left"
+                          onClick={() => {
+                            setMenuOpen(false);
+                            router.push("/admin");
+                          }}
+                        >
+                          <FiSettings className="w-6 h-6" />
+                          <span>Panel Admin</span>
+                        </button>
+                      )}
+                    </div>
+                  </>
+                )}
+              </nav>
 
-            {/* Bottom Actions */}
-            <div className="p-4 border-t border-gray-200 bg-gray-50">
-              {!usuario ? (
-                <div className="space-y-2">
+              {/* Bottom Actions */}
+              <div className="p-4 border-t border-gray-200 bg-gray-50">
+                {!usuario ? (
+                  <div className="space-y-2">
+                    <Button
+                      variant="default"
+                      className="w-full bg-[#00a19a] hover:bg-[#007973] text-white font-semibold"
+                      onClick={() => {
+                        setMenuOpen(false);
+                        setAuthModalOpen(true);
+                      }}
+                    >
+                      Iniciar sesión
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="w-full border-[#00a19a] text-[#00a19a] hover:bg-[#e0f2f1] font-semibold"
+                      onClick={() => {
+                        setMenuOpen(false);
+                        setAuthModalOpen(true);
+                      }}
+                    >
+                      Registrarse
+                    </Button>
+                  </div>
+                ) : (
                   <Button
-                    variant="default"
-                    className="w-full bg-[#00a19a] hover:bg-[#007973] text-white font-semibold"
-                    onClick={() => {
+                    variant="destructive"
+                    className="w-full bg-red-500 hover:bg-red-600 text-white font-semibold flex items-center justify-center gap-2"
+                    onClick={async () => {
                       setMenuOpen(false);
-                      setAuthModalOpen(true);
+                      await supabase.auth.signOut();
+                      router.push("/");
                     }}
                   >
-                    Iniciar sesión
+                    <IoMdLogOut className="w-5 h-5" />
+                    <span>Cerrar sesión</span>
                   </Button>
-                  <Button
-                    variant="outline"
-                    className="w-full border-[#00a19a] text-[#00a19a] hover:bg-[#e0f2f1] font-semibold"
-                    onClick={() => {
-                      setMenuOpen(false);
-                      setAuthModalOpen(true);
-                    }}
-                  >
-                    Registrarse
-                  </Button>
-                </div>
-              ) : (
-                <Button
-                  variant="destructive"
-                  className="w-full bg-red-500 hover:bg-red-600 text-white font-semibold flex items-center justify-center gap-2"
-                  onClick={async () => {
-                    setMenuOpen(false);
-                    await supabase.auth.signOut();
-                    router.push("/");
-                  }}
-                >
-                  <IoMdLogOut className="w-5 h-5" />
-                  <span>Cerrar sesión</span>
-                </Button>
-              )}
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
       {/* Auth Modal */}
       <SupabaseAuth
