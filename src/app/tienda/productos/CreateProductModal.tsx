@@ -155,32 +155,31 @@ export default function CreateProductModal({ open, onOpenChangeAction, onProduct
     return ok0 && ok1 && ok2;
   };
 
-  const handleSubmit = async (e?: React.FormEvent, draft = false) => {
+  const handleSubmit = async (e?: React.FormEvent) => {
     if (e && typeof e.preventDefault === "function") e.preventDefault();
+    if (!validateAll()) return;
     setLoading(true);
 
     try {
       const finalVideoUrl = videoUrl || form.video_url;
 
-      // Incluir las URLs de imagen, modelo 3D y video en el formulario
       const formData = {
         ...form,
         image_url: imageUrl || form.image_url,
         model_url: modelUrl || form.model_url,
         video_url: finalVideoUrl,
-        draft,
       };
 
-      let res;
+      console.log("[CreateProductModal] Enviando formData:", formData);
+
+      let res: Response;
       if (product?.id) {
-        // Editar producto
         res = await fetch(`/api/productos/${product.id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(formData),
         });
       } else {
-        // Crear producto
         res = await fetch("/api/productos", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -188,17 +187,26 @@ export default function CreateProductModal({ open, onOpenChangeAction, onProduct
         });
       }
 
+      const responseText = await res.clone().text();
+      console.log("[CreateProductModal] Respuesta API:", res.status, responseText.slice(0, 300));
+
       if (res.ok) {
         onOpenChangeAction(false);
         onProductCreatedAction?.();
       } else {
-        const data = (await res.json()) as { error?: string };
-        console.error("Error al guardar producto:", data.error);
-        alert("Error al guardar producto: " + (data.error ?? "Error desconocido"));
+        let errorMessage = `Error ${res.status}`;
+        try {
+          const data = JSON.parse(responseText) as { error?: string };
+          errorMessage = data.error ?? errorMessage;
+        } catch {
+          errorMessage = responseText.slice(0, 200) || errorMessage;
+        }
+        console.error("[CreateProductModal] Error del servidor:", errorMessage);
+        alert("Error al guardar producto: " + errorMessage);
       }
     } catch (error) {
-      console.error('Error en submit:', error);
-      alert('Error al procesar el formulario');
+      console.error("[CreateProductModal] Error de red o excepción:", error);
+      alert("Error al procesar el formulario: " + String(error));
     } finally {
       setLoading(false);
     }
@@ -211,14 +219,6 @@ export default function CreateProductModal({ open, onOpenChangeAction, onProduct
     }
   };
 
-  const handleSaveDraft = async () => {
-    // validate all required fields before saving
-    if (!validateAll()) {
-      // focus first error could be implemented here
-      return;
-    }
-    await handleSubmit(undefined, true);
-  };
 
   const handleRemoveImage = () => {
     setImageUrl("");
@@ -275,7 +275,7 @@ export default function CreateProductModal({ open, onOpenChangeAction, onProduct
     <Dialog open={open} onOpenChange={onOpenChangeAction}>
       <DialogContent className="p-0 bg-transparent overflow-hidden">
         <div className="max-w-[1400px] w-[95vw] xl:w-[70vw] 2xl:w-full mx-auto bg-white rounded-lg shadow-lg p-6 border border-gray-100 h-auto max-h-[90vh] overflow-hidden flex flex-col pb-24 relative">
-          <form onSubmit={handleSubmit} className="mt-4 flex flex-col flex-1">
+          <div className="mt-4 flex flex-col flex-1">
             <DialogHeader className="pb-2">
               <div className="flex items-start gap-4">
                 <div className="p-3 rounded-lg bg-[#e6fffb] text-[#0d9488]"><Package className="w-5 h-5" /></div>
@@ -287,7 +287,7 @@ export default function CreateProductModal({ open, onOpenChangeAction, onProduct
 
               <div className="mt-4">
                 {(() => {
-                   
+
                   const steps: Array<{ label: string; icon: React.ComponentType<{ className?: string }> }> = [
                     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
                     { label: 'Información', icon: Package },
@@ -484,14 +484,18 @@ export default function CreateProductModal({ open, onOpenChangeAction, onProduct
                     <div className="max-w-3xl mx-auto flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <Button type="button" variant="ghost" onClick={() => setStep(Math.max(0, step - 1))} className="text-gray-600" disabled={step === 0}>Atrás</Button>
-                        <div role="button" onClick={handleSaveDraft} className="text-gray-600 px-4 py-2 hover:bg-gray-100 rounded-md cursor-pointer text-sm font-medium">Guardar</div>
                       </div>
 
                       <div className="flex items-center gap-3">
                         {step !== totalSteps - 1 ? (
                           <Button type="button" onClick={handleNext} className="bg-[#0d9488] hover:bg-[#0b7f78] text-white py-3 px-6 rounded-lg">Siguiente</Button>
                         ) : (
-                          <Button type="submit" className="bg-[#0d9488] hover:bg-[#0b7f78] text-white py-3 px-6 rounded-lg" disabled={loading}>
+                          <Button
+                            type="button"
+                            onClick={() => void handleSubmit()}
+                            className="bg-[#0d9488] hover:bg-[#0b7f78] text-white py-3 px-6 rounded-lg"
+                            disabled={loading}
+                          >
                             {loading ? ('Procesando...') : (product ? 'Actualizar producto' : 'Guardar producto')}
                           </Button>
                         )}
@@ -501,7 +505,7 @@ export default function CreateProductModal({ open, onOpenChangeAction, onProduct
                 </div>
               </div>
             </div>
-          </form>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

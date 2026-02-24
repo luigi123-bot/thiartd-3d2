@@ -1,20 +1,78 @@
 "use client";
-import React, { useEffect, useState } from "react";
-import { Card } from "~/components/ui/card";
+import React, { useEffect, useState, useCallback } from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle
+} from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
+import { Badge } from "~/components/ui/badge";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from "~/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+  DialogFooter,
+} from "~/components/ui/dialog";
+import { Input } from "~/components/ui/input";
+import { Textarea } from "~/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "~/components/ui/select";
 import { createClient } from "@supabase/supabase-js";
-import { FiCheckCircle, FiAlertTriangle, FiClock, FiXCircle, FiMail } from "react-icons/fi";
+import {
+  CheckCircle2,
+  AlertTriangle,
+  Clock,
+  XCircle,
+  Mail,
+  Plus,
+  Filter,
+  MoreVertical,
+  ArrowRight,
+  LifeBuoy
+} from "lucide-react";
+import { useToast } from "~/components/ui/use-toast";
+import { motion, AnimatePresence } from "framer-motion";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "TU_SUPABASE_URL";
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "TU_SUPABASE_ANON_KEY";
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-const ESTADOS = [
-  { value: "abierto", label: "Abierto", color: "bg-blue-500" },
-  { value: "en_progreso", label: "En progreso", color: "bg-yellow-500" },
-  { value: "resuelto", label: "Resuelto", color: "bg-green-500" },
-  { value: "cerrado", label: "Cerrado", color: "bg-gray-400" },
+interface IconProps {
+  className?: string;
+  size?: number | string;
+  stroke?: string | number;
+}
+
+interface EstadoConfig {
+  value: string;
+  label: string;
+  color: string;
+  icon: React.ComponentType<IconProps>;
+}
+
+const ESTADOS: EstadoConfig[] = [
+  { value: "abierto", label: "Abierto", color: "bg-blue-500/10 text-blue-500 border-blue-500/20", icon: Clock as React.ComponentType<IconProps> },
+  { value: "en_progreso", label: "En progreso", color: "bg-amber-500/10 text-amber-500 border-amber-500/20", icon: AlertTriangle as React.ComponentType<IconProps> },
+  { value: "resuelto", label: "Resuelto", color: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20", icon: CheckCircle2 as React.ComponentType<IconProps> },
+  { value: "cerrado", label: "Cerrado", color: "bg-slate-500/10 text-slate-500 border-slate-500/20", icon: XCircle as React.ComponentType<IconProps> },
 ];
+
 const CATEGORIAS = [
   "Error",
   "Sugerencia",
@@ -22,284 +80,458 @@ const CATEGORIAS = [
   "Otro"
 ];
 
-export default function AdminTicketsPage() {
-  interface Ticket {
-    id: number;
-    titulo: string;
-    descripcion: string;
-    categoria: string;
-    estado: string;
-    created_at: string;
-    imagen_url?: string;
-  }
+interface Ticket {
+  id: number;
+  titulo: string;
+  descripcion: string;
+  categoria: string;
+  estado: string;
+  created_at: string;
+  imagen_url?: string;
+}
 
+export default function AdminTicketsPage() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
-  const [estadoFiltro, setEstadoFiltro] = useState<string>("");
-  const [categoriaFiltro, setCategoriaFiltro] = useState<string>("");
-  const [modalTicket, setModalTicket] = useState<Record<string, unknown> | null>(null);
+  const [estadoFiltro, setEstadoFiltro] = useState<string>("all");
+  const [categoriaFiltro, setCategoriaFiltro] = useState<string>("all");
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const { toast } = useToast();
 
-  // Cargar tickets
-  const fetchTickets = React.useCallback(async () => {
+  const fetchTickets = useCallback(async () => {
     setLoading(true);
-    // Solo selecciona los campos que existen en tu tabla
     let query = supabase
       .from("tickets")
       .select("id,titulo,descripcion,categoria,estado,created_at,imagen_url")
       .order("created_at", { ascending: false });
-    if (estadoFiltro) query = query.eq("estado", estadoFiltro);
-    if (categoriaFiltro) query = query.eq("categoria", categoriaFiltro);
+
+    if (estadoFiltro !== "all") query = query.eq("estado", estadoFiltro);
+    if (categoriaFiltro !== "all") query = query.eq("categoria", categoriaFiltro);
+
     const { data, error } = await query;
     if (error) {
       console.error("Error al obtener tickets:", error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los tickets.",
+        variant: "destructive",
+      });
       setTickets([]);
     } else {
       setTickets(Array.isArray(data) ? data : []);
     }
     setLoading(false);
-  }, [estadoFiltro, categoriaFiltro]);
+  }, [estadoFiltro, categoriaFiltro, toast]);
 
   useEffect(() => {
     void fetchTickets();
   }, [fetchTickets]);
 
-  // Cambiar estado del ticket
   const cambiarEstado = async (id: number, nuevoEstado: string) => {
-    await supabase.from("tickets").update({ estado: nuevoEstado }).eq("id", id);
-    void fetchTickets();
+    const { error } = await supabase.from("tickets").update({ estado: nuevoEstado }).eq("id", id);
+    if (error) {
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar el estado.",
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Éxito",
+        description: "Estado actualizado correctamente.",
+      });
+      void fetchTickets();
+    }
   };
 
-  // Estadísticas para burbujas
-  const total = tickets.length;
-  const abiertos = tickets.filter(t => t.estado === "abierto").length;
-  const enProgreso = tickets.filter(t => t.estado === "en_progreso").length;
-  const resueltos = tickets.filter(t => t.estado === "resuelto").length;
-  const cerrados = tickets.filter(t => t.estado === "cerrado").length;
+  const stats = {
+    total: tickets.length,
+    abiertos: tickets.filter(t => t.estado === "abierto").length,
+    enProgreso: tickets.filter(t => t.estado === "en_progreso").length,
+    resueltos: tickets.filter(t => t.estado === "resuelto").length,
+  };
 
   return (
-    <div className="min-h-screen p-8 bg-gray-50">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-        <div>
-          <h1 className="text-3xl font-bold">Gestión de Tickets</h1>
-          <p className="text-gray-500">Administra y responde los tickets de soporte y errores.</p>
+    <div className="min-h-screen bg-slate-50/50 p-4 md:p-8 space-y-8">
+      {/* Background Decor */}
+      <div className="fixed inset-0 pointer-events-none opacity-[0.03] z-0 overflow-hidden">
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-[#00a19a] rounded-full blur-[120px]" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500 rounded-full blur-[120px]" />
+      </div>
+
+      <div className="relative z-10 space-y-8">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+          <div className="space-y-1">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#00a19a]/10 border border-[#00a19a]/20 text-[#00a19a] text-xs font-bold uppercase tracking-wider mb-2">
+              <LifeBuoy className="w-3 h-3" /> Soporte Técnico
+            </div>
+            <h1 className="text-4xl md:text-5xl font-black tracking-tight text-slate-900">
+              Gestión de <span className="text-[#00a19a]">Tickets</span>
+            </h1>
+            <p className="text-slate-500 text-lg max-w-2xl">
+              Monitorea, gestiona y responde a todas las solicitudes de soporte de tus clientes desde un panel centralizado.
+            </p>
+          </div>
+          <Button
+            onClick={() => setIsModalOpen(true)}
+            className="bg-slate-900 hover:bg-slate-800 text-white shadow-xl shadow-slate-900/10 group h-12 px-6 rounded-xl transition-all hover:scale-[1.02]"
+          >
+            <Plus className="w-5 h-5 mr-2 group-hover:rotate-90 transition-transform" />
+            Nuevo Ticket
+          </Button>
         </div>
-        <Button onClick={() => setModalTicket({})}>Nuevo Ticket</Button>
-      </div>
-      {/* Burbujas de estado */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <Card className="p-4 flex flex-col items-center">
-          <FiMail className="text-2xl mb-1" />
-          <div className="text-xl font-bold">{total}</div>
-          <div className="text-gray-500 text-sm">Total Tickets</div>
-        </Card>
-        <Card className="p-4 flex flex-col items-center">
-          <FiClock className="text-2xl mb-1 text-blue-500" />
-          <div className="text-xl font-bold">{abiertos}</div>
-          <div className="text-gray-500 text-sm">Abiertos</div>
-        </Card>
-        <Card className="p-4 flex flex-col items-center">
-          <FiAlertTriangle className="text-2xl mb-1 text-yellow-500" />
-          <div className="text-xl font-bold">{enProgreso}</div>
-          <div className="text-gray-500 text-sm">En progreso</div>
-        </Card>
-        <Card className="p-4 flex flex-col items-center">
-          <FiCheckCircle className="text-2xl mb-1 text-green-500" />
-          <div className="text-xl font-bold">{resueltos}</div>
-          <div className="text-gray-500 text-sm">Resueltos</div>
-        </Card>
-        <Card className="p-4 flex flex-col items-center">
-          <FiXCircle className="text-2xl mb-1 text-gray-400" />
-          <div className="text-xl font-bold">{cerrados}</div>
-          <div className="text-gray-500 text-sm">Cerrados</div>
-        </Card>
-      </div>
-      {/* Filtros */}
-      <div className="flex flex-wrap gap-4 mb-6">
-        <label htmlFor="estado-filtro" className="sr-only">Filtrar por estado</label>
-        <select
-          id="estado-filtro"
-          className="border rounded px-3 py-2"
-          value={estadoFiltro}
-          onChange={e => setEstadoFiltro(e.target.value)}
-          aria-label="Filtrar por estado"
-        >
-          <option value="">Todos los estados</option>
-          {ESTADOS.map(e => <option key={e.value} value={e.value}>{e.label}</option>)}
-        </select>
-        <label htmlFor="categoria-filtro" className="sr-only">Filtrar por categoría</label>
-        <select
-          id="categoria-filtro"
-          className="border rounded px-3 py-2"
-          value={categoriaFiltro}
-          onChange={e => setCategoriaFiltro(e.target.value)}
-          aria-label="Filtrar por categoría"
-        >
-          <option value="">Todas las categorías</option>
-          {CATEGORIAS.map(c => <option key={c} value={c}>{c}</option>)}
-        </select>
-      </div>
-      {/* Tabla de tickets */}
-      <Card>
-        <div className="p-4 overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead>
-              <tr>
-                <th className="text-left py-2 px-2">ID</th>
-                <th className="text-left py-2 px-2">Título</th>
-                <th className="text-left py-2 px-2">Categoría</th>
-                <th className="text-left py-2 px-2">Estado</th>
-                <th className="text-left py-2 px-2">Fecha</th>
-                <th className="text-left py-2 px-2">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={6} className="text-center py-8">Cargando tickets...</td>
-                </tr>
-              ) : tickets.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="text-center py-8">No hay tickets.</td>
-                </tr>
-              ) : (
-                tickets.map((t) => (
-                  <tr key={t.id}>
-                    <td className="py-2 px-2">{t.id}</td>
-                    <td className="py-2 px-2">{t.titulo}</td>
-                    <td className="py-2 px-2">{t.categoria}</td>
-                    <td className="py-2 px-2">
-                      <span className={`inline-block px-2 py-1 rounded-full text-xs font-semibold ${ESTADOS.find(e => e.value === t.estado)?.color ?? "bg-gray-200"}`}>
-                        {ESTADOS.find(e => e.value === t.estado)?.label ?? t.estado}
-                      </span>
-                    </td>
-                    <td className="py-2 px-2">{t.created_at ? new Date(t.created_at).toLocaleString() : ""}</td>
-                    <td className="py-2 px-2">
-                      <select
-                        className="border rounded px-2 py-1 text-xs"
-                        value={t.estado}
-                        onChange={e => cambiarEstado(t.id, e.target.value)}
-                        aria-label="Cambiar estado del ticket"
-                      >
-                        {ESTADOS.map(e => <option key={e.value} value={e.value}>{e.label}</option>)}
-                      </select>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          {[
+            { label: "Total Tickets", value: stats.total, icon: Mail as React.ComponentType<IconProps>, color: "slate" as const },
+            { label: "Abiertos", value: stats.abiertos, icon: Clock as React.ComponentType<IconProps>, color: "blue" as const },
+            { label: "En Progreso", value: stats.enProgreso, icon: AlertTriangle as React.ComponentType<IconProps>, color: "amber" as const },
+            { label: "Resueltos", value: stats.resueltos, icon: CheckCircle2 as React.ComponentType<IconProps>, color: "emerald" as const },
+          ].map((stat, i) => (
+            <motion.div
+              key={stat.label}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.1 }}
+            >
+              <Card className="border-none shadow-sm shadow-slate-200/50 bg-white/80 backdrop-blur-sm hover:shadow-md transition-all group overflow-hidden">
+                <CardContent className="p-6">
+                  <div className="flex justify-between items-start">
+                    <div className="space-y-4">
+                      <div className={`p-2 w-fit rounded-lg bg-${stat.color}-50 text-${stat.color}-600 ring-1 ring-${stat.color}-500/10`}>
+                        <stat.icon className="w-5 h-5" />
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium text-slate-500 uppercase tracking-wider">{stat.label}</p>
+                        <h3 className="text-3xl font-black text-slate-900">{stat.value}</h3>
+                      </div>
+                    </div>
+                    <div className="opacity-[0.05] group-hover:opacity-[0.1] transition-opacity">
+                      <stat.icon className="w-16 h-16 -mr-4 -mt-4 rotate-[-15deg]" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          ))}
         </div>
-      </Card>
-      {/* Modal para crear ticket */}
-      {modalTicket && (
-        <TicketModal
-          open={!!modalTicket}
-          onOpenChange={v => setModalTicket(v ? {} : null)}
-          onTicketCreated={fetchTickets}
-        />
-      )}
+
+        {/* Filters and Table Card */}
+        <Card className="border-none shadow-xl shadow-slate-200/50 bg-white overflow-hidden rounded-2xl">
+          <CardHeader className="border-b border-slate-100 bg-slate-50/50 py-6 px-8">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-white shadow-sm ring-1 ring-slate-200">
+                  <Filter className="w-4 h-4 text-slate-500" />
+                </div>
+                <div>
+                  <CardTitle className="text-lg font-bold">Base de Datos</CardTitle>
+                  <CardDescription>Mostrando {tickets.length} tickets actuales</CardDescription>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-3">
+                <Select value={estadoFiltro} onValueChange={setEstadoFiltro}>
+                  <SelectTrigger className="w-[180px] h-10 bg-white rounded-xl shadow-sm border-slate-200">
+                    <SelectValue placeholder="Estado" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los estados</SelectItem>
+                    {ESTADOS.map(e => (
+                      <SelectItem key={e.value} value={e.value}>{e.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select value={categoriaFiltro} onValueChange={setCategoriaFiltro}>
+                  <SelectTrigger className="w-[180px] h-10 bg-white rounded-xl shadow-sm border-slate-200">
+                    <SelectValue placeholder="Categoría" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas las categorías</SelectItem>
+                    {CATEGORIAS.map(c => (
+                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Button variant="outline" size="icon" onClick={() => void fetchTickets()} className="h-10 w-10 shrink-0 rounded-xl">
+                  <Clock className={`w-4 h-4 text-slate-500 ${loading ? 'animate-spin' : ''}`} />
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader className="bg-slate-50/50">
+                <TableRow className="hover:bg-transparent border-slate-100">
+                  <TableHead className="w-[80px] pl-8 py-4 font-bold text-slate-400 uppercase text-[10px] tracking-widest">ID</TableHead>
+                  <TableHead className="py-4 font-bold text-slate-400 uppercase text-[10px] tracking-widest">Ticket</TableHead>
+                  <TableHead className="py-4 font-bold text-slate-400 uppercase text-[10px] tracking-widest">Categoría</TableHead>
+                  <TableHead className="py-4 font-bold text-slate-400 uppercase text-[10px] tracking-widest">Estado</TableHead>
+                  <TableHead className="py-4 font-bold text-slate-400 uppercase text-[10px] tracking-widest">Fecha</TableHead>
+                  <TableHead className="w-[150px] pr-8 text-right py-4 font-bold text-slate-400 uppercase text-[10px] tracking-widest">Acciones</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="h-64 text-center">
+                      <div className="flex flex-col items-center justify-center space-y-3">
+                        <div className="w-10 h-10 border-4 border-[#00a19a]/30 border-t-[#00a19a] rounded-full animate-spin" />
+                        <p className="text-slate-400 font-medium">Sincronizando tickets...</p>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : tickets.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="h-64 text-center">
+                      <div className="flex flex-col items-center justify-center space-y-4">
+                        <div className="p-4 rounded-full bg-slate-50 ring-1 ring-slate-100">
+                          <LifeBuoy className="w-8 h-8 text-slate-300" />
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-slate-900 font-bold">No se encontraron tickets</p>
+                          <p className="text-slate-500 text-sm">Prueba ajustando los filtros de búsqueda.</p>
+                        </div>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  tickets.map((t, idx) => (
+                    <motion.tr
+                      key={t.id}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: idx * 0.05 }}
+                      className="group hover:bg-slate-50/50 transition-colors border-slate-100"
+                    >
+                      <TableCell className="pl-8 font-mono text-xs text-slate-400">#{t.id}</TableCell>
+                      <TableCell className="max-w-md">
+                        <div className="space-y-1">
+                          <p className="font-bold text-slate-900 line-clamp-1 group-hover:text-[#00a19a] transition-colors">{t.titulo}</p>
+                          <p className="text-xs text-slate-500 line-clamp-1">{t.descripcion}</p>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="bg-slate-50 text-slate-600 border-slate-200 capitalize text-[10px] font-bold py-0 h-5 px-2 rounded-md">
+                          {t.categoria}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {(() => {
+                          const found = ESTADOS.find(e => e.value === t.estado);
+                          const config = found ?? ESTADOS[0]!;
+                          const Icon = config.icon;
+                          return (
+                            <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-black uppercase tracking-tight ${config.color}`}>
+                              <Icon className="w-3 h-3" />
+                              {config.label}
+                            </div>
+                          );
+                        })()}
+                      </TableCell>
+                      <TableCell className="text-slate-500 text-xs">
+                        {t.created_at ? new Date(t.created_at).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' }) : "---"}
+                      </TableCell>
+                      <TableCell className="pr-8 text-right">
+                        <div className="inline-flex items-center gap-1">
+                          <Select
+                            value={t.estado}
+                            onValueChange={(val) => cambiarEstado(t.id, val)}
+                          >
+                            <SelectTrigger className="w-[130px] h-8 text-[10px] font-bold uppercase tracking-tight rounded-lg">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {ESTADOS.map(e => (
+                                <SelectItem key={e.value} value={e.value} className="text-[10px] font-bold uppercase">{e.label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg">
+                            <MoreVertical className="w-4 h-4 text-slate-400" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </motion.tr>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+          <div className="bg-slate-50/50 border-t border-slate-100 p-4 px-8 flex justify-between items-center">
+            <p className="text-xs text-slate-500 font-medium">Mostrando {tickets.length} resultados globales</p>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" className="h-8 rounded-lg text-xs" disabled>Anterior</Button>
+              <Button variant="outline" size="sm" className="h-8 rounded-lg text-xs" disabled>Siguiente</Button>
+            </div>
+          </div>
+        </Card>
+      </div>
+
+      <AnimatePresence>
+        {isModalOpen && (
+          <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+            <TicketModal
+              onClose={() => setIsModalOpen(false)}
+              onTicketCreated={() => {
+                setIsModalOpen(false);
+                void fetchTickets();
+              }}
+            />
+          </Dialog>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
 
-// Modal para crear ticket
-function TicketModal({ onOpenChange, onTicketCreated }: { open: boolean, onOpenChange: (v: boolean) => void, onTicketCreated: () => void }) {
-  interface Ticket {
-    id: number;
-    titulo: string;
-    descripcion: string;
-    categoria: string;
-    estado: string;
-    created_at: string;
-    imagen_url?: string;
-  }
+function TicketModal({ onClose, onTicketCreated }: { onClose: () => void, onTicketCreated: () => void }) {
   const [form, setForm] = useState({ titulo: "", descripcion: "", categoria: CATEGORIAS[0] });
-  const [loading, setLoading] = useState(false);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
-  };
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    const ticketData = {
-      titulo: form.titulo,
-      descripcion: form.descripcion,
-      categoria: form.categoria,
-      estado: "abierto",
-      created_at: new Date().toISOString(),
-    };
-    console.log("Intentando guardar ticket en Supabase:", ticketData);
+    setIsSubmitting(true);
 
     try {
-      const { data, error }: { data: Ticket | null; error: { message: string; details?: string; hint?: string } | null } = await supabase.from("tickets").insert([ticketData]).select().single();
-      console.log("Respuesta de Supabase:", { data, error });
-      setLoading(false);
-      if (!error && data) {
-        // Enviar correo al admin (ajusta el endpoint según tu backend)
-        fetch("/api/enviar-correo-admin", {
+      const { data, error } = await supabase
+        .from("tickets")
+        .insert([{
+          titulo: form.titulo,
+          descripcion: form.descripcion,
+          categoria: form.categoria,
+          estado: "abierto",
+          created_at: new Date().toISOString(),
+        }])
+        .select()
+        .single() as { data: Ticket | null; error: unknown };
+
+      if (error) throw new Error(JSON.stringify(error));
+
+      if (data) {
+        toast({
+          title: "¡Ticket creado!",
+          description: "El ticket ha sido registrado correctamente.",
+        });
+
+        // Correo notificado via API (opcional)
+        void fetch("/api/enviar-correo-admin", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             to: "admin@thiart3d.com",
             subject: "Nuevo Ticket de Soporte",
-            text: `Se ha creado un nuevo ticket:\n\nTítulo: ${form.titulo}\nCategoría: ${form.categoria}\nDescripción: ${form.descripcion}`,
+            text: `Nuevo ticket: ${form.titulo}`,
           }),
-        }).catch((error) => {
-          console.error("Error al enviar el correo al admin:", error);
-        });
-        onOpenChange(false);
+        }).catch((e: Error) => { console.error("Error sending email:", e); });
+
         onTicketCreated();
-      } else {
-        alert("Error al guardar el ticket: " + (error?.message ?? "Error desconocido"));
       }
     } catch (err) {
-      setLoading(false);
-      console.error("Excepción al guardar el ticket:", err);
-      alert("Error inesperado al guardar el ticket.");
+      const error = err as Error;
+      toast({
+        title: "Error al crear ticket",
+        description: error.message ?? "Ha ocurrido un error inesperado.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-xl shadow-lg p-8 w-full max-w-md">
-        <h2 className="text-xl font-bold mb-4">Nuevo Ticket</h2>
-        <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
-          <input
-            name="titulo"
-            className="border rounded px-3 py-2"
-            placeholder="Título"
-            value={form.titulo}
-            onChange={handleChange}
-            required
-          />
-          <label htmlFor="modal-categoria" className="sr-only">Categoría</label>
-          <select
-            id="modal-categoria"
-            name="categoria"
-            className="border rounded px-3 py-2"
-            value={form.categoria}
-            onChange={handleChange}
-            aria-label="Categoría"
-          >
-            {CATEGORIAS.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
-          <textarea
-            name="descripcion"
-            className="border rounded px-3 py-2 min-h-[80px]"
-            placeholder="Describe el problema o sugerencia"
-            value={form.descripcion}
-            onChange={handleChange}
-            required
-          />
-          <div className="flex gap-2 justify-end">
-            <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>Cancelar</Button>
-            <Button type="submit" disabled={loading}>{loading ? "Enviando..." : "Crear Ticket"}</Button>
+    <DialogContent className="sm:max-w-[500px] border-none shadow-2xl rounded-3xl p-0 overflow-hidden bg-white">
+      <div className="bg-slate-900 p-8 text-white relative">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-[#00a19a]/20 rounded-full blur-3xl -mr-16 -mt-16" />
+        <div className="relative z-10 flex items-center gap-4">
+          <div className="p-3 bg-white/10 backdrop-blur-md rounded-2xl ring-1 ring-white/20">
+            <Mail className="w-6 h-6 text-[#00a19a]" />
           </div>
-        </form>
+          <div>
+            <DialogTitle className="text-2xl font-black tracking-tight">Nuevo Ticket</DialogTitle>
+            <DialogDescription className="text-slate-400">
+              Completa la información técnica del incidente.
+            </DialogDescription>
+          </div>
+        </div>
       </div>
-    </div>
+
+      <form onSubmit={handleSubmit} className="p-8 space-y-6">
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-slate-400 uppercase tracking-widest px-1">Título del Incidente</label>
+            <Input
+              placeholder="Ej: Error al cargar modelo 3D..."
+              required
+              className="h-12 bg-slate-50 border-slate-100 rounded-xl focus-visible:ring-[#00a19a]"
+              value={form.titulo}
+              onChange={e => setForm({ ...form, titulo: e.target.value })}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-slate-400 uppercase tracking-widest px-1">Categoría</label>
+            <Select
+              value={form.categoria}
+              onValueChange={val => setForm({ ...form, categoria: val })}
+            >
+              <SelectTrigger className="h-12 bg-slate-50 border-slate-100 rounded-xl">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {CATEGORIAS.map(c => (
+                  <SelectItem key={c} value={c}>{c}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-slate-400 uppercase tracking-widest px-1">Descripción Detallada</label>
+            <Textarea
+              placeholder="Describe paso a paso cómo reproducir el error o los detalles de tu consulta..."
+              required
+              className="min-h-[120px] bg-slate-50 border-slate-100 rounded-xl focus-visible:ring-[#00a19a] resize-none"
+              value={form.descripcion}
+              onChange={e => setForm({ ...form, descripcion: e.target.value })}
+            />
+          </div>
+        </div>
+
+        <DialogFooter className="pt-4 border-t border-slate-100 flex gap-3">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={onClose}
+            className="rounded-xl flex-1 h-12 text-slate-500 font-bold"
+          >
+            Cancelar
+          </Button>
+          <Button
+            type="submit"
+            disabled={isSubmitting}
+            className="rounded-xl flex-[2] h-12 bg-[#00a19a] hover:bg-[#007973] text-white font-bold transition-all shadow-lg shadow-[#00a19a]/20"
+          >
+            {isSubmitting ? (
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                Registrando...
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                Crear Ticket <ArrowRight className="w-4 h-4" />
+              </div>
+            )}
+          </Button>
+        </DialogFooter>
+      </form>
+    </DialogContent>
   );
 }
+
 

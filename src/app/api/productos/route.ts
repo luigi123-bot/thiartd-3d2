@@ -6,7 +6,14 @@ const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 export async function GET() {
-  const { data: productos, error } = await supabase.from("productos").select("*");
+  const { data: productos, error } = await supabase
+    .from("productos")
+    .select(`
+      *,
+      usuarios:user_id (
+        nombre
+      )
+    `);
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -32,9 +39,9 @@ export async function POST(req: Request) {
     const body = (await req.json()) as ProductoBody;
     // Ajusta los campos según tu tabla productos
     const { nombre, precio, descripcion, tamano, categoria, stock, detalles, destacado, image_url, model_url, video_url, user_id } = body;
-    if (!nombre || precio === undefined || !descripcion || !tamano || !categoria || stock === undefined || !user_id) {
+    if (!nombre || precio === undefined || !descripcion || !tamano || !categoria || stock === undefined) {
       return NextResponse.json(
-        { error: "Todos los campos son obligatorios." },
+        { error: "Los campos nombre, precio, descripción, tamaño, categoría y stock son obligatorios." },
         { status: 400 }
       );
     }
@@ -67,12 +74,12 @@ export async function POST(req: Request) {
         tamano,
         categoria,
         stock,
-        detalles,
-        destacado,
-        image_url,
-        model_url,
-        video_url,
-        user_id,
+        detalles: detalles ?? null,
+        destacado: destacado ?? false,
+        image_url: image_url ?? null,
+        model_url: model_url ?? null,
+        video_url: video_url ?? null,
+        ...(user_id ? { user_id } : {}),
       }])
       .select()
       .single();

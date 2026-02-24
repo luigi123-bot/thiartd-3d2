@@ -1,30 +1,28 @@
 "use client";
+// Force rebuild to clear HMR cache
 
-import { useState } from "react";
-import { Dialog, DialogContent } from "~/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "~/components/ui/dialog";
 import { Button } from "~/components/ui/button";
-import { Card } from "~/components/ui/card";
-import { 
-  Receipt, 
-  CheckCircle2, 
-  Clock, 
-  XCircle, 
-  Maximize2, 
-  Minimize2,
+import {
+  CheckCircle2,
+  X,
   User,
   Mail,
   Phone,
   MapPin,
-  Home,
-  Building2,
-  MapIcon,
-  Mail as MailIcon,
   CreditCard,
   Package,
   Printer,
-  Download
+  Download,
+  Calendar,
+  AlertCircle,
+  ShieldCheck,
+  TrendingUp,
+  Layout,
+  Receipt,
 } from "lucide-react";
-import { parseJSON, getEstadoBadgeClass } from "../app/admin/pedidos/utils";
+import { parseJSON } from "../app/admin/pedidos/utils";
+import { motion } from "framer-motion";
 
 interface Producto {
   id: string;
@@ -68,502 +66,83 @@ interface DetallePedidoModalProps {
   procesandoPago: number | null;
 }
 
-// ============================================
-// COMPONENTES INTERNOS
-// ============================================
+// ----------------------------------------------------------------------
+// SUB-COMPONENTES OPTIMIZADOS
+// ----------------------------------------------------------------------
 
-// Componente de Item reutilizable para información
-function InfoItem({ 
-  label, 
-  value, 
-  icon, 
-  bg 
-}: { 
-  label: string; 
-  value: string; 
-  icon: React.ReactNode; 
-  bg: string; 
-}) {
+interface IconProps {
+  className?: string;
+  size?: number | string;
+  stroke?: string | number;
+}
+
+interface StatBoxProps {
+  label: string;
+  value: string | number;
+  icon: React.ComponentType<IconProps>;
+  colorClass: string;
+  delay?: number;
+  className?: string;
+}
+
+function StatBox({ label, value, icon: Icon, colorClass, delay = 0, className = "" }: StatBoxProps) {
   return (
-    <div className="flex items-start gap-3">
-      <div className={`w-10 h-10 ${bg} rounded-xl flex items-center justify-center flex-shrink-0`}>
-        {icon}
+    <motion.div
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ delay }}
+      className={`bg-white/5 backdrop-blur-md border border-white/10 p-3 sm:p-4 rounded-2xl flex items-center gap-3 sm:gap-4 group hover:bg-white/10 transition-all min-w-0 ${className}`}
+    >
+      <div className={`p-2 rounded-xl flex-shrink-0 ${colorClass} bg-opacity-20`}>
+        <Icon className={`w-4 h-4 sm:w-5 sm:h-5 ${colorClass.replace('bg-', 'text-')}`} />
       </div>
-      <div className="flex-1">
-        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">{label}</p>
-        <p className="text-sm font-semibold text-gray-900 break-words">{value}</p>
+      <div className="flex flex-col min-w-0">
+        <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 truncate">{label}</span>
+        <span className="text-sm sm:text-base font-black text-white tracking-tighter tabular-nums truncate">{value}</span>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
-// Header del pedido
-function PedidoHeader({ 
-  pedido, 
-  modalSize, 
-  onToggleSize, 
-  onClose 
-}: { 
-  pedido: Pedido; 
-  modalSize: "normal" | "expanded" | "full"; 
-  onToggleSize: () => void; 
-  onClose: () => void; 
-}) {
-  const estadoBadgeClass = getEstadoBadgeClass(pedido.estado);
-
-  return (
-    <div className="flex-shrink-0 bg-gradient-to-r from-[#00897B] to-emerald-600 px-12 py-6 shadow-lg relative">
-      <div className="flex items-center justify-between max-w-[1920px] mx-auto">
-        <div className="flex items-center gap-6">
-          <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-4">
-            <Receipt className="w-8 h-8 text-white" />
-          </div>
-          <div>
-            <h1 className="text-3xl font-bold text-white mb-1 tracking-tight">
-              Pedido #{pedido.id}
-            </h1>
-            <p className="text-sm text-white/90 font-medium">
-              {new Date(pedido.created_at).toLocaleDateString("es-ES", {
-                weekday: "long",
-                day: "numeric",
-                month: "long",
-                year: "numeric",
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-6">
-          <div className="flex items-center gap-3">
-            {pedido.estado === "pagado" && (
-              <CheckCircle2 className="w-6 h-6 text-white animate-pulse" />
-            )}
-            {pedido.estado === "pendiente_pago" && (
-              <Clock className="w-6 h-6 text-white animate-spin" style={{ animationDuration: "3s" }} />
-            )}
-            {(pedido.estado === "pago_rechazado" || pedido.estado === "pago_cancelado") && (
-              <XCircle className="w-6 h-6 text-white" />
-            )}
-            <span className={`px-6 py-2.5 rounded-full text-sm font-bold border-2 shadow-lg ${estadoBadgeClass}`}>
-              {pedido.estado.replace(/_/g, " ").toUpperCase()}
-            </span>
-          </div>
-
-          <div className="bg-white/20 backdrop-blur-sm rounded-2xl px-8 py-4 border-2 border-white/30">
-            <p className="text-xs text-white/90 font-semibold mb-1 uppercase tracking-wider">
-              Total
-            </p>
-            <p className="text-4xl font-bold text-white tracking-tight">
-              ${Number(pedido.total).toLocaleString("es-CO")}
-            </p>
-          </div>
-
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onToggleSize}
-            className="text-white hover:text-white bg-white/30 hover:bg-white/40 rounded-xl h-12 w-12 transition-all shadow-md border-2 border-white/50"
-          >
-            {modalSize === 'full' ? <Minimize2 className="w-6 h-6" /> : <Maximize2 className="w-6 h-6" />}
-          </Button>
-
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onClose}
-            className="text-white hover:text-white bg-white/30 hover:bg-white/40 rounded-xl h-12 w-12 transition-all shadow-md border-2 border-white/50"
-          >
-            <span className="text-3xl font-light">×</span>
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
+interface GlassCardProps {
+  label: string;
+  value: string | undefined;
+  icon: React.ComponentType<IconProps>;
+  theme: "blue" | "purple" | "emerald" | "amber";
+  delay?: number;
 }
 
-// Card de información del cliente
-function ClienteCard({ 
-  pedido, 
-  datos 
-}: { 
-  pedido: Pedido; 
-  datos: DatosContacto; 
-}) {
-  return (
-    <Card className="rounded-3xl shadow-md p-8 bg-white border-0 hover:shadow-xl transition-shadow duration-300 overflow-hidden">
-      <div className="flex items-center gap-4 pb-4 border-b-2 border-gray-100 mb-5">
-        <div className="w-12 h-12 bg-gradient-to-br from-[#00897B] to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg">
-          <User className="w-6 h-6 text-white" />
-        </div>
-        <div>
-          <h3 className="text-lg font-bold text-gray-900">Cliente</h3>
-          <p className="text-xs text-gray-500 font-medium">Información de contacto</p>
-        </div>
-      </div>
-
-      <div className="space-y-5">
-        <InfoItem 
-          label="Nombre completo" 
-          value={datos.nombre ?? "No especificado"} 
-          icon={<User className="w-5 h-5 text-blue-600" />} 
-          bg="bg-blue-50" 
-        />
-        <InfoItem 
-          label="Correo electrónico" 
-          value={datos.email ?? "No especificado"} 
-          icon={<Mail className="w-5 h-5 text-green-600" />} 
-          bg="bg-green-50" 
-        />
-        <InfoItem 
-          label="Teléfono" 
-          value={pedido.telefono_envio ?? "No especificado"} 
-          icon={<Phone className="w-5 h-5 text-purple-600" />} 
-          bg="bg-purple-50" 
-        />
-      </div>
-    </Card>
-  );
-}
-
-// Card de dirección de envío
-function DireccionCard({ pedido }: { pedido: Pedido }) {
-  const direccionCompleta = [
-    pedido.direccion_envio,
-    pedido.ciudad_envio,
-    pedido.departamento_envio,
-    "Colombia",
-  ].filter(Boolean).join(", ");
-
-  const mapUrl = direccionCompleta
-    ? `https://www.google.com/maps/embed/v1/place?key=AIzaSyBFw0Qbyq9zTFTd-tUY6dZWTgaQzuU17R8&q=${encodeURIComponent(direccionCompleta)}`
-    : null;
-
-  return (
-    <Card className="rounded-3xl shadow-md p-8 bg-white border-0 hover:shadow-xl transition-shadow duration-300 overflow-hidden">
-      <div className="flex items-center gap-4 pb-4 border-b-2 border-gray-100 mb-5">
-        <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl flex items-center justify-center shadow-lg">
-          <MapPin className="w-6 h-6 text-white" />
-        </div>
-        <div>
-          <h3 className="text-lg font-bold text-gray-900">Dirección de Envío</h3>
-          <p className="text-xs text-gray-500 font-medium">Ubicación de entrega</p>
-        </div>
-      </div>
-
-      <div className="space-y-5">
-        <InfoItem 
-          label="Dirección" 
-          value={pedido.direccion_envio ?? "No especificada"} 
-          icon={<Home className="w-5 h-5 text-orange-600" />} 
-          bg="bg-orange-50" 
-        />
-
-        <div className="grid grid-cols-2 gap-4">
-          <InfoItem 
-            label="Ciudad" 
-            value={pedido.ciudad_envio ?? "-"} 
-            icon={<Building2 className="w-5 h-5 text-teal-600" />} 
-            bg="bg-teal-50" 
-          />
-          <InfoItem 
-            label="Departamento" 
-            value={pedido.departamento_envio ?? "-"} 
-            icon={<MapIcon className="w-5 h-5 text-indigo-600" />} 
-            bg="bg-indigo-50" 
-          />
-        </div>
-
-        {pedido.codigo_postal_envio && (
-          <InfoItem 
-            label="Código Postal" 
-            value={pedido.codigo_postal_envio} 
-            icon={<MailIcon className="w-5 h-5 text-pink-600" />} 
-            bg="bg-pink-50" 
-          />
-        )}
-
-        {pedido.notas_envio && (
-          <div className="bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-200 rounded-2xl p-4 shadow-sm">
-            <p className="text-xs font-bold text-amber-800 uppercase mb-2 flex items-center gap-2">
-              <span>📝</span> Notas especiales
-            </p>
-            <p className="text-sm text-amber-900 leading-relaxed">{pedido.notas_envio}</p>
-          </div>
-        )}
-
-        {mapUrl && (
-          <div className="rounded-2xl overflow-hidden border-2 border-gray-200 shadow-lg mt-4">
-            <iframe
-              title={`Ubicación: ${direccionCompleta}`}
-              width="100%"
-              height="220"
-              className="border-0"
-              loading="lazy"
-              allowFullScreen
-              referrerPolicy="no-referrer-when-downgrade"
-              src={mapUrl}
-            />
-          </div>
-        )}
-      </div>
-    </Card>
-  );
-}
-
-// Card de información de pago
-function PagoCard({ 
-  pedido, 
-  procesandoPago, 
-  onAprobarPago 
-}: { 
-  pedido: Pedido; 
-  procesandoPago: number | null; 
-  onAprobarPago: (pedidoId: number) => void; 
-}) {
-  return (
-    <Card className="rounded-3xl shadow-md p-8 bg-white border-0 hover:shadow-xl transition-shadow duration-300 overflow-hidden">
-      <div className="flex items-center gap-4 pb-4 border-b-2 border-gray-100 mb-5">
-        <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg">
-          <CreditCard className="w-6 h-6 text-white" />
-        </div>
-        <div>
-          <h3 className="text-lg font-bold text-gray-900">Información de Pago</h3>
-          <p className="text-xs text-gray-500 font-medium">Detalles de transacción</p>
-        </div>
-      </div>
-
-      <div className="space-y-5">
-        {pedido.payment_method ? (
-          <>
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 bg-green-50 rounded-xl flex items-center justify-center flex-shrink-0">
-                <CreditCard className="w-5 h-5 text-green-600" />
-              </div>
-              <div className="flex-1">
-                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
-                  Método de Pago
-                </p>
-                <p className="text-base font-bold text-gray-900 uppercase">
-                  {pedido.payment_method}
-                </p>
-              </div>
-            </div>
-
-            {pedido.payment_id && (
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <Receipt className="w-5 h-5 text-purple-600" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
-                    ID de Transacción
-                  </p>
-                  <code className="text-xs bg-gray-50 px-4 py-3 rounded-xl border border-gray-200 block font-mono text-gray-900 break-all shadow-sm">
-                    {pedido.payment_id}
-                  </code>
-                </div>
-              </div>
-            )}
-
-            {pedido.estado === "pendiente_pago" && (
-              <Button
-                onClick={() => onAprobarPago(pedido.id)}
-                disabled={procesandoPago === pedido.id}
-                className="w-full bg-gradient-to-r from-[#00897B] to-emerald-600 hover:from-emerald-600 hover:to-[#00897B] text-white font-bold py-6 rounded-2xl shadow-lg text-base mt-6 transition-all duration-300 hover:shadow-xl"
-              >
-                {procesandoPago === pedido.id ? (
-                  <>
-                    <Clock className="w-5 h-5 mr-2 animate-spin" />
-                    Procesando...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle2 className="w-5 h-5 mr-2" />
-                    Aprobar Pago
-                  </>
-                )}
-              </Button>
-            )}
-          </>
-        ) : (
-          <div className="flex items-center justify-center h-full py-12">
-            <div className="text-center">
-              <CreditCard className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-              <p className="text-sm text-gray-500 italic">
-                No hay información de pago disponible
-              </p>
-            </div>
-          </div>
-        )}
-      </div>
-    </Card>
-  );
-}
-
-// Card de productos del pedido
-function ProductosCard({ productos }: { productos: Producto[] }) {
-  return (
-    <div className="lg:col-span-2">
-      <Card className="rounded-3xl shadow-md p-8 bg-white border-0 hover:shadow-xl transition-shadow duration-300 overflow-hidden">
-        <div className="flex items-center gap-4 pb-4 border-b-2 border-gray-100 mb-5">
-          <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
-            <Package className="w-6 h-6 text-white" />
-          </div>
-          <div>
-            <h3 className="text-lg font-bold text-gray-900">Productos del Pedido</h3>
-            <p className="text-xs text-gray-500 font-medium">
-              {productos.length} artículo{productos.length !== 1 ? "s" : ""}
-            </p>
-          </div>
-        </div>
-
-        <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 scroll-smooth">
-          {productos.map((prod, idx) => (
-            <div
-              key={idx}
-              className="bg-gradient-to-br from-gray-50 to-purple-50 border-2 border-gray-100 rounded-2xl p-5 hover:shadow-md transition-all duration-300 hover:border-purple-200"
-            >
-              <div className="flex justify-between items-start mb-3">
-                <h4 className="font-bold text-gray-900 text-base flex-1 leading-tight pr-4">
-                  {prod.titulo ?? prod.nombre ?? prod.producto_id}
-                </h4>
-                <span className="bg-gradient-to-r from-[#00897B] to-emerald-600 text-white text-sm px-4 py-2 rounded-full font-bold shadow-md whitespace-nowrap">
-                  ×{prod.cantidad}
-                </span>
-              </div>
-
-              {prod.descripcion && (
-                <p className="text-sm text-gray-600 mb-3 leading-relaxed">
-                  {prod.descripcion}
-                </p>
-              )}
-
-              <div className="border-t-2 border-gray-200 pt-3 space-y-2">
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-gray-600 font-medium">Precio unitario</span>
-                  <span className="font-bold text-gray-900">
-                    ${Number(prod.precio_unitario).toLocaleString("es-CO")}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-900 font-bold">Subtotal</span>
-                  <span className="font-extrabold text-[#00897B] text-lg">
-                    ${(prod.cantidad * prod.precio_unitario).toLocaleString("es-CO")}
-                  </span>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </Card>
-    </div>
-  );
-}
-
-// Card de resumen del pedido
-function ResumenCard({ pedido }: { pedido: Pedido }) {
-  return (
-    <Card className="rounded-3xl shadow-md p-6 bg-gradient-to-br from-emerald-50 to-teal-50 border-0 hover:shadow-xl transition-shadow duration-300 overflow-hidden">
-      <div className="flex items-center gap-4 pb-4 border-b-2 border-emerald-200 mb-6 overflow-hidden">
-        <div className="w-12 h-12 bg-gradient-to-br from-[#00897B] to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg">
-          <Receipt className="w-6 h-6 text-white" />
-        </div>
-        <div>
-          <h3 className="text-lg font-bold text-gray-900">Resumen</h3>
-          <p className="text-xs text-gray-600 font-medium">Desglose de costos</p>
-        </div>
-      </div>
-
-      <div className="space-y-5">
-        <div className="flex justify-between items-center py-3 border-b border-emerald-200">
-          <span className="text-base font-semibold text-gray-700">Subtotal</span>
-          <span className="text-xl font-bold text-gray-900">
-            ${Number(pedido.subtotal ?? pedido.total).toLocaleString("es-CO")}
-          </span>
-        </div>
-
-        <div className="flex justify-between items-center py-3 border-b border-emerald-200">
-          <span className="text-base font-semibold text-gray-700">Envío</span>
-          <span className="text-xl font-bold text-gray-900">
-            ${Number(pedido.costo_envio ?? 0).toLocaleString("es-CO")}
-          </span>
-        </div>
-
-        <div className="bg-gradient-to-r from-[#00897B] to-emerald-600 rounded-3xl p-6 shadow-2xl mt-6 relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" />
-          
-          <div className="relative">
-            <p className="text-sm font-bold text-white/90 uppercase tracking-wider mb-2 text-center">
-              Total del Pedido
-            </p>
-            <p className="text-5xl font-bold text-white text-center tracking-tight">
-              ${Number(pedido.total).toLocaleString("es-CO")}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <style jsx>{`
-        @keyframes shimmer {
-          0% { transform: translateX(-100%); }
-          100% { transform: translateX(100%); }
-        }
-        .animate-shimmer {
-          animation: shimmer 3s infinite;
-        }
-      `}</style>
-    </Card>
-  );
-}
-
-// Footer del modal con acciones
-function PedidoFooter({ pedido }: { pedido: Pedido }) {
-  const handlePrint = () => {
-    window.print();
-  };
-
-  const handleDownload = () => {
-    alert("Función de descarga en desarrollo");
+function GlassCard({ label, value, icon: Icon, theme, delay = 0 }: GlassCardProps) {
+  const themes = {
+    blue: "from-blue-500/10 to-transparent text-blue-600",
+    purple: "from-purple-500/10 to-transparent text-purple-600",
+    emerald: "from-emerald-500/10 to-transparent text-emerald-600",
+    amber: "from-amber-500/10 to-transparent text-amber-600",
   };
 
   return (
-    <div className="flex-shrink-0 bg-white border-t-2 border-gray-100 px-12 py-5 shadow-lg">
-      <div className="max-w-[1920px] mx-auto">
-        <div className="flex justify-between items-center">
-          <p className="text-sm text-gray-500 font-medium">
-            Pedido generado el{" "}
-            {new Date(pedido.created_at).toLocaleDateString("es-ES")}
-          </p>
-          
-          <div className="flex gap-3">
-            <Button
-              variant="outline"
-              onClick={handlePrint}
-              className="border-2 border-gray-300 hover:border-[#00897B] hover:bg-emerald-50 text-gray-700 font-semibold px-6 py-5 rounded-2xl transition-all duration-300"
-            >
-              <Printer className="w-5 h-5 mr-2" />
-              Imprimir
-            </Button>
-            
-            <Button
-              onClick={handleDownload}
-              className="bg-gradient-to-r from-[#00897B] to-emerald-600 hover:from-emerald-600 hover:to-[#00897B] text-white font-bold px-6 py-5 rounded-2xl shadow-lg transition-all duration-300 hover:shadow-xl"
-            >
-              <Download className="w-5 h-5 mr-2" />
-              Descargar PDF
-            </Button>
-          </div>
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay }}
+      className="relative group bg-white border border-slate-200/60 p-5 rounded-[20px] shadow-sm hover:shadow-md transition-all h-full"
+    >
+      <div className="flex items-start gap-4 relative z-10">
+        <div className={`w-11 h-11 rounded-xl bg-slate-50 flex items-center justify-center ${themes[theme].split(' ')[1]} flex-shrink-0 shadow-inner group-hover:bg-slate-100 transition-colors`}>
+          <Icon className="w-6 h-6" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1">{label}</p>
+          <p className="text-slate-900 font-bold text-[15px] leading-tight break-words">{value ?? "---"}</p>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
-// ============================================
-// COMPONENTE PRINCIPAL
-// ============================================
+// ----------------------------------------------------------------------
+// COMPONENTE PRINCIPAL: RESPONSIVE ELITE MODAL
+// ----------------------------------------------------------------------
 
 export function DetallePedidoModal({
   pedido,
@@ -571,59 +150,215 @@ export function DetallePedidoModal({
   onAprobarPago,
   procesandoPago,
 }: DetallePedidoModalProps) {
-  const [modalSize, setModalSize] = useState<"normal" | "expanded" | "full">("expanded");
-  
   if (!pedido) return null;
 
   const datos = parseJSON<DatosContacto>(pedido.datos_contacto) ?? {};
   const productos = parseJSON<Producto[]>(pedido.productos) ?? [];
 
-  const toggleSize = () => {
-    setModalSize((s) => (s === "normal" ? "expanded" : s === "expanded" ? "full" : "normal"));
+  const getStatusConfig = (estado: string): { label: string; color: string; icon: React.ComponentType<IconProps> } => {
+    switch (estado) {
+      case 'pagado':
+        return { label: 'CONFIRMADO', color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20', icon: CheckCircle2 as React.ComponentType<IconProps> };
+      case 'pendiente_pago':
+        return { label: 'PENDIENTE', color: 'text-amber-400 bg-amber-500/10 border-amber-500/20', icon: CreditCard as React.ComponentType<IconProps> };
+      case 'pago_cancelado':
+        return { label: 'CANCELADO', color: 'text-rose-400 bg-rose-500/10 border-rose-500/20', icon: X as React.ComponentType<IconProps> };
+      default:
+        return { label: (estado ?? '---').replace(/_/g, ' ').toUpperCase(), color: 'text-slate-400 bg-slate-500/10 border-slate-500/20', icon: Layout as React.ComponentType<IconProps> };
+    }
   };
 
-  const modalSizeClasses = {
-    normal: "w-[85vw] h-[85vh]",
-    expanded: "w-[98vw] h-[98vh]",
-    full: "w-screen h-screen",
-  };
+  const status = getStatusConfig(pedido.estado);
 
   return (
     <Dialog open={!!pedido} onOpenChange={(v) => !v && onClose()}>
       <DialogContent
-        className={`max-w-none ${modalSizeClasses[modalSize]} p-0 gap-0 overflow-hidden border-0 shadow-2xl transition-all duration-300`}
-        aria-label="Detalle del pedido"
+        className="w-[98vw] sm:max-w-[95vw] lg:max-w-[1450px] p-0 border-0 shadow-[0_50px_100px_-20px_rgba(0,0,0,0.5)] rounded-[40px] bg-white overflow-hidden focus:outline-none"
+        style={{ width: '98vw', maxWidth: '1450px' }}
       >
-        <div className="h-full flex flex-col overflow-hidden bg-[#F8F9FA]">
-          <PedidoHeader 
-            pedido={pedido} 
-            modalSize={modalSize} 
-            onToggleSize={toggleSize} 
-            onClose={onClose} 
-          />
+        <div className="sr-only">
+          <DialogTitle>Detalle del Pedido #{pedido.id}</DialogTitle>
+          <DialogDescription>
+            Interfaz de gestión de pedidos con información detallada del cliente, productos e inversión final.
+          </DialogDescription>
+        </div>
+        <div className="flex flex-col h-auto max-h-[95vh] overflow-hidden">
 
-          <div className="flex-1 overflow-y-auto px-12 py-8 scroll-smooth">
-            <div className="max-w-[1920px] mx-auto space-y-8">
-              {/* Información general */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <ClienteCard pedido={pedido} datos={datos} />
-                <DireccionCard pedido={pedido} />
-                <PagoCard 
-                  pedido={pedido} 
-                  procesandoPago={procesandoPago} 
-                  onAprobarPago={onAprobarPago} 
-                />
+          {/* HEADER: Compacto & Dinámico */}
+          <header className="flex-shrink-0 bg-[#020617] p-10 sm:p-12 md:p-14 text-white relative">
+            <div className="absolute top-0 right-0 w-96 h-96 bg-[#7b00ff]/10 blur-[120px] rounded-full pointer-events-none" />
+
+            <button
+              onClick={onClose}
+              className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-slate-400 hover:text-white transition-all z-50"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="relative z-10 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 sm:gap-8">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6">
+                <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-[20px] bg-gradient-to-tr from-[#7b00ff] to-[#a855f7] flex items-center justify-center shadow-lg shadow-[#7b00ff]/20">
+                  <Receipt className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tighter uppercase leading-none mb-2">
+                    PEDIDO <span className="text-[#a855f7]">#{pedido.id}</span>
+                  </h2>
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                    <span className={`px-3 py-1 text-[9px] font-black rounded-full border ${status.color} tracking-widest`}>
+                      {status.label}
+                    </span>
+                    <p className="text-slate-500 text-[11px] font-bold flex items-center gap-2">
+                      <Calendar className="w-3 h-3 text-[#a855f7]" />
+                      {new Date(pedido.created_at).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" })}
+                    </p>
+                  </div>
+                </div>
               </div>
 
-              {/* Productos y resumen */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <ProductosCard productos={productos} />
-                <ResumenCard pedido={pedido} />
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 w-full lg:w-auto">
+                <StatBox label="Total" value={`$${Number(pedido.total).toLocaleString("es-CO")}`} icon={TrendingUp as React.ComponentType<IconProps>} colorClass="bg-emerald-500" />
+                <StatBox label="Items" value={productos.length} icon={Package as React.ComponentType<IconProps>} colorClass="bg-blue-500" />
+                <StatBox label="Seguro" value="SSL" icon={ShieldCheck as React.ComponentType<IconProps>} colorClass="bg-purple-500" className="hidden sm:flex" />
               </div>
+            </div>
+          </header>
+
+          {/* MAIN CONTENT: Scrollable & Grid Optimized */}
+          <div className="flex-1 overflow-y-auto bg-slate-50/30 p-4 sm:p-6 md:p-8">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-8">
+
+              {/* Entidades y Productos */}
+              <div className="lg:col-span-8 space-y-6 md:space-y-8">
+
+                {/* Cuadrícula de Información (2x2) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <GlassCard label="Cliente" value={datos.nombre} icon={User as React.ComponentType<IconProps>} theme="blue" />
+                  <GlassCard label="Email" value={datos.email} icon={Mail as React.ComponentType<IconProps>} theme="purple" />
+                  <GlassCard label="Entrega" value={pedido.direccion_envio} icon={MapPin as React.ComponentType<IconProps>} theme="emerald" />
+                  <GlassCard label="Teléfono" value={pedido.telefono_envio} icon={Phone as React.ComponentType<IconProps>} theme="amber" />
+                </div>
+
+                {/* Notas */}
+                <div className="p-6 sm:p-8 rounded-[24px] bg-white border border-slate-200/60 shadow-sm relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 p-6 opacity-[0.02] group-hover:scale-110 transition-transform">
+                    <AlertCircle className="w-24 h-24 text-[#7b00ff]" />
+                  </div>
+                  <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-4">Observaciones</h3>
+                  <p className="text-slate-600 font-medium whitespace-pre-wrap leading-relaxed">
+                    {pedido.notas_envio ?? "Sin especificaciones especiales."}
+                  </p>
+                </div>
+
+                {/* Lista de Productos */}
+                <div className="p-6 sm:p-8 rounded-[24px] bg-white border border-slate-200/60 shadow-sm">
+                  <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-6">Detalle de Compra</h3>
+                  <div className="space-y-4">
+                    {productos.map((p, i) => (
+                      <div key={i} className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 py-4 border-b border-slate-50 last:border-0 last:pb-0">
+                        <div className="flex items-center gap-4 min-w-0">
+                          <div className="w-12 h-12 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400">
+                            <Package className="w-6 h-6" />
+                          </div>
+                          <div className="min-w-0">
+                            <span className="text-base font-bold text-slate-900 block truncate">{p.titulo ?? p.nombre ?? p.producto_id}</span>
+                            <span className="text-[10px] font-black uppercase tracking-[0.1em] text-[#7b00ff]">SKU-{i + 1}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between w-full sm:w-auto gap-8">
+                          <div className="text-center">
+                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Cant.</p>
+                            <p className="text-sm font-black text-slate-900">×{p.cantidad}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Precio</p>
+                            <p className="text-base font-black text-slate-900">
+                              ${(p.cantidad * p.precio_unitario).toLocaleString("es-CO")}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Sidebar Financiero */}
+              <aside className="lg:col-span-4 space-y-6 h-fit lg:sticky lg:top-8">
+                <div className="bg-white p-6 sm:p-8 rounded-[32px] shadow-xl border border-slate-100 flex flex-col relative overflow-hidden group">
+                  <div className="flex-1 flex flex-col items-center justify-center py-6">
+                    <div className="w-20 h-20 bg-slate-50 rounded-[28px] flex items-center justify-center text-slate-300 mb-6 shadow-inner">
+                      <CreditCard className="w-10 h-10" />
+                    </div>
+                    <div className="text-center">
+                      <p className="text-[9px] font-black text-[#7b00ff] uppercase tracking-[0.3em] mb-2">Transacción</p>
+                      <h4 className="text-2xl font-black text-slate-900 tracking-tighter uppercase">
+                        {status.label}
+                      </h4>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 mt-4">
+                    <div className="flex justify-between items-center text-slate-500">
+                      <span className="text-[10px] font-black uppercase tracking-widest">Subtotal</span>
+                      <span className="text-slate-900 font-extrabold text-sm">
+                        $ {Number(pedido.subtotal ?? (pedido.total - (pedido.costo_envio ?? 0))).toLocaleString("es-CO")}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center text-slate-500">
+                      <span className="text-[10px] font-black uppercase tracking-widest">Envío</span>
+                      <span className="text-slate-900 font-extrabold text-sm">
+                        $ {Number(pedido.costo_envio ?? 0).toLocaleString("es-CO")}
+                      </span>
+                    </div>
+                    <div className="pt-6 mt-4 border-t-2 border-slate-50 flex justify-between items-end">
+                      <div className="flex flex-col">
+                        <span className="text-slate-900 font-black text-xs uppercase tracking-[0.2em] leading-none mb-1">TOTAL</span>
+                        <span className="text-[8px] font-bold text-[#7b00ff] uppercase tracking-widest">IVA Incluido</span>
+                      </div>
+                      <span className="text-[#7b00ff] text-3xl font-black tracking-tighter leading-none">
+                        ${Number(pedido.total).toLocaleString("es-CO")}
+                      </span>
+                    </div>
+                  </div>
+
+                  {pedido.estado === "pendiente_pago" && (
+                    <Button
+                      onClick={() => onAprobarPago(pedido.id)}
+                      disabled={procesandoPago === pedido.id}
+                      className="mt-8 w-full h-14 bg-[#7b00ff] hover:bg-[#6200cc] text-white font-black rounded-2xl shadow-lg transition-all active:scale-[0.98] text-xs uppercase tracking-[0.1em]"
+                    >
+                      {procesandoPago === pedido.id ? "SINCRONIZANDO..." : "VALIDAR PAGO"}
+                    </Button>
+                  )}
+                </div>
+              </aside>
+
             </div>
           </div>
 
-          <PedidoFooter pedido={pedido} />
+          {/* FOOTER: Acciones Principales */}
+          <footer className="flex-shrink-0 bg-white border-t border-slate-100 p-6 sm:p-8 flex flex-col md:flex-row justify-between items-center gap-6">
+            <div className="flex items-center gap-4 bg-slate-50 px-4 py-2 rounded-xl border border-slate-100">
+              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-[11px] font-mono font-bold text-slate-500">REF: LX-{pedido.id}</span>
+            </div>
+
+            <div className="flex gap-4 w-full md:w-auto">
+              <button
+                onClick={() => window.print()}
+                className="flex-1 h-12 md:h-14 px-6 rounded-2xl font-black text-[12px] uppercase text-slate-600 bg-white border-2 border-slate-100 hover:border-slate-800 transition-all flex items-center justify-center gap-2"
+              >
+                <Printer className="h-4 w-4" />
+                <span className="hidden sm:inline">Imprimir</span>
+              </button>
+              <button className="flex-1 h-12 md:h-14 px-8 rounded-2xl font-black text-[12px] uppercase text-white bg-slate-900 hover:bg-black transition-all flex items-center justify-center gap-2 shadow-xl shadow-slate-200">
+                <Download className="h-4 w-4" />
+                <span className="hidden sm:inline">PDF</span>
+                <span className="sm:hidden">Exportar</span>
+              </button>
+            </div>
+          </footer>
         </div>
       </DialogContent>
     </Dialog>
