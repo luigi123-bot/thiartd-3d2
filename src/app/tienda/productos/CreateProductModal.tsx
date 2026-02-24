@@ -287,10 +287,15 @@ export default function CreateProductModal({ open, onOpenChangeAction, onProduct
 
               <div className="mt-4">
                 {(() => {
+                   
                   const steps: Array<{ label: string; icon: React.ComponentType<{ className?: string }> }> = [
+                    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
                     { label: 'Información', icon: Package },
+                    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
                     { label: 'Clasificación', icon: Tag },
+                    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
                     { label: 'Precio', icon: DollarSign },
+                    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
                     { label: 'Multimedia', icon: ImageIcon },
                   ];
                   return (
