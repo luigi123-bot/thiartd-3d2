@@ -2,13 +2,14 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { 
-  uploadProductImage, 
-  uploadSTLFile, 
-  uploadAvatar, 
+import {
+  uploadProductImage,
+  uploadSTLFile,
+  uploadAvatar,
   uploadTicketImage,
   uploadChatFile,
   uploadModel3D,
+  uploadProductVideo,
   optimizeImage,
   StorageBucket,
   validateFile
@@ -82,33 +83,37 @@ export function useFileUpload(options: UseFileUploadOptions) {
 
         // Subir según el bucket
         let url: string
-        
+
         switch (bucket) {
           case StorageBucket.PRODUCTOS:
             url = await uploadProductImage(fileToUpload, metadata?.entityId ?? 'temp')
             break
-            
+
           case StorageBucket.MODELS:
             url = await uploadModel3D(fileToUpload, metadata?.entityId ?? 'temp')
             break
-            
+
           case StorageBucket.PERSONALIZACIONES:
             const stlResult = await uploadSTLFile(fileToUpload, metadata?.userId ?? 'temp')
             url = stlResult.signedUrl
             break
-            
+
           case StorageBucket.AVATARES:
             url = await uploadAvatar(fileToUpload, metadata?.userId ?? 'temp')
             break
-            
+
           case StorageBucket.TICKETS:
             url = await uploadTicketImage(fileToUpload, metadata?.entityId ?? 'temp')
             break
-            
+
           case StorageBucket.CHAT:
             url = await uploadChatFile(fileToUpload, metadata?.entityId ?? 'temp')
             break
-            
+
+          case StorageBucket.VIDEOS:
+            url = await uploadProductVideo(fileToUpload, metadata?.entityId ?? 'temp')
+            break
+
           default:
             throw new Error('Bucket no soportado')
         }
@@ -122,11 +127,11 @@ export function useFileUpload(options: UseFileUploadOptions) {
         return url
       } catch (error) {
         const err = error as Error
-        setState((prev) => ({ 
-          ...prev, 
-          error: err.message, 
+        setState((prev) => ({
+          ...prev,
+          error: err.message,
           uploading: false,
-          progress: 0 
+          progress: 0
         }))
 
         if (onError) {

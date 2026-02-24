@@ -6,7 +6,7 @@ const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 export async function GET() {
-  const { data: productos, error } = await supabase.from("productos_3d").select("*");
+  const { data: productos, error } = await supabase.from("productos").select("*");
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -59,7 +59,7 @@ export async function POST(req: Request) {
     }
 
     const insertResult = await supabase
-      .from("productos_3d")
+      .from("productos")
       .insert([{
         nombre,
         precio,

@@ -11,7 +11,6 @@ import {
   IoIosCube,
   IoIosColorPalette,
   IoIosPeople,
-  IoIosMail,
   IoMdClose,
   IoIosCart,
   IoMdMenu,

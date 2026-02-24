@@ -49,7 +49,7 @@ export async function POST(req: Request) {
             });
             if (match) { found = true; break; }
           }
-        } catch (err) {
+        } catch {
           continue;
         }
       }

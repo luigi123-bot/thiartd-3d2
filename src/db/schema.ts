@@ -11,7 +11,7 @@ export const usuario = pgTable("public.usuario", {
   role: varchar("role", { length: 20 }).default("user"), // <-- Cambiado a 'role'
 });
 
-export const products = pgTable("public.productos_3d", {
+export const products = pgTable("public.productos", {
   id: serial("id").primaryKey(),
   name: varchar("name", { length: 100 }).notNull(),         // OBLIGATORIO
   description: text("description"),                         // Opcional

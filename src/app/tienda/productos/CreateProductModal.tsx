@@ -4,12 +4,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "~/components/u
 import { Input } from "~/components/ui/input";
 import { Button } from "~/components/ui/button";
 import { Textarea } from "~/components/ui/textarea";
-import { ProductImageUpload, ProductModel3DUpload } from "~/components/FileUploadWidget";
+import { ProductImageUpload, ProductModel3DUpload, ProductVideoUpload } from "~/components/FileUploadWidget";
 import { Model3DViewer, Model3DViewerLoading } from "~/components/Model3DViewer";
-import { uploadProductVideo } from "~/lib/supabase-storage";
 import Image from "next/image";
 import { FiX } from "react-icons/fi";
-import { Video, Upload, Package, Tag, DollarSign, Image as ImageIcon } from "lucide-react";
+import { Video, Package, Tag, DollarSign, Image as ImageIcon } from "lucide-react";
 
 const categorias = [
   "Abstracto",
@@ -64,8 +63,6 @@ export default function CreateProductModal({ open, onOpenChangeAction, onProduct
   const [imageUrl, setImageUrl] = useState<string>("");
   const [modelUrl, setModelUrl] = useState<string>("");
   const [videoUrl, setVideoUrl] = useState<string>("");
-  const [videoFile, setVideoFile] = useState<File | null>(null);
-  const [uploadingVideo, setUploadingVideo] = useState(false);
   const [videoPreview, setVideoPreview] = useState<string | null>(null);
   const [showModelDialog, setShowModelDialog] = useState(false);
   interface Creator {
@@ -113,16 +110,15 @@ export default function CreateProductModal({ open, onOpenChangeAction, onProduct
         stock: 0,
         detalles: "",
         destacado: false,
-          image_url: "",
-          model_url: "",
-          video_url: "",
-          user_id: "",
+        image_url: "",
+        model_url: "",
+        video_url: "",
+        user_id: "",
       });
       setImageUrl("");
       setModelUrl("");
       setVideoUrl("");
       setVideoPreview(null);
-      setVideoFile(null);
     }
   }, [product, open]);
 
@@ -130,32 +126,7 @@ export default function CreateProductModal({ open, onOpenChangeAction, onProduct
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  const handleVideoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      // Validar tipo de archivo
-      const validTypes = ['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime'];
-      if (!validTypes.includes(file.type)) {
-        alert('Por favor selecciona un archivo de video válido (MP4, WebM, OGG, MOV)');
-        return;
-      }
-      
-      // Validar tamaño (100MB)
-      if (file.size > 100 * 1024 * 1024) {
-        alert('El video es demasiado grande. Máximo 100MB');
-        return;
-      }
-
-      setVideoFile(file);
-      
-      // Crear preview
-      const objectUrl = URL.createObjectURL(file);
-      setVideoPreview(objectUrl);
-    }
-  };
-
   const handleRemoveVideo = () => {
-    setVideoFile(null);
     setVideoPreview(null);
     setVideoUrl("");
     setForm({ ...form, video_url: "" });
@@ -187,27 +158,9 @@ export default function CreateProductModal({ open, onOpenChangeAction, onProduct
   const handleSubmit = async (e?: React.FormEvent, draft = false) => {
     if (e && typeof e.preventDefault === "function") e.preventDefault();
     setLoading(true);
-    
-    try {
-      let finalVideoUrl = videoUrl || form.video_url;
 
-      // Si hay un nuevo video, subirlo primero
-      if (videoFile) {
-        setUploadingVideo(true);
-        try {
-          const tempId = product?.id?.toString() ?? `temp_${Date.now()}`;
-          finalVideoUrl = await uploadProductVideo(videoFile, tempId);
-          console.log('✅ Video subido:', finalVideoUrl);
-          setVideoUrl(finalVideoUrl);
-        } catch (error) {
-          console.error('Error subiendo video:', error);
-          alert(`Error al subir el video: ${error instanceof Error ? error.message : 'Error desconocido'}`);
-          setLoading(false);
-          setUploadingVideo(false);
-          return;
-        }
-        setUploadingVideo(false);
-      }
+    try {
+      const finalVideoUrl = videoUrl || form.video_url;
 
       // Incluir las URLs de imagen, modelo 3D y video en el formulario
       const formData = {
@@ -217,7 +170,7 @@ export default function CreateProductModal({ open, onOpenChangeAction, onProduct
         video_url: finalVideoUrl,
         draft,
       };
-      
+
       let res;
       if (product?.id) {
         // Editar producto
@@ -234,7 +187,7 @@ export default function CreateProductModal({ open, onOpenChangeAction, onProduct
           body: JSON.stringify(formData),
         });
       }
-      
+
       if (res.ok) {
         onOpenChangeAction(false);
         onProductCreatedAction?.();
@@ -324,31 +277,35 @@ export default function CreateProductModal({ open, onOpenChangeAction, onProduct
         <div className="max-w-[1400px] w-[95vw] xl:w-[70vw] 2xl:w-full mx-auto bg-white rounded-lg shadow-lg p-6 border border-gray-100 h-auto max-h-[90vh] overflow-hidden flex flex-col pb-24 relative">
           <form onSubmit={handleSubmit} className="mt-4 flex flex-col flex-1">
             <DialogHeader className="pb-2">
-            <div className="flex items-start gap-4">
-              <div className="p-3 rounded-lg bg-[#e6fffb] text-[#0d9488]"><Package className="w-5 h-5" /></div>
-              <div>
-                <DialogTitle className="text-lg font-semibold text-[#0d9488]">{product ? 'Editar producto' : 'Añadir nuevo producto'}</DialogTitle>
-                <p className="text-sm text-gray-500 mt-1">Paso {step + 1} de {totalSteps}</p>
+              <div className="flex items-start gap-4">
+                <div className="p-3 rounded-lg bg-[#e6fffb] text-[#0d9488]"><Package className="w-5 h-5" /></div>
+                <div>
+                  <DialogTitle className="text-lg font-semibold text-[#0d9488]">{product ? 'Editar producto' : 'Añadir nuevo producto'}</DialogTitle>
+                  <p className="text-sm text-gray-500 mt-1">Paso {step + 1} de {totalSteps}</p>
+                </div>
               </div>
-            </div>
 
-            <div className="mt-4">
-              <div className="flex items-center justify-between gap-4">
-                {/* eslint-disable-next-line @typescript-eslint/no-unsafe-assignment */}
-                {([
-                  { label: 'Información', icon: Package },
-                  { label: 'Clasificación', icon: Tag },
-                  { label: 'Precio', icon: DollarSign },
-                  { label: 'Multimedia', icon: ImageIcon }
-                ] as Array<{ label: string; icon: React.ComponentType<{ className?: string }> }>).map(({ label, icon: Icon }, i) => (
-                  <div key={label} className="flex-1 flex flex-col items-center text-center">
-                    <div className={`p-3 rounded-full ${step === i ? 'bg-[#0d9488] text-white' : 'bg-gray-100 text-gray-500'}`}><Icon className="w-4 h-4" /></div>
-                    <div className="text-xs mt-2 text-gray-600">{label}</div>
-                  </div>
-                ))}
+              <div className="mt-4">
+                {(() => {
+                  const steps: Array<{ label: string; icon: React.ComponentType<{ className?: string }> }> = [
+                    { label: 'Información', icon: Package },
+                    { label: 'Clasificación', icon: Tag },
+                    { label: 'Precio', icon: DollarSign },
+                    { label: 'Multimedia', icon: ImageIcon },
+                  ];
+                  return (
+                    <div className="flex items-center justify-between gap-4">
+                      {steps.map(({ label, icon: Icon }, i) => (
+                        <div key={label} className="flex-1 flex flex-col items-center text-center">
+                          <div className={`p-3 rounded-full ${step === i ? 'bg-[#0d9488] text-white' : 'bg-gray-100 text-gray-500'}`}><Icon className="w-4 h-4" /></div>
+                          <div className="text-xs mt-2 text-gray-600">{label}</div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
-            </div>
-          </DialogHeader>
+            </DialogHeader>
 
             <div className="flex justify-center gap-3 mt-3">
               {Array.from({ length: totalSteps }).map((_, i) => (
@@ -480,15 +437,21 @@ export default function CreateProductModal({ open, onOpenChangeAction, onProduct
                       <div className="bg-white border rounded-lg p-4 shadow-sm mt-4">
                         <h4 className="text-sm font-semibold text-gray-800 flex items-center gap-2"><Video className="w-4 h-4 text-[#0d9488]" />Video (opcional)</h4>
                         <p className="text-xs text-gray-500">MP4, WebM, OGG, MOV (máx. 100MB)</p>
-                        { (videoPreview ?? videoUrl) ? (
+                        {(videoPreview ?? videoUrl) ? (
                           <div className="mt-3 relative rounded-md overflow-hidden border">
                             <video src={videoPreview ?? videoUrl} controls className="w-full h-28 object-cover" />
                             <button type="button" onClick={handleRemoveVideo} className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1"><FiX className="w-4 h-4" /></button>
                           </div>
                         ) : (
-                          <div className="mt-3 border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
-                            <input type="file" accept="video/mp4,video/webm,video/ogg,video/quicktime" onChange={handleVideoChange} className="hidden" id="video-upload" />
-                            <label htmlFor="video-upload" className="cursor-pointer flex flex-col items-center gap-2"><Upload className="w-8 h-8 text-gray-400" /><span className="text-sm text-gray-600">Seleccionar video</span><span className="text-xs text-gray-400">MP4, WebM, OGG, MOV (máx. 100MB)</span></label>
+                          <div className="mt-3">
+                            <ProductVideoUpload
+                              productId={product?.id?.toString() ?? 'new'}
+                              onUploadComplete={(url) => {
+                                setVideoUrl(url);
+                                setVideoPreview(url);
+                                setForm({ ...form, video_url: url });
+                              }}
+                            />
                           </div>
                         )}
                       </div>
@@ -516,15 +479,15 @@ export default function CreateProductModal({ open, onOpenChangeAction, onProduct
                     <div className="max-w-3xl mx-auto flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <Button type="button" variant="ghost" onClick={() => setStep(Math.max(0, step - 1))} className="text-gray-600" disabled={step === 0}>Atrás</Button>
-                        <Button type="button" variant="ghost" onClick={handleSaveDraft} className="text-gray-600">Guardar</Button>
+                        <div role="button" onClick={handleSaveDraft} className="text-gray-600 px-4 py-2 hover:bg-gray-100 rounded-md cursor-pointer text-sm font-medium">Guardar</div>
                       </div>
 
                       <div className="flex items-center gap-3">
                         {step !== totalSteps - 1 ? (
                           <Button type="button" onClick={handleNext} className="bg-[#0d9488] hover:bg-[#0b7f78] text-white py-3 px-6 rounded-lg">Siguiente</Button>
                         ) : (
-                          <Button type="submit" className="bg-[#0d9488] hover:bg-[#0b7f78] text-white py-3 px-6 rounded-lg" disabled={loading || uploadingVideo}>
-                            {uploadingVideo ? (<><Upload className="w-4 h-4 mr-2 animate-spin" />Subiendo...</>) : loading ? ('Procesando...') : (product ? 'Actualizar producto' : 'Guardar producto')}
+                          <Button type="submit" className="bg-[#0d9488] hover:bg-[#0b7f78] text-white py-3 px-6 rounded-lg" disabled={loading}>
+                            {loading ? ('Procesando...') : (product ? 'Actualizar producto' : 'Guardar producto')}
                           </Button>
                         )}
                       </div>

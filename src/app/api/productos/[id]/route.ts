@@ -43,7 +43,7 @@ export async function PUT(
 
     // Actualizar producto
     const result = await supabase
-      .from("productos_3d")
+      .from("productos")
       .update(body)
       .eq("id", id)
       .select()
@@ -80,7 +80,7 @@ export async function DELETE(
 
     // Eliminar producto
     const { error } = await supabase
-      .from("productos_3d")
+      .from("productos")
       .delete()
       .eq("id", id);
 
