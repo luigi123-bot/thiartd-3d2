@@ -18,9 +18,9 @@ export async function middleware(req: NextRequest) {
 
   // DEBUG: log del id de usuario obtenido desde el JWT (temporal)
   try {
-    // eslint-disable-next-line no-console
+
     console.log('[middleware] supabase auth.getUser -> user id:', userData.user.id);
-  } catch (e) {
+  } catch {
     // ignore
   }
 
@@ -30,9 +30,9 @@ export async function middleware(req: NextRequest) {
   // en la tabla `usuario` mientras se depura. NO dejar en producción.
   if (process.env.NODE_ENV !== 'production' && userData.user) {
     try {
-      // eslint-disable-next-line no-console
+
       console.log('[middleware] DEV BYPASS: allowing access to protected route for user', userData.user.id);
-    } catch (e) {}
+    } catch { }
     return NextResponse.next();
   }
 
@@ -49,9 +49,9 @@ export async function middleware(req: NextRequest) {
   const usuario = data as Usuario | null;
   // DEBUG: log resultado de la consulta a la tabla 'usuario' (temporal)
   try {
-    // eslint-disable-next-line no-console
+
     console.log('[middleware] usuario row:', usuario);
-  } catch (e) {
+  } catch {
     // ignore
   }
 

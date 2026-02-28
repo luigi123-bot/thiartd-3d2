@@ -13,7 +13,8 @@ interface Producto {
   categoria: string;
   precio: number;
   destacado?: boolean;
-  imagen?: string;
+  image_url?: string;
+  usuarios?: { nombre: string } | null;
 }
 
 interface ProductosCarruselProps {
@@ -32,7 +33,7 @@ const mockProductos: Producto[] = [
     categoria: "Grandes",
     precio: 350,
     destacado: true,
-    imagen: "/Logo%20Thiart%20Tiktok.png", // Imagen que sí existe en public/
+    image_url: "/Logo%20Thiart%20Tiktok.png",
   },
   {
     id: 2,
@@ -41,7 +42,7 @@ const mockProductos: Producto[] = [
     categoria: "Pequeños",
     precio: 120,
     destacado: false,
-    imagen: "/Logo%20Thiart%20Tiktok.png",
+    image_url: "/Logo%20Thiart%20Tiktok.png",
   },
   {
     id: 3,
@@ -50,7 +51,7 @@ const mockProductos: Producto[] = [
     categoria: "Medianos",
     precio: 200,
     destacado: false,
-    imagen: "/Logo%20Thiart%20Tiktok.png",
+    image_url: "/Logo%20Thiart%20Tiktok.png",
   },
   {
     id: 4,
@@ -59,7 +60,7 @@ const mockProductos: Producto[] = [
     categoria: "Personalizados",
     precio: 450,
     destacado: true,
-    imagen: "/Logo%20Thiart%20Tiktok.png",
+    image_url: "/Logo%20Thiart%20Tiktok.png",
   },
 ];
 
@@ -83,7 +84,7 @@ export default function ProductosCarrusel({ soloDestacados = false }: ProductosC
         categoria: "Pequeños",
         precio: 90,
         destacado: false,
-        imagen: "/Logo%20Thiart%20Tiktok.png",
+        image_url: "/Logo%20Thiart%20Tiktok.png",
       },
       {
         id: 6,
@@ -92,7 +93,7 @@ export default function ProductosCarrusel({ soloDestacados = false }: ProductosC
         categoria: "Medianos",
         precio: 180,
         destacado: false,
-        imagen: "/Logo%20Thiart%20Tiktok.png",
+        image_url: "/Logo%20Thiart%20Tiktok.png",
       },
       {
         id: 7,
@@ -101,7 +102,7 @@ export default function ProductosCarrusel({ soloDestacados = false }: ProductosC
         categoria: "Grandes",
         precio: 220,
         destacado: true,
-        imagen: "/Logo%20Thiart%20Tiktok.png",
+        image_url: "/Logo%20Thiart%20Tiktok.png",
       },
     ],
     []
@@ -115,11 +116,31 @@ export default function ProductosCarrusel({ soloDestacados = false }: ProductosC
         // Traer productos desde Supabase
         const { data } = await supabase
           .from("productos")
-          .select("id, nombre, descripcion, categoria, precio, destacado, imagen");
-        let productosFiltrados = ((data as Producto[]) ?? []).map((p) => ({
-          ...p,
+          .select("id, nombre, descripcion, categoria, precio, destacado, image_url, usuarios:user_id(nombre)");
+
+        interface RawProducto {
+          id: number;
+          nombre: string;
+          descripcion: string;
+          categoria: string;
+          precio: number;
+          destacado: boolean | null;
+          image_url: string | null;
+          usuarios: { nombre: string } | { nombre: string }[] | null;
+        }
+
+        const rawData = (data as unknown as RawProducto[]) ?? [];
+        let productosFiltrados = rawData.map((p) => ({
+          id: p.id,
+          nombre: p.nombre,
+          descripcion: p.descripcion,
+          categoria: p.categoria,
+          precio: p.precio,
           destacado: p.destacado ?? false,
-        }));
+          image_url: p.image_url ?? undefined,
+          usuarios: Array.isArray(p.usuarios) ? p.usuarios[0] : p.usuarios
+        })) as Producto[];
+
         if (!!soloDestacados) {
           productosFiltrados = productosFiltrados.filter((p: Producto) => p.destacado);
         }
@@ -270,7 +291,7 @@ export default function ProductosCarrusel({ soloDestacados = false }: ProductosC
               {/* Imagen */}
               <div className="flex items-center justify-center w-full pt-6 pb-3 px-4">
                 <Image
-                  src={prod.imagen ?? "/Logo%20Thiart%20Tiktok.png"}
+                  src={prod.image_url ?? "/Logo%20Thiart%20Tiktok.png"}
                   alt={prod.nombre}
                   width={120}
                   height={120}
@@ -285,7 +306,8 @@ export default function ProductosCarrusel({ soloDestacados = false }: ProductosC
                 />
               </div>
               {/* Nombre */}
-              <div className="flex items-center justify-center w-full mb-1 px-4">
+              <div className="flex flex-col items-center justify-center w-full mb-1 px-4">
+                <span className="text-[10px] font-medium text-[#00a19a] uppercase tracking-wider mb-0.5">By {prod.usuarios?.nombre ?? "Thiart"}</span>
                 <span className="text-base font-bold text-center text-black w-full truncate">{prod.nombre}</span>
               </div>
               {/* Descripción */}

@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
       token?: string;
       newPassword?: string;
     };
-    
+
     const { email, action, code, token, newPassword } = body;
 
     if (action === "send-code") {
@@ -69,14 +69,34 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // Verificar que el usuario existe
-      const { data: usuario, error: usuarioError } = await supabase
+      // Verificar que el usuario existe - Intentar en 'usuarios' y 'usuario'
+      let targetUser: { id: string; email: string; nombre: string } | null = null;
+
+      // 1. Intentar en 'usuarios'
+      const { data: q1 } = await supabase
         .from("usuarios")
         .select("id, email, nombre")
-        .eq("email", email)
-        .single();
+        .ilike("email", email)
+        .maybeSingle();
 
-      if (usuarioError || !usuario) {
+      if (q1) {
+        targetUser = q1 as { id: string; email: string; nombre: string };
+      }
+
+      // 2. Intentar en 'usuario'
+      if (!targetUser) {
+        const { data: q2 } = await supabase
+          .from("usuario")
+          .select("id, email, nombre")
+          .ilike("email", email)
+          .maybeSingle();
+
+        if (q2) {
+          targetUser = q2 as { id: string; email: string; nombre: string };
+        }
+      }
+
+      if (!targetUser) {
         return NextResponse.json(
           { error: "No se encontró una cuenta con este correo electrónico" },
           { status: 404 }
@@ -85,7 +105,7 @@ export async function POST(req: NextRequest) {
 
       // Generar código
       const codigo = generarCodigo();
-      
+
       // Generar token JWT con el código (no guardamos en DB)
       const resetToken = generarTokenReset(email, codigo);
 
@@ -93,7 +113,7 @@ export async function POST(req: NextRequest) {
       const emailResult = await sendPasswordResetEmail({
         to: email,
         code: codigo,
-        userName: usuario.nombre as string,
+        userName: targetUser.nombre,
       });
 
       if (!emailResult.success) {
@@ -106,7 +126,7 @@ export async function POST(req: NextRequest) {
 
       // Registrar en notificaciones para auditoría
       await supabase.from("notificaciones").insert({
-        usuario_id: usuario.id as string,
+        usuario_id: targetUser.id,
         tipo: "email",
         titulo: "Código de recuperación de contraseña",
         mensaje: `Código de recuperación enviado a ${email}. Expira en 15 minutos.`,
@@ -182,23 +202,62 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // Obtener el usuario
-      const { data: usuario } = await supabase
-        .from("usuarios")
-        .select("auth_id")
-        .eq("email", decoded.email)
-        .single();
+      // Obtener el usuario - Intentar en 'usuarios' y 'usuario' con búsqueda insensible a mayúsculas
+      let authUserId: string | null = null;
 
-      if (!usuario?.auth_id) {
+      // 1. Intentar en 'usuarios'
+      const { data: userPlural } = await supabase
+        .from("usuarios")
+        .select("id, auth_id")
+        .ilike("email", decoded.email)
+        .maybeSingle() as { data: { id: string; auth_id: string | null } | null };
+
+      if (userPlural) {
+        authUserId = userPlural.auth_id ?? userPlural.id;
+        console.log("Usuario encontrado en 'usuarios' (update):", authUserId);
+      }
+
+      // 2. Si no se encontró, intentar en 'usuario'
+      if (!authUserId) {
+        const { data: userSingular } = await supabase
+          .from("usuario")
+          .select("id, auth_id")
+          .ilike("email", decoded.email)
+          .maybeSingle() as { data: { id: string; auth_id: string | null } | null };
+
+        if (userSingular) {
+          authUserId = userSingular.auth_id ?? userSingular.id;
+          console.log("Usuario encontrado en 'usuario' (update):", authUserId);
+        }
+      }
+
+      // 3. Fallback CRÍTICO: Buscar directamente en Auth de Supabase si no está en las tablas de perfil
+      if (!authUserId) {
+        console.log("Usuario no encontrado en tablas de perfil, buscando en Auth directamente...");
+        const { data: authList, error: listError } = await supabase.auth.admin.listUsers();
+
+        if (!listError && authList?.users) {
+          const authFound = authList.users.find(u =>
+            u.email?.toLowerCase() === decoded.email.toLowerCase()
+          );
+          if (authFound) {
+            authUserId = authFound.id;
+            console.log("Usuario encontrado directamente en Auth:", authUserId);
+          }
+        }
+      }
+
+      if (!authUserId) {
+        console.error("No se encontró el usuario para actualización:", decoded.email);
         return NextResponse.json(
-          { error: "Usuario no encontrado o sin auth_id" },
+          { error: "No se pudo encontrar una cuenta de autenticación vinculada a este correo (" + decoded.email + ")" },
           { status: 404 }
         );
       }
 
       // Actualizar contraseña usando Supabase Admin API
       const { error: updateError } = await supabase.auth.admin.updateUserById(
-        usuario.auth_id as string,
+        authUserId,
         { password: newPassword }
       );
 

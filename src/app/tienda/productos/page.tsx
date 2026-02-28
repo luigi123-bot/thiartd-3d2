@@ -42,6 +42,7 @@ type Product = {
   stock: number;
   image_url?: string;
   details?: string;
+  usuarios?: { nombre: string } | null;
 };
 
 // --- Contexto de Carrito ---
@@ -230,6 +231,7 @@ function ProductosTiendaPageInner() {
     tamano: p.tamano ?? p.size ?? "N/A",
     precio: p.precio ?? p.price ?? 0,
     destacado: p.destacado ?? p.featured ?? false,
+    creador: p.usuarios?.nombre ?? "Desconocido",
   });
 
   // Filtrado de productos
@@ -444,6 +446,11 @@ function ProductosTiendaPageInner() {
                       )}
                     </div>
                     <CardHeader>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs font-medium text-[#00a19a] bg-[#e6fffb] px-2 py-0.5 rounded-full">
+                          De {data.creador}
+                        </span>
+                      </div>
                       <CardTitle className="font-bold text-lg mb-1">{data.nombre}</CardTitle>
                       <CardDescription className="mb-2 line-clamp-2">{data.desc}</CardDescription>
                     </CardHeader>

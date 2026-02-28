@@ -153,14 +153,6 @@ export default function PersonalizarPage() {
 	}, [convId]);
 
 	// Añade helpers para el carrito
-	function addToCarritoLocal(producto: CarritoProducto) {
-		if (typeof window === "undefined") return;
-		const carritoLocal = localStorage.getItem("carrito");
-		const carrito: CarritoProducto[] = carritoLocal ? JSON.parse(carritoLocal) as CarritoProducto[] : [];
-		carrito.push({ ...producto, cantidad: 1 });
-		localStorage.setItem("carrito", JSON.stringify(carrito));
-		console.log("Producto personalizado agregado al carrito:", producto);
-	}
 
 	function clearCarritoLocal() {
 		if (typeof window === "undefined") return;
@@ -218,7 +210,7 @@ Descripción: ${descripcion}`
 				body: JSON.stringify(orderPayload),
 			});
 
-			const data = await res.json();
+			const data = await res.json() as { error?: string };
 
 			if (res.ok) {
 				setMensaje("¡Solicitud enviada con éxito! Revisa 'Mis Pedidos' para ver el estado.");
@@ -227,7 +219,7 @@ Descripción: ${descripcion}`
 				setTipoProyecto("");
 				setPresupuesto(PRESUPUESTOS[0]);
 			} else {
-				setMensaje(`Error al enviar: ${data.error || "Inténtalo de nuevo."}`);
+				setMensaje(`Error al enviar: ${data.error ?? "Inténtalo de nuevo."}`);
 			}
 		} catch (error) {
 			console.error("Error enviando cotización:", error);

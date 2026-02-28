@@ -4,7 +4,7 @@ import React, { useEffect, useState, Suspense } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import { createClient } from "@supabase/supabase-js";
-import { ArrowLeft, ShoppingCart, Package, Ruler, Tag, Star,Sparkles, Video, Heart, Minus, Plus } from "lucide-react";
+import { ArrowLeft, ShoppingCart, Package, Ruler, Tag, Star, Sparkles, Video, Heart, Minus, Plus } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
@@ -64,6 +64,7 @@ interface Producto {
   image_url: string;
   modelo_url?: string;
   video_url?: string;
+  usuarios?: { nombre: string } | null;
 }
 
 interface ProductoData {
@@ -80,6 +81,7 @@ interface ProductoData {
   modelo_url: string | null;
   model_url?: string | null; // Algunos lugares usan `model_url` (inglés). Soporte ambos nombres.
   video_url: string | null;
+  usuarios: { nombre: string } | null;
 }
 
 export default function ProductoDetallePage() {
@@ -101,7 +103,7 @@ export default function ProductoDetallePage() {
       try {
         const { data, error } = await supabase
           .from("productos")
-          .select("*")
+          .select("*, usuarios:user_id(nombre)")
           .eq("id", params.id)
           .single<ProductoData>();
 
@@ -125,11 +127,11 @@ export default function ProductoDetallePage() {
             video_url_type: typeof data.video_url,
             video_url_length: data.video_url?.length,
             hasVideoUrl: !!data.video_url,
-            mensaje: isValid 
-              ? '✅ Modelo 3D válido encontrado' 
+            mensaje: isValid
+              ? '✅ Modelo 3D válido encontrado'
               : '❌ No hay modelo 3D - El campo está NULL o vacío. Para agregar un modelo, sube un archivo STL/GLB/GLTF a Supabase Storage y actualiza este campo.',
-            videoMensaje: data.video_url 
-              ? '✅ Video encontrado' 
+            videoMensaje: data.video_url
+              ? '✅ Video encontrado'
               : '⚠️ No hay video - El campo video_url está NULL o vacío. Para agregar un video, sube un archivo de video a Supabase Storage desde el modal de crear/editar producto.'
           });
 
@@ -147,6 +149,7 @@ export default function ProductoDetallePage() {
             // Guardamos la URL resuelta (soporta ambos nombres de campo)
             modelo_url: resolvedModelUrl,
             video_url: data.video_url ?? undefined,
+            usuarios: data.usuarios,
           });
 
         }
@@ -245,11 +248,10 @@ export default function ProductoDetallePage() {
                         setShowVideo(false);
                       }}
                       aria-label="Ver imagen principal"
-                      className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all ${
-                        selectedImage === 0 && !showModel && !showVideo
+                      className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all ${selectedImage === 0 && !showModel && !showVideo
                           ? "border-teal-600 shadow-md ring-2 ring-teal-100"
                           : "border-gray-200 hover:border-teal-300"
-                      }`}
+                        }`}
                     >
                       {producto.image_url ? (
                         <Image
@@ -274,11 +276,10 @@ export default function ProductoDetallePage() {
                           setShowVideo(false);
                         }}
                         aria-label="Ver modelo 3D"
-                        className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all ${
-                          showModel
+                        className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all ${showModel
                             ? "border-teal-600 shadow-md ring-2 ring-teal-100"
                             : "border-gray-200 hover:border-teal-300"
-                        } bg-gradient-to-br from-teal-50 to-cyan-50`}
+                          } bg-gradient-to-br from-teal-50 to-cyan-50`}
                       >
                         <div className="w-full h-full flex items-center justify-center">
                           <Sparkles className="w-5 h-5 sm:w-6 sm:h-6 text-teal-600" />
@@ -296,11 +297,10 @@ export default function ProductoDetallePage() {
                           setShowVideo(true);
                         }}
                         aria-label="Ver video"
-                        className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all ${
-                          showVideo
+                        className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all ${showVideo
                             ? "border-teal-600 shadow-md ring-2 ring-teal-100"
                             : "border-gray-200 hover:border-teal-300"
-                        } bg-gradient-to-br from-purple-50 to-pink-50`}
+                          } bg-gradient-to-br from-purple-50 to-pink-50`}
                       >
                         <div className="w-full h-full flex items-center justify-center">
                           <Video className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600" />
@@ -311,7 +311,7 @@ export default function ProductoDetallePage() {
 
                   {/* Visor principal */}
                   <div className="flex-1">
-                    <div 
+                    <div
                       className={`relative ${showModel ? 'h-[500px]' : 'aspect-square'} bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl overflow-hidden`}
                       onMouseEnter={() => !showModel && !showVideo && setImageZoom(true)}
                       onMouseLeave={() => setImageZoom(false)}
@@ -320,7 +320,7 @@ export default function ProductoDetallePage() {
                       {showModel ? (
                         <div className="w-full h-full">
                           {hasValidModel(producto.modelo_url) ? (
-                            <ErrorBoundary 
+                            <ErrorBoundary
                               fallback={
                                 <div className="w-full h-full flex items-center justify-center bg-gray-100">
                                   <div className="text-center p-6">
@@ -341,7 +341,7 @@ export default function ProductoDetallePage() {
                                 </div>
                               }
                             >
-                              <Suspense 
+                              <Suspense
                                 fallback={
                                   <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-teal-50 to-cyan-50">
                                     <div className="text-center">
@@ -351,7 +351,7 @@ export default function ProductoDetallePage() {
                                   </div>
                                 }
                               >
-                                <Model3DViewer 
+                                <Model3DViewer
                                   modelUrl={producto.modelo_url!}
                                   height="500px"
                                   showControls={true}
@@ -381,9 +381,8 @@ export default function ProductoDetallePage() {
                           src={producto.image_url}
                           alt={producto.nombre}
                           fill
-                          className={`object-contain p-4 sm:p-8 transition-transform duration-300 ${
-                            imageZoom ? "scale-110" : "scale-100"
-                          }`}
+                          className={`object-contain p-4 sm:p-8 transition-transform duration-300 ${imageZoom ? "scale-110" : "scale-100"
+                            }`}
                           priority
                         />
                       ) : (
@@ -421,18 +420,15 @@ export default function ProductoDetallePage() {
                     {/* Contador de medios */}
                     <div className="flex justify-center items-center gap-2 mt-3 sm:mt-4">
                       <div className="flex gap-1.5">
-                        <div className={`h-1.5 rounded-full transition-all ${
-                          !showModel && !showVideo ? "w-6 bg-teal-600" : "w-1.5 bg-gray-300"
-                        }`}></div>
-                        {hasValidModel(producto.modelo_url) && (
-                          <div className={`h-1.5 rounded-full transition-all ${
-                            showModel ? "w-6 bg-teal-600" : "w-1.5 bg-gray-300"
+                        <div className={`h-1.5 rounded-full transition-all ${!showModel && !showVideo ? "w-6 bg-teal-600" : "w-1.5 bg-gray-300"
                           }`}></div>
+                        {hasValidModel(producto.modelo_url) && (
+                          <div className={`h-1.5 rounded-full transition-all ${showModel ? "w-6 bg-teal-600" : "w-1.5 bg-gray-300"
+                            }`}></div>
                         )}
                         {producto.video_url && (
-                          <div className={`h-1.5 rounded-full transition-all ${
-                            showVideo ? "w-6 bg-teal-600" : "w-1.5 bg-gray-300"
-                          }`}></div>
+                          <div className={`h-1.5 rounded-full transition-all ${showVideo ? "w-6 bg-teal-600" : "w-1.5 bg-gray-300"
+                            }`}></div>
                         )}
                       </div>
                     </div>
@@ -473,7 +469,7 @@ export default function ProductoDetallePage() {
                       </div>
                     </div>
                   )}
-                  
+
                   {producto.tamano && (
                     <div className="flex items-start gap-3 p-3 sm:p-4 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl border border-purple-100">
                       <div className="w-9 h-9 sm:w-10 sm:h-10 bg-purple-600 rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm">
@@ -485,7 +481,7 @@ export default function ProductoDetallePage() {
                       </div>
                     </div>
                   )}
-                  
+
                   <div className="flex items-start gap-3 p-3 sm:p-4 bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border border-green-100">
                     <div className="w-9 h-9 sm:w-10 sm:h-10 bg-green-600 rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm">
                       <Package className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
@@ -495,7 +491,7 @@ export default function ProductoDetallePage() {
                       <p className="text-sm sm:text-base font-semibold text-gray-900">PLA / ABS Premium</p>
                     </div>
                   </div>
-                  
+
                   <div className="flex items-start gap-3 p-3 sm:p-4 bg-gradient-to-br from-orange-50 to-amber-50 rounded-xl border border-orange-100">
                     <div className="w-9 h-9 sm:w-10 sm:h-10 bg-orange-600 rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm">
                       <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
@@ -551,11 +547,10 @@ export default function ProductoDetallePage() {
                   <div className="flex items-center gap-3 mb-6 pb-6 border-b border-gray-200">
                     <div className="flex items-center gap-1">
                       {[1, 2, 3, 4, 5].map((star) => (
-                        <Star 
-                          key={star} 
-                          className={`w-4 h-4 sm:w-5 sm:h-5 ${
-                            star <= 4 ? "fill-amber-400 text-amber-400" : "text-gray-300"
-                          }`} 
+                        <Star
+                          key={star}
+                          className={`w-4 h-4 sm:w-5 sm:h-5 ${star <= 4 ? "fill-amber-400 text-amber-400" : "text-gray-300"
+                            }`}
                         />
                       ))}
                     </div>
@@ -595,13 +590,12 @@ export default function ProductoDetallePage() {
                         <Package className="w-4 h-4 text-teal-600" />
                         Stock disponible
                       </span>
-                      <span className={`text-sm font-bold ${
-                        producto.stock > 10 ? "text-green-600" : producto.stock > 0 ? "text-amber-600" : "text-red-600"
-                      }`}>
+                      <span className={`text-sm font-bold ${producto.stock > 10 ? "text-green-600" : producto.stock > 0 ? "text-amber-600" : "text-red-600"
+                        }`}>
                         {producto.stock > 0 ? `${Math.min(producto.stock, 99)}+ unidades` : "Agotado"}
                       </span>
                     </div>
-                    
+
                     {/* Selector de cantidad */}
                     <div className="flex items-center gap-3">
                       <span className="text-sm text-gray-700">Cantidad:</span>
@@ -642,7 +636,7 @@ export default function ProductoDetallePage() {
                       <ShoppingCart className="w-5 h-5 mr-2" />
                       {producto.stock === 0 ? "Producto agotado" : "Comprar ahora"}
                     </Button>
-                    
+
                     <Button
                       onClick={() => {
                         console.log("Agregar al carrito:", producto, "Cantidad:", cantidad);
@@ -667,7 +661,7 @@ export default function ProductoDetallePage() {
                     <div className="flex items-start justify-between mb-3">
                       <div>
                         <p className="text-xs text-gray-600 mb-1">Vendido por</p>
-                        <p className="text-base sm:text-lg font-bold text-gray-900">Thiart 3D Store</p>
+                        <p className="text-base sm:text-lg font-bold text-gray-900">{producto.usuarios?.nombre ?? "Thiart 3D Store"}</p>
                       </div>
                       <Badge className="bg-gradient-to-r from-green-100 to-emerald-100 text-green-700 font-bold text-xs">
                         Verificado ✓

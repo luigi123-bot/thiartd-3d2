@@ -29,7 +29,7 @@ interface DatosEnvio {
 }
 
 interface PedidoRequestBody {
-  cliente_id: string;
+  cliente_id?: string;
   productos: ProductoPedido[];
   total: number;
   subtotal?: number; // Opcional, no se usa en la BD
@@ -66,59 +66,61 @@ export async function POST(req: Request) {
   try {
     const body = await req.json() as PedidoRequestBody;
     console.log("Datos recibidos en /api/pedidos:", body);
-    
-    const { 
-      cliente_id, 
-      productos, 
-      total, 
+
+    const {
+      cliente_id,
+      productos,
+      total,
       // subtotal ya no existe en la tabla
       costo_envio,
-      estado, 
+      estado,
       datos_contacto,
-      datos_envio 
+      datos_envio
     } = body;
-    
-    if (!cliente_id || !productos || !estado || !datos_envio) {
+
+    if (!productos || !estado || !datos_envio) {
       return NextResponse.json({ error: "Faltan campos obligatorios." }, { status: 400 });
     }
 
-    // Verificar si el usuario existe en la tabla usuario, si no, crearlo
-    const { data: usuarioExistente } = await supabase
-      .from("usuario")
-      .select("id")
-      .eq("id", cliente_id)
-      .single();
+    // Verificar si el usuario existe en la tabla usuario, si no, crearlo (solo si cliente_id existe)
+    if (cliente_id) {
+      const { data: usuarioExistente } = await supabase
+        .from("usuario")
+        .select("id")
+        .eq("id", cliente_id)
+        .single();
 
-    if (!usuarioExistente) {
-      console.log("Usuario no existe en tabla 'usuario', creándolo...");
-      // Obtener datos del usuario de Supabase Auth
-      const { data: authUser } = await supabase.auth.admin.getUserById(cliente_id);
-      
-      if (authUser?.user) {
-        const userMetadata = authUser.user.user_metadata as { nombre?: string } | undefined;
-        const nombreUsuario = userMetadata?.nombre ?? authUser.user.email?.split('@')[0] ?? 'Usuario';
-        
-        const { error: insertUserError } = await supabase
-          .from("usuario")
-          .insert([{
-            id: cliente_id,
-            email: authUser.user.email ?? '',
-            nombre: nombreUsuario,
-            password: '', // Password vacío porque usa Supabase Auth
-            role: 'user'
-          }]);
-        
-        if (insertUserError) {
-          console.error("Error creando usuario:", insertUserError);
-          // Continuar de todas formas, el pedido es más importante
-        } else {
-          console.log("✅ Usuario creado en tabla 'usuario'");
+      if (!usuarioExistente) {
+        console.log("Usuario no existe en tabla 'usuario', creándolo...");
+        // Obtener datos del usuario de Supabase Auth
+        const { data: authUser } = await supabase.auth.admin.getUserById(cliente_id);
+
+        if (authUser?.user) {
+          const userMetadata = authUser.user.user_metadata as { nombre?: string } | undefined;
+          const nombreUsuario = userMetadata?.nombre ?? authUser.user.email?.split('@')[0] ?? 'Usuario';
+
+          const { error: insertUserError } = await supabase
+            .from("usuario")
+            .insert([{
+              id: cliente_id,
+              email: authUser.user.email ?? '',
+              nombre: nombreUsuario,
+              password: '', // Password vacío porque usa Supabase Auth
+              role: 'user'
+            }]);
+
+          if (insertUserError) {
+            console.error("Error creando usuario:", insertUserError);
+            // Continuar de todas formas, el pedido es más importante
+          } else {
+            console.log("✅ Usuario creado en tabla 'usuario'");
+          }
         }
       }
     }
 
     const insertData = {
-      cliente_id,
+      cliente_id: cliente_id ?? null,
       productos: JSON.stringify(productos),
       total,
       // REMOVIDO: subtotal (no existe en la tabla)
@@ -195,10 +197,10 @@ export async function GET(req: Request) {
 
 export async function PATCH(req: Request) {
   try {
-    const body = await req.json() as { 
-      pedido_id?: number; 
+    const body = await req.json() as {
+      pedido_id?: number;
       pedidoId?: number;
-      payment_id?: string; 
+      payment_id?: string;
       payment_method?: string;
       estado?: string;
     };
@@ -212,8 +214,8 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: "Falta el ID del pedido" }, { status: 400 });
     }
 
-    const updateData: { 
-      payment_id?: string; 
+    const updateData: {
+      payment_id?: string;
       payment_method?: string;
       estado?: string;
       updated_at?: string;

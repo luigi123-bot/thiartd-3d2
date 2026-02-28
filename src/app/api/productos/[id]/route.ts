@@ -31,7 +31,10 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const body = (await req.json()) as ProductoBody;
+    const rawBody = (await req.json()) as ProductoBody & { draft?: boolean };
+    // Strip fields that don't exist in the productos table
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { draft: _draft, ...body } = rawBody;
     const { id } = await params;
 
     if (!id) {
@@ -43,7 +46,7 @@ export async function PUT(
 
     // Actualizar producto
     const result = await supabase
-      .from("productos_3d")
+      .from("productos")
       .update(body)
       .eq("id", id)
       .select()
@@ -80,7 +83,7 @@ export async function DELETE(
 
     // Eliminar producto
     const { error } = await supabase
-      .from("productos_3d")
+      .from("productos")
       .delete()
       .eq("id", id);
 

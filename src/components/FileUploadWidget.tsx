@@ -35,7 +35,7 @@ export function FileUploadWidget({
   className = '',
 }: FileUploadWidgetProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
-  
+
   const { uploading, progress, error, fileUrl, preview, uploadFile, resetState } = useFileUpload({
     bucket,
     onSuccess: onUploadComplete,
@@ -312,6 +312,31 @@ export function TicketImageUpload({
       maxSizeMB={5}
       label="Captura de pantalla (opcional)"
       buttonText="Adjuntar imagen"
+      onUploadComplete={onUploadComplete}
+      className={className}
+    />
+  )
+}
+
+// Componente especializado para videos de productos
+export function ProductVideoUpload({
+  productId,
+  onUploadComplete,
+  className,
+}: {
+  productId: string
+  onUploadComplete?: (url: string) => void
+  className?: string
+}) {
+  return (
+    <FileUploadWidget
+      bucket={StorageBucket.VIDEOS}
+      entityId={productId}
+      acceptedTypes="video/mp4,video/webm,video/ogg,video/quicktime"
+      maxSizeMB={200}
+      showPreview={false}
+      label="Video del producto"
+      buttonText="Seleccionar video"
       onUploadComplete={onUploadComplete}
       className={className}
     />
