@@ -11,47 +11,47 @@ import { useUser } from "@clerk/nextjs";
 const TopbarTienda = dynamic(() => import("./tienda/componentes/TopbarTienda"), { ssr: false });
 
 export default function Home() {
-		const [modalOpen, setModalOpen] = useState(false);
-		const [usuariosModalOpen, setUsuariosModalOpen] = useState(false);
-		const { user } = useUser();
-		const [isAdmin, setIsAdmin] = useState(false);
+	const [modalOpen, setModalOpen] = useState(false);
+	const [usuariosModalOpen, setUsuariosModalOpen] = useState(false);
+	const { user } = useUser();
+	const [isAdmin, setIsAdmin] = useState(false);
 
-		useEffect(() => {
-			let mounted = true;
-			async function checkRole() {
-				if (user?.publicMetadata?.role === 'admin') {
-					if (mounted) setIsAdmin(true);
-					return;
-				}
-				if (!user) {
-					if (mounted) setIsAdmin(false);
-					return;
-				}
-				try {
-					const res = await fetch('/api/admin/whoami', {
-						method: 'POST',
-						headers: { 'Content-Type': 'application/json' },
-						body: JSON.stringify({ auth_id: user.id }),
-					});
-					if (!res.ok) {
-						if (mounted) setIsAdmin(false);
-						return;
-					}
-					type WhoAmIResponse = { isAdmin?: boolean };
-					const json = (await res.json()) as WhoAmIResponse;
-					if (mounted) setIsAdmin(Boolean(json?.isAdmin));
-				} catch {
-					if (mounted) setIsAdmin(false);
-				}
+	useEffect(() => {
+		let mounted = true;
+		async function checkRole() {
+			if (user?.publicMetadata?.role === 'admin') {
+				if (mounted) setIsAdmin(true);
+				return;
 			}
-			void checkRole();
-			return () => { mounted = false; };
-		}, [user]);
+			if (!user) {
+				if (mounted) setIsAdmin(false);
+				return;
+			}
+			try {
+				const res = await fetch('/api/admin/whoami', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ auth_id: user.id }),
+				});
+				if (!res.ok) {
+					if (mounted) setIsAdmin(false);
+					return;
+				}
+				type WhoAmIResponse = { isAdmin?: boolean };
+				const json = (await res.json()) as WhoAmIResponse;
+				if (mounted) setIsAdmin(Boolean(json?.isAdmin));
+			} catch {
+				if (mounted) setIsAdmin(false);
+			}
+		}
+		void checkRole();
+		return () => { mounted = false; };
+	}, [user]);
 
 	return (
 		<div className="min-h-screen bg-[#007973]">
 			<TopbarTienda /> {/* Renderiza el Topbar aquí */}
-			
+
 			{/* Hero Section */}
 			<section className="flex flex-col lg:flex-row items-center justify-between px-4 sm:px-6 md:px-8 lg:px-12 py-10 sm:py-12 md:py-16 lg:py-20 bg-gradient-to-br from-white to-[#e0f2f1]">
 				<div className="max-w-xl w-full lg:w-1/2 text-center lg:text-left mb-8 lg:mb-0">
@@ -87,7 +87,7 @@ export default function Home() {
 					</div>
 				</div>
 			</section>
-			
+
 			{/* Categorías */}
 			<section className="bg-[#e0f2f1] py-10 sm:py-12 md:py-16">
 				<div className="text-center mb-8 md:mb-12 px-4">
@@ -146,7 +146,7 @@ export default function Home() {
 					))}
 				</div>
 			</section>
-			
+
 			{/* Productos Destacados */}
 			<section className="py-10 sm:py-12 md:py-16 bg-white">
 				<div className="text-center mb-8 md:mb-12 px-4">
@@ -159,29 +159,29 @@ export default function Home() {
 				</div>
 				<ProductosCarrusel soloDestacados />
 			</section>
-			
+
 			{/* Botones flotantes - responsive */}
-			<Button 
-				onClick={() => setModalOpen(true)} 
+			<Button
+				onClick={() => setModalOpen(true)}
 				className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 md:bottom-8 md:right-8 z-50 bg-[#007973] text-white text-sm md:text-base px-4 py-2 md:px-6 md:py-3 shadow-lg hover:shadow-xl transition-shadow"
 			>
 				<span className="hidden sm:inline">Contáctanos</span>
 				<span className="sm:hidden">Contacto</span>
 			</Button>
 			<ContactModal open={modalOpen} onOpenChangeAction={setModalOpen} />
-			
-						{isAdmin && (
-							<>
-								<Button 
-									onClick={() => setUsuariosModalOpen(true)} 
-									className="fixed bottom-4 left-4 sm:bottom-6 sm:left-6 md:bottom-8 md:left-8 z-50 bg-blue-700 text-white text-sm md:text-base px-4 py-2 md:px-6 md:py-3 shadow-lg hover:shadow-xl transition-shadow"
-								>
-									<span className="hidden lg:inline">Gestionar usuarios y roles</span>
-									<span className="lg:hidden">Usuarios</span>
-								</Button>
-								<UsuariosAdminModal open={usuariosModalOpen} onOpenChange={setUsuariosModalOpen} />
-							</>
-						)}
+
+			{isAdmin && (
+				<>
+					<Button
+						onClick={() => setUsuariosModalOpen(true)}
+						className="fixed bottom-4 left-4 sm:bottom-6 sm:left-6 md:bottom-8 md:left-8 z-50 bg-blue-700 text-white text-sm md:text-base px-4 py-2 md:px-6 md:py-3 shadow-lg hover:shadow-xl transition-shadow"
+					>
+						<span className="hidden lg:inline">Gestionar usuarios y roles</span>
+						<span className="lg:hidden">Usuarios</span>
+					</Button>
+					<UsuariosAdminModal open={usuariosModalOpen} onOpenChange={setUsuariosModalOpen} />
+				</>
+			)}
 		</div>
 	);
 }
