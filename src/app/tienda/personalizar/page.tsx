@@ -1,9 +1,8 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { FiSend } from "react-icons/fi";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
-import { createClient } from "@supabase/supabase-js";
 import {
 	Dialog,
 	DialogContent,
@@ -11,9 +10,6 @@ import {
 	DialogTitle,
 	DialogFooter
 } from "~/components/ui/dialog"; // Ajusta la ruta si es necesario
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "TU_SUPABASE_URL";
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "TU_SUPABASE_ANON_KEY";
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 const PRESUPUESTOS = [
 	"Menos de $20.000",
@@ -47,110 +43,9 @@ export default function PersonalizarPage() {
 	const [mensaje, setMensaje] = useState("");
 	const [loading, setLoading] = useState(false);
 	const [showPago, setShowPago] = useState(false);
-	const [chatOpen, setChatOpen] = useState(false);
-	type Mensaje = {
-		id?: string | number;
-		conversacion_id: string;
-		usuario_id?: string;
-		remitente: string;
-		texto: string;
-		hora: string;
-		created_at?: string;
-	};
-	const [mensajes, setMensajes] = useState<Mensaje[]>([]);
-	const [nuevoMensaje, setNuevoMensaje] = useState("");
-	const [convId, setConvId] = useState<string | null>(null);
-	const [usuario, setUsuario] = useState<{ id?: string; nombre?: string; email?: string } | null>(null);
+	const [usuario] = useState<{ id?: string; nombre?: string; email?: string } | null>(null);
 
-	useEffect(() => {
-		// Obtén el usuario actual de Supabase Auth
-		void (async () => {
-			const { data } = await supabase.auth.getUser();
-			if (data?.user) {
-				const userMetadata: { nombre?: string } = data.user.user_metadata ?? {};
-				setUsuario({
-					id: data.user.id,
-					nombre: userMetadata.nombre ?? data.user.email,
-					email: data.user.email,
-				});
-			}
-		})();
-	}, []);
-
-	// Crear o buscar conversación para el usuario
-	useEffect(() => {
-		if (!usuario) return;
-		void (async () => {
-			type Conversacion = { id: string; usuario_id: string; cliente_nombre: string };
-			let conv: Conversacion | null = null;
-			try {
-				const convResult = await supabase
-					.from("conversaciones")
-					.select("*")
-					.eq("usuario_id", usuario.id)
-					.single();
-				const convData: Conversacion | null = convResult.data as Conversacion | null;
-				const convError = convResult.error;
-				if (convError) {
-					// handle error if needed
-				}
-				conv = convData;
-				if (!conv) {
-					const nuevaResult = await supabase
-						.from("conversaciones")
-						.insert([
-							{
-								usuario_id: usuario.id,
-								cliente_nombre:
-									usuario.nombre ??
-									usuario.email ??
-									"Invitado",
-							},
-						])
-						.select()
-						.single();
-					if (nuevaResult.error) {
-						// handle error if needed
-					}
-					conv = nuevaResult.data as Conversacion | null;
-				}
-				if (conv?.id) {
-					setConvId(conv.id);
-				}
-			} catch {
-				// handle unexpected errors
-			}
-		})();
-	}, [usuario]);
-
-	// Cargar mensajes y suscripción realtime
-	useEffect(() => {
-		if (!convId) return;
-		let ignore = false;
-		supabase
-			.from("mensajes")
-			.select("*")
-			.eq("conversacion_id", convId)
-			.order("created_at", { ascending: true })
-			.then(({ data }) => {
-				if (!ignore) setMensajes(Array.isArray(data) ? data : []);
-			});
-		// Suscripción realtime
-		const channel = supabase
-			.channel("mensajes-personalizar")
-			.on(
-				"postgres_changes",
-				{ event: "INSERT", schema: "public", table: "mensajes", filter: `conversacion_id=eq.${convId}` },
-				(payload) => {
-					setMensajes((prev) => [...prev, payload.new as Mensaje]);
-				}
-			)
-			.subscribe();
-		return () => {
-			ignore = true;
-			void supabase.removeChannel(channel);
-		};
-	}, [convId]);
+	// El historial de mensajes se maneja globalmente por el ChatWidget
 
 	// Añade helpers para el carrito
 
@@ -272,21 +167,8 @@ Descripción: ${descripcion}`
 		setLoading(false);
 	};
 
-	// Enviar mensaje
-	const enviarMensaje = async (e: React.FormEvent) => {
-		e.preventDefault();
-		if (!nuevoMensaje.trim() || !convId) return;
-		await supabase.from("mensajes").insert([
-			{
-				conversacion_id: convId,
-				usuario_id: usuario?.id,
-				remitente: "cliente",
-				texto: nuevoMensaje,
-				hora: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-			},
-		]);
-		setNuevoMensaje("");
-	};
+	// Enviar mensaje ahora se maneja por el ChatWidget global
+	// const enviarMensaje ... (eliminado)
 
 	return (
 		<div className="bg-gray-50 min-h-screen flex flex-col font-sans items-center justify-center py-12 md:py-20">
@@ -435,69 +317,7 @@ Descripción: ${descripcion}`
 				</DialogContent>
 			</Dialog>
 
-			{/* Chat flotante */}
-			<button
-				className="fixed bottom-4 right-4 sm:bottom-8 sm:right-8 bg-black text-white rounded-full p-3 sm:p-4 shadow-lg hover:bg-gray-800 z-[9999]"
-				onClick={() => setChatOpen(true)}
-				title="Chatea con nosotros"
-			>
-				<FiSend className="text-lg sm:text-2xl" />
-			</button>
-			{chatOpen && (
-				<div
-					className="fixed bottom-16 right-4 sm:bottom-24 sm:right-8 w-[calc(100%-2rem)] xs:w-80 bg-white rounded-xl shadow-lg border flex flex-col z-[9999] chat-float h-[400px] sm:h-auto"
-				>
-					<div className="flex items-center justify-between p-2 sm:p-3 border-b flex-shrink-0">
-						<div className="font-bold text-sm sm:text-base lg:text-lg flex items-center gap-2">
-							<FiSend /> <span className="hidden xs:inline">Chat Personalización</span><span className="xs:hidden">Chat</span>
-						</div>
-						<button onClick={() => setChatOpen(false)} className="p-1 rounded hover:bg-gray-100 text-xl sm:text-2xl" title="Cerrar chat">
-							×
-						</button>
-					</div>
-					{/* Área de mensajes con scroll */}
-					<div
-						className="flex-1 overflow-y-auto chat-messages-area p-2 sm:p-3"
-					>
-						<div className="flex flex-col gap-1.5 sm:gap-2">
-							{mensajes.map((m, idx) => (
-								<div
-									key={idx}
-									className={`flex ${m.remitente === "cliente" ? "justify-end" : "justify-start"}`}
-								>
-									<div
-										className={`rounded-lg px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm max-w-[80%] sm:max-w-[70%] ${m.remitente === "cliente"
-											? "bg-black text-white rounded-br-none"
-											: "bg-gray-100 text-gray-900 rounded-bl-none"
-											}`}
-									>
-										{m.texto}
-										<div className="text-[10px] sm:text-xs text-gray-400 text-right mt-1">{m.hora}</div>
-									</div>
-								</div>
-							))}
-						</div>
-					</div>
-					{/* Input fijo abajo */}
-					<form className="flex items-center gap-2 p-2 sm:p-3 border-t flex-shrink-0" onSubmit={enviarMensaje}>
-						<input
-							type="text"
-							className="border rounded px-2 sm:px-3 py-1.5 sm:py-2 w-full text-xs sm:text-sm"
-							placeholder="Escribe un mensaje..."
-							value={nuevoMensaje}
-							onChange={e => setNuevoMensaje(e.target.value)}
-						/>
-						<button
-							type="submit"
-							className="bg-black text-white rounded-full p-1.5 sm:p-2 hover:bg-gray-800 flex-shrink-0"
-							disabled={!nuevoMensaje.trim()}
-							title="Enviar mensaje"
-						>
-							<FiSend className="text-sm sm:text-base" />
-						</button>
-					</form>
-				</div>
-			)}
+			{/* El chat flotante global ahora maneja todo */}
 		</div>
 	);
 }

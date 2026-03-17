@@ -1,13 +1,13 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
-import { FiMessageCircle, FiSend, FiX, FiClock } from "react-icons/fi";
+import { FiMessageCircle, FiSend, FiX, FiCheck } from "react-icons/fi";
 import { createClient } from "@supabase/supabase-js";
 import ReportarErrorModal from "./ReportarErrorModal";
+import { motion, AnimatePresence } from "framer-motion";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "TU_SUPABASE_URL";
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "TU_SUPABASE_ANON_KEY";
 const supabase = createClient(supabaseUrl, supabaseKey);
-
 
 export default function ChatWidget({
   clienteId,
@@ -21,283 +21,219 @@ export default function ChatWidget({
   const [open, setOpen] = useState(false);
   type Mensaje = {
     id: number;
-    conversacion_id: number;
-    remitente: string;
-    texto: string;
-    hora: string;
-    created_at?: string;
+    nombre: string;
+    email: string;
+    mensaje: string;
+    respondido: boolean;
+    creado_en: string;
   };
   const [mensajes, setMensajes] = useState<Mensaje[]>([]);
   const [msg, setMsg] = useState("");
-  const [convId, setConvId] = useState<number | null>(null);
   const [hasNew, setHasNew] = useState(false);
-  const [showHistorial, setShowHistorial] = useState(false);
-  type Conv = {
-    id: number;
-    cliente_id: string;
-    cliente_nombre: string;
-    cliente_email: string;
-    created_at: string;
-    // Add other fields as needed based on your "conversaciones" table
-  };
-  const [convs, setConvs] = useState<Conv[]>([]);
   const [ticketModal, setTicketModal] = useState(false);
   const chatRef = useRef<HTMLDivElement>(null);
 
-  // Buscar o crear conversación principal (actual)
+  // Initial fetch
   useEffect(() => {
-    async function getOrCreateConv() {
-      const { data: conv } = await supabase
-        .from("conversaciones")
-        .select("*")
-        .eq("cliente_id", clienteId!)
-        .single<Conv>();
-      let conversation = conv;
-      if (!conversation) {
-        const { data: nueva } = await supabase
-          .from("conversaciones")
-          .insert([{ cliente_id: clienteId, cliente_nombre: clienteNombre, cliente_email: clienteEmail }])
-          .select()
-          .single<Conv>();
-        conversation = nueva;
-      }
-      if (conversation) setConvId(conversation.id);
-    }
-    if (clienteId) void getOrCreateConv();
-  }, [clienteId, clienteNombre, clienteEmail]);
-
-  // Cargar historial de conversaciones del usuario
-  useEffect(() => {
-    if (!clienteId) return;
-    supabase
-      .from("conversaciones")
-      .select("*")
-      .eq("cliente_id", clienteId)
-      .order("created_at", { ascending: false })
-      .then(({ data }) => setConvs(Array.isArray(data) ? data : []));
-  }, [clienteId, open, showHistorial]);
-
-  // Cargar mensajes y suscripción en tiempo real
-  useEffect(() => {
-    if (!convId) return;
-    let ignore = false;
-    // Cargar mensajes iniciales
+    if (!clienteEmail || !open) return;
     supabase
       .from("mensajes")
       .select("*")
-      .eq("conversacion_id", convId)
-      .order("created_at", { ascending: true })
-      .then(({ data }) => {
-        if (!ignore) setMensajes(Array.isArray(data) ? data : []);
-      });
+      .eq("email", clienteEmail)
+      .order("creado_en", { ascending: true })
+      .then(({ data }) => setMensajes(Array.isArray(data) ? data : []));
+  }, [clienteEmail, open]);
 
-    // Suscripción realtime: usa .on('broadcast', ...) para canales Realtime nuevos de Supabase
-    // y .on('postgres_changes', ...) para tablas
+  // Suscripción Realtime Global (Escucha siempre)
+  useEffect(() => {
+    if (!clienteEmail) return;
+    
+    const channelName = `global-chat-${clienteEmail.replace(/[@.]/g, '-')}`;
     const channel = supabase
-      .channel(`mensajes-chatwidget-${convId}`)
+      .channel(channelName)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "mensajes", filter: `conversacion_id=eq.${convId}` },
+        { event: "INSERT", schema: "public", table: "mensajes" },
         (payload) => {
-          // Recarga todos los mensajes para asegurar sincronía
-          supabase
-            .from("mensajes")
-            .select("*")
-            .eq("conversacion_id", convId)
-            .order("created_at", { ascending: true })
-            .then(({ data }) => {
-              setMensajes(Array.isArray(data) ? data : []);
+          const newMessage = payload.new as Mensaje;
+          if (newMessage.email === clienteEmail) {
+            setMensajes(prev => {
+              if (prev.some(m => m.id === newMessage.id)) return prev;
+              return [...prev, newMessage];
             });
-          // Si el mensaje es del admin y el chat está cerrado, muestra notificación
-          if ((payload.new as { remitente?: string })?.remitente === "admin" && !open) setHasNew(true);
+            // Si el mensaje es del admin y el chat está cerrado, marcamos notificación
+            if (newMessage.nombre === "Admin" && !open) setHasNew(true);
+          }
         }
       )
       .subscribe();
 
     return () => {
-      ignore = true;
       void supabase.removeChannel(channel);
     };
-  }, [convId, open]);
+  }, [clienteEmail, open]); // RE-subscribing on open/close ensures we always have correct 'open' state for notifications
 
-  // Marcar como leído al abrir el chat
   useEffect(() => {
     if (open) setHasNew(false);
     setTimeout(() => {
-      if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
+      if (chatRef.current) chatRef.current.scrollTo({ top: chatRef.current.scrollHeight, behavior: 'smooth' });
     }, 100);
   }, [open, mensajes.length]);
 
-  // Enviar mensaje
   const enviarMensaje = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!msg.trim() || !convId) return;
-    // Insertar mensaje
-    const { data: mensajeInsertado } = await supabase
-      .from("mensajes")
-      .insert([
-        {
-          conversacion_id: convId,
-          remitente: "cliente",
-          texto: msg,
-          hora: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        },
-      ])
-      .select()
-      .single<Mensaje>();
+    if (!msg.trim() || !clienteEmail) return;
+    const currentText = msg;
     setMsg("");
-    // Crear notificación para el admin
-    if (mensajeInsertado) {
-      await supabase.from("notificaciones").insert([
-        {
-          usuario_id: "admin", // o el id del admin si tienes varios
-          tipo: "mensaje",
-          mensaje: `Nuevo mensaje de ${clienteNombre}`,
-          conversacion_id: convId,
-          mensaje_id: mensajeInsertado.id,
-          leido: false,
-        },
-      ]);
+    
+    const { data: inserted, error } = await supabase
+      .from("mensajes")
+      .insert([{ nombre: clienteNombre, email: clienteEmail, mensaje: currentText, respondido: false }])
+      .select().single<Mensaje>();
+      
+    if (!error && inserted) {
+      setMensajes(prev => [...prev, inserted]);
+      // Notify admin
+      await supabase.from("notificaciones").insert([{
+        usuario_id: null,
+        tipo: "mensaje",
+        mensaje: `Nuevo de ${clienteNombre}: ${currentText.slice(0, 30)}...`,
+        leido: false,
+      }]);
     }
-    setTimeout(() => {
-      if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
-    }, 100);
   };
 
-  // Subir ticket (imagen, descripción, categoría)
-
   return (
-    <div className="fixed bottom-6 right-6 z-[9999] flex flex-col items-end gap-3">
-      {/* Botón flotante para abrir el modal de reportar error */}
-      {!ticketModal && (
-        <button
-          className="bg-red-600 text-white rounded-full p-4 shadow-lg hover:bg-red-700 relative mb-2"
-          onClick={() => setTicketModal(true)}
-          title="Reportar un problema"
-        >
-          🐞
-        </button>
-      )}
-      {/* Modal de reportar error */}
-      <ReportarErrorModal
-        open={ticketModal}
-        onOpenChangeAction={setTicketModal}
-        clienteId={clienteId}
-      />
-      {/* Botón para abrir el chat */}
-      {!open ? (
-        <button
-          className="bg-black text-white rounded-full p-4 shadow-lg hover:bg-gray-800 relative"
-          onClick={() => setOpen(true)}
-          title="Chatea con nosotros"
-        >
-          <FiMessageCircle className="text-2xl" />
-          {hasNew && (
-            <span className="absolute top-1 right-1 bg-red-500 text-white text-xs rounded-full px-2 animate-bounce">
-              1
-            </span>
-          )}
-        </button>
-      ) : (
-        <div
-          className="w-80 bg-white rounded-xl shadow-lg border flex flex-col"
-          style={{ height: 420, maxHeight: 420, minHeight: 420 }}
-        >
-          <div className="flex items-center justify-between p-3 border-b flex-shrink-0">
-            <div className="font-bold text-lg flex items-center gap-2">
-              <FiMessageCircle /> Chat
-            </div>
-            <div className="flex gap-2">
-              <button
-                className="p-1 rounded hover:bg-gray-100"
-                title="Reportar problema"
-                onClick={() => setTicketModal(true)}
-              >
-                🐞
-              </button>
-              <button
-                className="p-1 rounded hover:bg-gray-100"
-                title="Historial de mensajes"
-                onClick={() => setShowHistorial((v) => !v)}
-              >
-                <FiClock />
-              </button>
-              <button onClick={() => setOpen(false)} className="p-1 rounded hover:bg-gray-100" title="Cerrar chat">
-                <FiX />
-              </button>
-            </div>
-          </div>
-          {showHistorial ? (
-            <div className="flex-1 overflow-y-auto p-3" style={{ minHeight: 0, maxHeight: 320 }}>
-              <div className="font-semibold mb-2 text-sm">Historial de mensajes</div>
-              {convs.length === 0 ? (
-                <div className="text-gray-400 text-center mt-10 text-sm">Sin conversaciones previas</div>
-              ) : (
-                <div className="flex flex-col gap-2">
-                  {convs.map((conv) => (
-                    <button
-                      key={conv.id}
-                      className={`w-full text-left px-3 py-2 rounded border ${convId === conv.id ? "bg-gray-100 border-black" : "bg-white border-gray-200"} hover:bg-gray-50`}
-                      onClick={() => {
-                        setConvId(conv.id);
-                        setShowHistorial(false);
-                      }}
-                    >
-                      <div className="font-medium text-xs">Conversación #{conv.id}</div>
-                      <div className="text-xs text-gray-500">{new Date(conv.created_at).toLocaleString()}</div>
-                    </button>
-                  ))}
+    <div className="fixed bottom-6 right-6 z-[9999] flex flex-col items-end gap-3 font-sans">
+      <AnimatePresence>
+        {!ticketModal && (
+          <motion.button
+            initial={{ opacity: 0, scale: 0.8, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            className="w-12 h-12 bg-red-500/10 backdrop-blur-md border border-red-500/20 text-red-500 rounded-2xl flex items-center justify-center shadow-xl hover:bg-red-500/20 transition-all mb-1 group"
+            onClick={() => setTicketModal(true)}
+            title="Reportar problema"
+          >
+            <span className="text-xl group-hover:rotate-12 transition-transform">🐞</span>
+          </motion.button>
+        )}
+      </AnimatePresence>
+
+      <ReportarErrorModal open={ticketModal} onOpenChangeAction={setTicketModal} clienteId={clienteId} />
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9, y: 20, transformOrigin: 'bottom right' }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9, y: 20 }}
+            className="w-[350px] sm:w-[380px] bg-white rounded-[2rem] shadow-2xl border border-gray-100 flex flex-col overflow-hidden"
+            style={{ height: 550, maxHeight: '80vh' }}
+          >
+            {/* Header */}
+            <div className="p-6 bg-black text-white flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-500 flex items-center justify-center text-white shadow-lg shadow-emerald-500/20">
+                  <FiMessageCircle className="text-xl" />
                 </div>
-              )}
-            </div>
-          ) : (
-            <>
-              <div
-                className="flex-1 overflow-y-auto p-3 chat-messages-area"
-                ref={chatRef}
-              >
-                <div className="flex flex-col gap-2">
-                  {mensajes.map((m, idx) => (
-                    <div
-                      key={idx}
-                      className={`flex ${m.remitente === "cliente" ? "justify-end" : "justify-start"}`}
-                    >
-                      <div
-                        className={`rounded-lg px-4 py-2 text-sm max-w-[70%] ${
-                          m.remitente === "cliente"
-                            ? "bg-black text-white rounded-br-none"
-                            : "bg-gray-100 text-gray-900 rounded-bl-none"
-                        }`}
-                      >
-                        {m.texto}
-                        <div className="text-xs text-gray-400 text-right mt-1">{m.hora}</div>
-                      </div>
-                    </div>
-                  ))}
+                <div>
+                  <h3 className="font-bold text-sm tracking-tight">Soporte Thiart3D</h3>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
+                    <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest leading-none">En línea</span>
+                  </div>
                 </div>
               </div>
-              {/* Input fijo abajo */}
-              <form className="flex items-center gap-2 p-3 border-t flex-shrink-0" onSubmit={enviarMensaje}>
-                <input
-                  type="text"
-                  className="border rounded px-3 py-2 w-full"
-                  placeholder="Escribe un mensaje..."
-                  value={msg}
-                  onChange={e => setMsg(e.target.value)}
-                />
-                <button
-                  type="submit"
-                  className="bg-black text-white rounded-full p-2 hover:bg-gray-800"
-                  disabled={!msg.trim()}
-                  title="Enviar mensaje"
+              <button onClick={() => setOpen(false)} className="p-2 hover:bg-white/10 rounded-xl transition-colors">
+                <FiX className="text-xl" />
+              </button>
+            </div>
+
+            {/* Messages Area */}
+            <div 
+              ref={chatRef}
+              className="flex-1 overflow-y-auto p-6 space-y-4 bg-gray-50/50 custom-scrollbar"
+            >
+              <div className="text-center mb-6">
+                <span className="px-3 py-1 bg-white border border-gray-100 rounded-full text-[10px] text-gray-400 font-bold uppercase tracking-widest shadow-sm">
+                  Hoy
+                </span>
+              </div>
+
+              {mensajes.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-20 text-center space-y-3 opacity-30">
+                  <FiMessageCircle className="text-4xl" />
+                  <p className="text-xs font-medium">¡Hola! ¿En qué podemos ayudarte?</p>
+                </div>
+              )}
+
+              {mensajes.map((m, idx) => (
+                <motion.div
+                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  key={m.id || idx}
+                  className={`flex ${m.nombre === "Admin" ? "justify-start" : "justify-end"}`}
                 >
-                  <FiSend />
-                </button>
-              </form>
-            </>
-          )}
-        </div>
-      )}
+                  <div className={`max-w-[80%] px-4 py-3 rounded-2xl text-sm shadow-sm transition-all ${
+                    m.nombre === "Admin"
+                      ? "bg-white text-gray-800 rounded-bl-none border border-gray-100"
+                      : "bg-black text-white rounded-br-none"
+                  }`}>
+                    <p className="leading-relaxed">{m.mensaje}</p>
+                    <div className="mt-1.5 flex items-center justify-between gap-2">
+                       <span className={`text-[9px] font-bold ${m.nombre === "Admin" ? "text-gray-400" : "text-gray-500"}`}>
+                        {new Date(m.creado_en).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                      {m.nombre !== "Admin" && (
+                        <FiCheck className="text-[10px] text-emerald-500" />
+                      )}
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+
+            {/* Input Form */}
+            <form onSubmit={enviarMensaje} className="p-4 bg-white border-t border-gray-50 flex items-center gap-2">
+              <input
+                type="text"
+                placeholder="Escribe un mensaje..."
+                className="flex-1 px-4 py-3 bg-gray-100 border-none rounded-2xl text-sm outline-none focus:ring-2 focus:ring-black/5 transition-all text-black"
+                value={msg}
+                onChange={e => setMsg(e.target.value)}
+              />
+              <button 
+                type="submit"
+                disabled={!msg.trim()}
+                className="w-12 h-12 bg-black text-white rounded-2xl flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-lg shadow-black/10 disabled:opacity-50 disabled:scale-100"
+              >
+                <FiSend className="text-lg" />
+              </button>
+            </form>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <motion.button
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
+        className="w-16 h-16 bg-black text-white rounded-[1.5rem] flex items-center justify-center shadow-2xl relative group overflow-hidden"
+        onClick={() => setOpen(!open)}
+      >
+        <div className="absolute inset-0 bg-gradient-to-tr from-emerald-500/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+        {open ? <FiX className="text-2xl" /> : <FiMessageCircle className="text-2xl" />}
+        {hasNew && (
+          <span className="absolute top-3 right-3 w-4 h-4 bg-emerald-500 border-2 border-black rounded-full animate-bounce"></span>
+        )}
+      </motion.button>
+
+      <style jsx global>{`
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #d1d5db; }
+      `}</style>
     </div>
   );
 }

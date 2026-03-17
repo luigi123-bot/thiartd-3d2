@@ -430,7 +430,7 @@ export default function CheckoutPage() {
                     <Truck className="w-3 h-3 sm:w-4 sm:h-4" />
                     Envío:
                   </span>
-                  <span className="text-green-600">Gratis</span>
+                  <span className="text-gray-600 text-sm">A convenir</span>
                 </div>
                 <hr />
                 <div className="flex justify-between font-bold text-base sm:text-lg">
@@ -439,9 +439,7 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
-              <div className="mt-3 sm:mt-4 p-2 sm:p-3 bg-green-50 border border-green-200 rounded-lg">
-                <p className="text-xs sm:text-sm text-green-700">🎉 ¡Envío gratis en todos los pedidos!</p>
-              </div>
+              {/* Se eliminó la alerta de envío gratis */}
 
               {!isDevelopment && total < 1500 && (
                 <div className="mt-3 sm:mt-4 p-2 sm:p-3 bg-yellow-50 border border-yellow-200 rounded-lg">

@@ -1,458 +1,451 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { FiSend, FiCheck, FiUser } from "react-icons/fi";
+import { FiSend, FiUser, FiSearch, FiMoreVertical, FiCheck, FiMessageCircle } from "react-icons/fi";
 import { MdDoneAll } from "react-icons/md";
 import { createClient } from "@supabase/supabase-js";
 import Loader from "~/components/providers/UiProvider";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "~/components/ui/dialog";
-import Image from "next/image";
 import { useToast } from "~/components/ui/use-toast";
+import { Badge } from "~/components/ui/badge";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "TU_SUPABASE_URL";
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "TU_SUPABASE_ANON_KEY";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 export default function AdminMensajesPage() {
-	interface Conversation {
-		id: number;
-		cliente_nombre: string;
-		cliente_email: string;
-		cliente_avatar_url?: string;
-		// Add other fields as needed
-	}
-
-	const [convs, setConvs] = useState<Conversation[]>([]);
-	const [convId, setConvId] = useState<number | null>(null);
 	interface Mensaje {
 		id: number;
-		conversacion_id: number;
-		remitente: string;
-		texto: string;
-		hora: string;
-		leido_cliente: boolean;
-		created_at: string;
+		nombre: string;
+		email: string;
+		mensaje: string;
+		respondido: boolean;
+		creado_en: string;
 	}
 
-	const [mensajes, setMensajes] = useState<Mensaje[]>([]);
-	const [msg, setMsg] = useState("");
-	const [busqueda, setBusqueda] = useState("");
-	const [loading, setLoading] = useState(true);
-	interface ModalUser {
-		cliente_id: number;
-		cliente_nombre: string;
-		cliente_email: string;
-		cliente_avatar_url?: string;
+	interface Thread {
+		email: string;
+		nombre: string;
+		ultimoMensaje: string;
+		fecha: string;
+		leido: boolean;
+		cliente_id?: string;
 	}
 
-	const [modalUser, setModalUser] = useState<ModalUser | null>(null);
 	interface Pedido {
 		id: number;
 		estado: string;
 		created_at: string;
-		// Add other fields as needed
 	}
 
+	const [threads, setThreads] = useState<Thread[]>([]);
+	const [selectedEmail, setSelectedEmail] = useState<string | null>(null);
+	const [mensajes, setMensajes] = useState<Mensaje[]>([]);
+	const [msg, setMsg] = useState("");
+	const [busqueda, setBusqueda] = useState("");
+	const [loading, setLoading] = useState(true);
+	const [modalUser, setModalUser] = useState<Thread | null>(null);
 	const [pedidos, setPedidos] = useState<Pedido[]>([]);
 	const [loadingPedidos, setLoadingPedidos] = useState(false);
-	const [isTyping, setIsTyping] = useState(false);
-	const [typingUsers] = useState<string[]>([]);
-	const [nuevosIds, setNuevosIds] = useState<number[]>([]);
 	const chatRef = useRef<HTMLDivElement>(null);
 	const { toast } = useToast();
 
-	// Cargar conversaciones (solo usuarios)
+	// Cargar hilos de conversación (agrupados por email del cliente)
 	useEffect(() => {
-		async function fetchConvs() {
+		async function fetchThreads() {
 			setLoading(true);
-			const { data } = await supabase
-				.from("conversaciones")
+			const { data, error } = await supabase
+				.from("mensajes")
 				.select("*")
-				.order("id", { ascending: false });
-			setConvs(Array.isArray(data) ? data : []);
+				.order("creado_en", { ascending: false });
+
+			if (error) {
+				console.error("Error fetching messages for threads:", error);
+				setLoading(false);
+				return;
+			}
+
+			const grouped = new Map<string, Thread>();
+			(data as Mensaje[]).forEach((m) => {
+				if (m.nombre !== "Admin" && !grouped.has(m.email)) {
+					grouped.set(m.email, {
+						email: m.email,
+						nombre: m.nombre,
+						ultimoMensaje: m.mensaje,
+						fecha: m.creado_en,
+						leido: true,
+					});
+				}
+			});
+
+			setThreads(Array.from(grouped.values()));
 			setLoading(false);
 		}
-		void fetchConvs();
+		void fetchThreads();
+
+		// Realtime para actualizar la lista de hilos
+		const channel = supabase
+			.channel("threads-update")
+			.on(
+				"postgres_changes",
+				{ event: "INSERT", schema: "public", table: "mensajes" },
+				() => {
+					void fetchThreads();
+				}
+			)
+			.subscribe();
+
+		return () => {
+			void supabase.removeChannel(channel);
+		};
 	}, []);
 
-	// Cargar mensajes de la conversación seleccionada y suscripción realtime
+	// Cargar mensajes del hilo seleccionado
 	useEffect(() => {
-		if (!convId) return;
-		setLoading(true);
-		let ignore = false;
+		if (!selectedEmail) return;
+		
 		const fetchMensajes = async () => {
 			const { data } = await supabase
 				.from("mensajes")
 				.select("*")
-				.eq("conversacion_id", convId)
-				.order("created_at", { ascending: true });
-			if (!ignore) setMensajes(Array.isArray(data) ? data : []);
-			setLoading(false);
+				.eq("email", selectedEmail)
+				.order("creado_en", { ascending: true });
+			setMensajes(Array.isArray(data) ? data : []);
 		};
 		void fetchMensajes();
 
+		console.log(`[Admin Realtime] Iniciando canal para: ${selectedEmail}`);
 		const channel = supabase
-			.channel("mensajes-admin")
+			.channel(`mensajes-admin-room-${selectedEmail}`)
 			.on(
 				"postgres_changes",
-				{ event: "INSERT", schema: "public", table: "mensajes", filter: `conversacion_id=eq.${convId}` },
+				{ event: "INSERT", schema: "public", table: "mensajes" },
 				(payload) => {
-					setMensajes((prev) => {
-						const newMessage = payload.new as Mensaje;
-						if (prev.some((m) => m.id === newMessage.id)) return prev;
-						// Si el mensaje es de cliente, marca como nuevo y muestra notificación
-						if (newMessage.remitente !== "admin") {
-							setNuevosIds((ids) => [...ids, newMessage.id]);
-							toast({
-								title: "Nuevo mensaje",
-								description: newMessage.texto?.length > 40 ? newMessage.texto.slice(0, 40) + "..." : newMessage.texto,
-								variant: "default",
-							});
-						}
-						return [...prev, newMessage];
-					});
+					console.log("[Admin Realtime] Mensaje detectado en tabla:", payload);
+					const newMessage = payload.new as Mensaje;
+					if (newMessage.email === selectedEmail) {
+						setMensajes((prev) => {
+							if (prev.some((m) => m.id === newMessage.id)) return prev;
+							return [...prev, newMessage];
+						});
+					}
 				}
 			)
-			.subscribe();
+			.subscribe((status) => {
+				console.log(`[Admin Realtime] Estado conexión (${selectedEmail}):`, status);
+			});
+
 		return () => {
-			ignore = true;
+			console.log(`[Admin Realtime] Limpiando canal: ${selectedEmail}`);
 			void supabase.removeChannel(channel);
 		};
-	}, [convId, toast]);
+	}, [selectedEmail]);
 
-	// Scroll automático al último mensaje
 	useEffect(() => {
 		if (chatRef.current) {
 			chatRef.current.scrollTop = chatRef.current.scrollHeight;
 		}
-	}, [mensajes.length]);
+	}, [mensajes]);
 
-	// Buscar pedidos del usuario al abrir el modal
 	useEffect(() => {
-		if (!modalUser) return;
+		if (!modalUser?.email) return;
 		setLoadingPedidos(true);
+		// Intentamos buscar pedidos por email ya que es lo que tenemos vinculado
 		supabase
 			.from("pedidos")
 			.select("*")
-			.eq("cliente_id", modalUser.cliente_id)
+			.eq("email_cliente", modalUser.email) // Asumiendo que esta es la columna en pedidos
 			.then(({ data }) => {
 				setPedidos(Array.isArray(data) ? data : []);
 				setLoadingPedidos(false);
 			});
 	}, [modalUser]);
 
-	const convFiltradas = convs.filter((c) =>
-		c.cliente_nombre.toLowerCase().includes(busqueda.toLowerCase())
+	const threadsFiltrados = threads.filter((t) =>
+		t.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
+		t.email.toLowerCase().includes(busqueda.toLowerCase())
 	);
-	const convSeleccionada = convs.find((c) => c.id === convId);
 
-	// Helper para obtener la imagen de perfil Clerk (si la guardas en la conversación)
-	const getProfileImage = (user: Conversation | ModalUser) =>
-			user.cliente_avatar_url ??
-			"https://ui-avatars.com/api/?name=User&background=cccccc&color=666666&size=80";
-
-	// Resumen de pedidos
-	const resumenPedidos = (pedidos: Pedido[]) => {
-		const total = pedidos.length;
-		const enEnvio = pedidos.filter((p) => p.estado === "en_envio").length;
-		const pendientes = pedidos.filter((p) => p.estado === "pendiente").length;
-		const completados = pedidos.filter((p) => p.estado === "completado").length;
-		return { total, enEnvio, pendientes, completados };
-	};
-
-	// Indicador de escritura (broadcast typing)
-	const handleTyping = () => {
-		if (!convId) return;
-		if (!isTyping) {
-			setIsTyping(true);
-			void supabase.channel("typing").send({
-				type: "broadcast",
-				event: "typing",
-				payload: { conversacion_id: convId, user: "admin", typing: true },
-			});
-		}
-		// Detener typing después de 2s sin escribir
-		setTimeout(() => {
-			setIsTyping(false);
-			void supabase.channel("typing").send({
-				type: "broadcast",
-				event: "typing",
-				payload: { conversacion_id: convId, user: "admin", typing: false },
-			});
-		}, 2000);
-	};
-
-	const renderEstado = (m: Mensaje) => {
-		if (m.remitente === "admin") {
-			if (m.leido_cliente) {
-				return <MdDoneAll className="inline ml-1 text-blue-500" title="Leído" />;
-			}
-			return <FiCheck className="inline ml-1 text-gray-400" title="Enviado" />;
-		}
-		return null;
-	};
+	const selectedThread = threads.find((t) => t.email === selectedEmail);
 
 	function formatDate(dateStr: string) {
-		if (typeof window === "undefined") return dateStr;
-		return new Date(dateStr).toLocaleString();
+		const date = new Date(dateStr);
+		return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+	}
+
+	function getInitial(name: string) {
+		return name.charAt(0).toUpperCase();
 	}
 
 	return (
-		<div className="min-h-screen p-2 md:p-10 bg-gray-50">
-			<h1 className="text-2xl font-bold mb-6">Mensajes de Contacto</h1>
-			<div className="flex flex-col md:flex-row gap-6">
-				{/* Conversaciones */}
-				<div className="w-full md:max-w-sm bg-white rounded-xl border p-4 flex flex-col min-h-[400px]">
-					<input
-						type="text"
-						placeholder="Buscar conversaciones..."
-						className="border rounded px-3 py-2 w-full text-sm mb-3"
-						value={busqueda}
-						onChange={(e) => setBusqueda(e.target.value)}
-					/>
-					<div className="flex-1 overflow-y-auto">
-						{loading ? (
-							<Loader />
-						) : convFiltradas.length === 0 ? (
-							<div className="text-gray-400 text-center mt-10">Sin conversaciones</div>
-						) : (
-							convFiltradas.map((conv) => (
-								<div
-									key={conv.id}
-									className={`flex items-center gap-3 p-2 rounded cursor-pointer mb-1 ${
-										convId === conv.id ? "bg-gray-100" : ""
-									}`}
-									onClick={() => setConvId(conv.id)}
-								>
-									<div
-										className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-400 font-bold text-lg overflow-hidden cursor-pointer border"
-										onClick={(e) => {
-											e.stopPropagation();
-											setModalUser({
-												cliente_id: conv.id,
-												cliente_nombre: conv.cliente_nombre,
-												cliente_email: conv.cliente_email,
-												cliente_avatar_url: conv.cliente_avatar_url,
-											});
-										}}
-										title="Ver perfil y pedidos"
-									>
-										<Image
-											src={getProfileImage(conv)}
-											alt={conv.cliente_nombre}
-											width={40}
-											height={40}
-											className="object-cover w-10 h-10 rounded-full"
-										/>
-									</div>
-									<div className="flex-1 min-w-0">
-										<div className="font-semibold text-sm truncate">
-											{conv.cliente_nombre}
-										</div>
-										<div className="text-xs text-gray-500 truncate">
-											{conv.cliente_email}
-													</div>
-												</div>
-											</div>
-									))
-								)}
+		<div className="min-h-screen bg-gray-50 flex flex-col md:flex-row h-screen overflow-hidden">
+			{/* Sidebar Izquierda */}
+			<div className="w-full md:w-96 bg-white border-r flex flex-col shadow-sm z-10">
+				<div className="p-6 border-b bg-white/50 backdrop-blur-md sticky top-0">
+					<div className="flex items-center justify-between mb-6">
+						<h1 className="text-2xl font-black text-gray-900 tracking-tight">Chats</h1>
+						<Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-100 font-bold">
+							{threads.length} hilos
+						</Badge>
+					</div>
+					<div className="relative">
+						<FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+						<input
+							type="text"
+							placeholder="Buscar por nombre o correo..."
+							className="w-full pl-10 pr-4 py-2.5 bg-gray-100 border-transparent rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition-all outline-none"
+							value={busqueda}
+							onChange={(e) => setBusqueda(e.target.value)}
+						/>
 					</div>
 				</div>
-				{/* Chat */}
-				<div className="flex-1 bg-white rounded-xl border p-2 md:p-6 flex flex-col min-h-[400px]">
-					{convSeleccionada ? (
-						<>
-							{/* Encabezado fijo */}
-							<div className="flex items-center gap-3 mb-4 flex-shrink-0">
-								<div
-									className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center text-gray-400 font-bold text-xl overflow-hidden cursor-pointer border"
-									onClick={() =>
-										setModalUser(
-											convSeleccionada
-												? {
-														cliente_id: convSeleccionada.id,
-														cliente_nombre: convSeleccionada.cliente_nombre,
-														cliente_email: convSeleccionada.cliente_email,
-														cliente_avatar_url: convSeleccionada.cliente_avatar_url,
-												  }
-												: null
-										)
-									}
-									title="Ver perfil y pedidos"
-								>
-									<Image
-										src={getProfileImage(convSeleccionada)}
-										alt={convSeleccionada.cliente_nombre}
-										width={48}
-										height={48}
-										className="object-cover w-12 h-12 rounded-full"
-									/>
-								</div>
-								<div>
-									<div className="font-bold text-lg">
-										{convSeleccionada.cliente_nombre}
-									</div>
-									<div className="text-xs text-gray-500">
-										{convSeleccionada.cliente_email}
-									</div>
-								</div>
-							</div>
-							{/* Área de mensajes con scroll y tamaño fijo */}
-							<div
-								className="flex-1 overflow-y-auto mb-4 min-h-0 max-h-[420px] h-[420px] rounded-xl bg-white border border-gray-100 p-2"
-								ref={chatRef}
-							>
-								<div className="flex flex-col gap-2">
-									{mensajes.map((m, idx) => (
-										<div
-											key={idx}
-											className={`flex ${
-												m.remitente === "admin" ? "justify-end" : "justify-start"
-											}`}
-										>
-											<div
-												className={`rounded-lg px-4 py-2 text-sm max-w-[80%] md:max-w-[70%] break-words shadow relative ${
-													m.remitente === "admin"
-														? "bg-blue-600 text-white rounded-br-none"
-														: "bg-gray-100 text-gray-900 rounded-bl-none"
-												} ${nuevosIds.includes(m.id) ? "ring-2 ring-green-400" : ""}`}
-											>
-												<div className="flex items-center">
-													{m.remitente !== "admin" && (
-														<FiUser className="mr-1 text-gray-400" />
-													)}
-													<span>{m.texto}</span>
-													{renderEstado(m)}
-													{nuevosIds.includes(m.id) && (
-														<span className="ml-2 inline-block w-2 h-2 bg-green-500 rounded-full animate-pulse" title="Nuevo mensaje"></span>
-													)}
-												</div>
-												<div className="text-xs text-gray-300 text-right mt-1">
-													{m.created_at ? formatDate(m.created_at) : m.hora}
-												</div>
-											</div>
-										</div>
-									))}
-									{typingUsers.length > 0 && (
-										<div className="flex justify-start">
-											<div className="rounded-lg px-4 py-2 text-xs bg-gray-200 text-gray-700 animate-pulse">
-												{typingUsers.join(", ")} está escribiendo...
-											</div>
-										</div>
-									)}
-								</div>
-							</div>
-							{/* Input fijo abajo */}
-							<form
-								className="flex items-center gap-2 flex-shrink-0 bg-white rounded-xl"
-								onSubmit={async (e) => {
-									e.preventDefault();
-									if (!msg.trim() || !convId) return;
-									const { error } = await supabase.from("mensajes").insert([
-										{
-											conversacion_id: convId,
-											remitente: "admin",
-											texto: msg,
-											hora: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-											leido_cliente: false,
-											created_at: new Date().toISOString(),
-										},
-									]);
-									setMsg("");
-									if (error) {
-										console.error("Error al enviar el mensaje:", error);
-										return;
-									}
-									// Mensaje enviado, ahora manejar el estado de 'enviado' o 'entregado'
-									setMensajes((prev) => {
-										const nuevoMensaje = {
-											conversacion_id: convId,
-											remitente: "admin",
-											texto: msg,
-											hora: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-											leido_cliente: false,
-											created_at: new Date().toISOString(),
-											id: Date.now(), // Temporal, para que React reconozca el nuevo mensaje
-										};
-										return [...prev, nuevoMensaje];
-									});
-								}}
-							>
-								<input
-									type="text"
-									placeholder="Escribe un mensaje..."
-									className="border rounded px-3 py-2 w-full text-sm"
-									value={msg}
-									onChange={(e) => setMsg(e.target.value)}
-									onKeyUp={handleTyping}
-								/>
-								<button
-									type="submit"
-									className="bg-blue-600 text-white rounded px-4 py-2 text-sm flex items-center gap-2"
-								>
-									<FiSend />
-									Enviar
-								</button>
-							</form>
-						</>
-					) : (
-						<div className="flex-1 flex items-center justify-center text-gray-400">
-							Selecciona una conversación para ver los mensajes.
+
+				<div className="flex-1 overflow-y-auto custom-scrollbar p-2">
+					{loading ? (
+						<div className="flex items-center justify-center py-20">
+							<Loader />
 						</div>
+					) : threadsFiltrados.length === 0 ? (
+						<div className="flex flex-col items-center justify-center py-20 text-gray-400">
+							<FiUser className="text-4xl mb-2 opacity-20" />
+							<p className="text-sm">Sin conversaciones</p>
+						</div>
+					) : (
+						threadsFiltrados.map((t) => (
+							<div
+								key={t.email}
+								className={`group flex items-center gap-4 p-4 rounded-2xl cursor-pointer transition-all mb-1 ${
+									selectedEmail === t.email 
+										? "bg-emerald-50 border-emerald-100 shadow-sm" 
+										: "hover:bg-gray-50 border-transparent"
+								} border`}
+								onClick={() => setSelectedEmail(t.email)}
+							>
+								<div className="relative">
+									<div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-inner ${
+										selectedEmail === t.email ? "bg-emerald-500" : "bg-gray-400"
+									}`}>
+										{getInitial(t.nombre)}
+									</div>
+									<div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 border-2 border-white rounded-full"></div>
+								</div>
+								
+								<div className="flex-1 min-w-0">
+									<div className="flex justify-between items-start mb-0.5">
+										<p className={`text-sm font-bold truncate ${selectedEmail === t.email ? "text-emerald-900" : "text-gray-900"}`}>
+											{t.nombre}
+										</p>
+										<span className="text-[10px] text-gray-400 font-medium uppercase tracking-wider whitespace-nowrap ml-2">
+											{formatDate(t.fecha)}
+										</span>
+									</div>
+									<p className="text-xs text-gray-500 truncate font-medium">
+										{t.ultimoMensaje}
+									</p>
+								</div>
+							</div>
+						))
 					)}
 				</div>
 			</div>
+
+			{/* Área de Chat Derecha */}
+			<div className="flex-1 flex flex-col relative bg-[#f8fafc]">
+				{selectedThread ? (
+					<>
+						{/* Header del Chat */}
+						<div className="h-20 bg-white/80 backdrop-blur-md border-b flex items-center justify-between px-8 sticky top-0 z-10">
+							<div className="flex items-center gap-4 cursor-pointer" onClick={() => setModalUser(selectedThread)}>
+								<div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center text-white font-bold shadow-sm">
+									{getInitial(selectedThread.nombre)}
+								</div>
+								<div>
+									<h2 className="font-bold text-gray-900 leading-none mb-1 group-hover:text-emerald-600 transition-colors">{selectedThread.nombre}</h2>
+									<p className="text-xs text-emerald-600 font-semibold">{selectedThread.email}</p>
+								</div>
+							</div>
+							<div className="flex items-center gap-2">
+								<button className="p-2.5 rounded-full hover:bg-gray-100 text-gray-400 transition-colors">
+									<FiMoreVertical />
+								</button>
+							</div>
+						</div>
+
+						{/* Mensajes */}
+						<div 
+							ref={chatRef}
+							className="flex-1 overflow-y-auto p-6 md:p-10 space-y-4 custom-scrollbar"
+						>
+							<div className="flex justify-center mb-8">
+								<span className="bg-white/80 backdrop-blur-sm shadow-sm border border-gray-100 px-4 py-1.5 rounded-full text-[10px] text-gray-400 font-bold uppercase tracking-widest leading-none">
+									Comienzo de la historia
+								</span>
+							</div>
+
+							{mensajes.map((m) => (
+								<div
+									key={m.id}
+									className={`flex flex-col ${m.nombre === "Admin" ? "items-end" : "items-start"}`}
+								>
+									<div
+										className={`group relative max-w-[85%] md:max-w-[70%] px-5 py-3.5 rounded-2xl shadow-sm transition-all ${
+											m.nombre === "Admin"
+												? "bg-black text-white rounded-br-none"
+												: "bg-white text-gray-800 rounded-bl-none border border-gray-100"
+										}`}
+									>
+										<p className="text-sm leading-relaxed font-medium">{m.mensaje}</p>
+										
+										<div className={`mt-2 flex items-center gap-2 text-[10px] ${
+											m.nombre === "Admin" ? "text-gray-400" : "text-gray-400"
+										}`}>
+											<span className="font-bold">{formatDate(m.creado_en)}</span>
+											{m.nombre === "Admin" && (
+												<div className="flex items-center">
+													{m.respondido ? (
+														<MdDoneAll className="text-blue-500 text-sm" />
+													) : (
+														<FiCheck className="text-gray-500" />
+													)}
+												</div>
+											)}
+										</div>
+									</div>
+								</div>
+							))}
+						</div>
+
+						{/* Input */}
+						<div className="p-6 bg-white border-t border-gray-100 shadow-[0_-4px_20px_rgba(0,0,0,0.02)]">
+							<form
+								className="max-w-4xl mx-auto relative flex items-center gap-3"
+								onSubmit={async (e) => {
+									e.preventDefault();
+									if (!msg.trim() || !selectedEmail) return;
+									const msgText = msg;
+									setMsg("");
+									
+									const { data, error } = await supabase.from("mensajes").insert([
+										{
+											nombre: "Admin",
+											email: selectedEmail,
+											mensaje: msgText,
+											respondido: true
+										},
+									]).select().single<Mensaje>();
+									
+									if (error) {
+										console.error("Error al enviar mensaje:", error);
+										toast({ title: "Error", description: "No se pudo enviar el mensaje", variant: "destructive" });
+										return;
+									}
+									
+									if (data) {
+										setMensajes((prev) => [...prev, data]);
+									}
+								}}
+							>
+								<div className="flex-1 relative">
+									<input
+										type="text"
+										placeholder="Escribe un mensaje aquí..."
+										className="w-full pl-6 pr-12 py-4 bg-gray-50 border-transparent rounded-2xl text-sm focus:bg-white focus:ring-2 focus:ring-black/5 transition-all outline-none"
+										value={msg}
+										onChange={(e) => setMsg(e.target.value)}
+									/>
+								</div>
+								<button
+									type="submit"
+									disabled={!msg.trim()}
+									className="bg-black text-white w-14 h-14 rounded-2xl flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-lg shadow-black/10 disabled:opacity-50 disabled:scale-100"
+								>
+									<FiSend className="text-xl" />
+								</button>
+							</form>
+						</div>
+					</>
+				) : (
+					<div className="flex-1 flex flex-col items-center justify-center text-center p-10">
+						<div className="w-24 h-24 bg-white rounded-full shadow-xl flex items-center justify-center mb-6">
+							<FiMessageCircle className="text-4xl text-emerald-500 animate-pulse" />
+						</div>
+						<h3 className="text-xl font-black text-gray-900 mb-2 tracking-tight">Tu centro de mensajería</h3>
+						<p className="text-gray-500 max-w-xs text-sm font-medium">
+							Selecciona un usuario de la lista de la izquierda para comenzar a gestionar sus solicitudes en tiempo real.
+						</p>
+					</div>
+				)}
+			</div>
+			
 			{/* Modal de perfil y pedidos */}
 			<Dialog open={!!modalUser} onOpenChange={(v) => !v && setModalUser(null)}>
-				<DialogContent>
+				<DialogContent className="max-w-md rounded-3xl">
 					<DialogHeader>
-						<DialogTitle>
-							<div className="flex items-center gap-3">
-								<Image
-									src={modalUser ? getProfileImage(modalUser) : "https://ui-avatars.com/api/?name=User&background=cccccc&color=666666&size=80"}
-									alt={modalUser?.cliente_nombre ?? ""}
-									width={48}
-									height={48}
-									className="object-cover w-12 h-12 rounded-full"
-								/>
-								<span>{modalUser?.cliente_nombre}</span>
+						<DialogTitle className="flex items-center gap-4">
+							<div className="w-12 h-12 rounded-2xl bg-emerald-500 flex items-center justify-center text-white font-bold text-xl shadow-lg">
+								{modalUser ? getInitial(modalUser.nombre) : ""}
+							</div>
+							<div className="text-left">
+								<h2 className="text-xl font-black text-gray-900 leading-none mb-1">{modalUser?.nombre}</h2>
+								<p className="text-xs text-emerald-600 font-bold">{modalUser?.email}</p>
 							</div>
 						</DialogTitle>
 					</DialogHeader>
-					<div className="mb-2 text-xs text-gray-500">{modalUser?.cliente_email}</div>
-					<div className="mb-4">
+					
+					<div className="py-6">
+						<h3 className="text-sm font-black text-gray-900 mb-4 uppercase tracking-widest leading-none flex items-center gap-2">
+							<span className="w-2 h-2 bg-emerald-500 rounded-full"></span>
+							Historial de Pedidos
+						</h3>
+						
 						{loadingPedidos ? (
-							<div className="text-center text-gray-400">Cargando pedidos...</div>
+							<div className="flex items-center justify-center py-10"><Loader /></div>
+						) : pedidos.length === 0 ? (
+							<div className="bg-gray-50 rounded-2xl p-8 text-center border border-dashed border-gray-200">
+								<p className="text-sm text-gray-400 font-medium italic">Este usuario aún no tiene pedidos.</p>
+							</div>
 						) : (
-							<>
-								<div className="font-semibold mb-2">Resumen de pedidos</div>
-								<ul className="text-sm mb-2">
-									<li>Total: <b>{resumenPedidos(pedidos).total}</b></li>
-									<li>En envío: <b>{resumenPedidos(pedidos).enEnvio}</b></li>
-									<li>Pendientes: <b>{resumenPedidos(pedidos).pendientes}</b></li>
-									<li>Completados: <b>{resumenPedidos(pedidos).completados}</b></li>
-								</ul>
-								{pedidos.length > 0 && (
-									<div className="max-h-32 overflow-y-auto border-t pt-2">
-										<div className="font-semibold text-xs mb-1">Pedidos recientes:</div>
-										<ul className="text-xs">
-											{pedidos.slice(0, 5).map((p, idx) => (
-												<li key={p.id || idx}>
-													#{p.id} - {p.estado} - {new Date(p.created_at).toLocaleDateString()}
-												</li>
-											))}
-										</ul>
+							<div className="space-y-3 max-h-64 overflow-y-auto custom-scrollbar pr-2">
+								{pedidos.map((p) => (
+									<div key={p.id} className="bg-white border border-gray-100 p-4 rounded-2xl shadow-sm flex items-center justify-between">
+										<div>
+											<p className="text-sm font-bold text-gray-900 tracking-tight">Pedido #{p.id}</p>
+											<p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">{new Date(p.created_at).toLocaleDateString()}</p>
+										</div>
+										<Badge className={`${p.estado === 'completado' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'} border-none font-black text-[10px] uppercase tracking-wide`}>
+											{p.estado}
+										</Badge>
 									</div>
-								)}
-							</>
+								))}
+							</div>
 						)}
 					</div>
+
 					<DialogFooter>
-						<button className="px-4 py-2 rounded bg-black text-white" onClick={() => setModalUser(null)}>
-							Cerrar
+						<button 
+							className="w-full py-4 bg-black text-white rounded-2xl font-black text-sm hover:scale-[1.02] active:scale-95 transition-all"
+							onClick={() => setModalUser(null)}
+						>
+							Cerrar Panel
 						</button>
 					</DialogFooter>
 				</DialogContent>
 			</Dialog>
+			
+			<style jsx global>{`
+				.custom-scrollbar::-webkit-scrollbar {
+					width: 6px;
+				}
+				.custom-scrollbar::-webkit-scrollbar-track {
+					background: transparent;
+				}
+				.custom-scrollbar::-webkit-scrollbar-thumb {
+					background: #e2e8f0;
+					border-radius: 10px;
+				}
+				.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+					background: #cbd5e1;
+				}
+			`}</style>
 		</div>
 	);
 }

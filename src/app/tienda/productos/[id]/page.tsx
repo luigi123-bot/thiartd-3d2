@@ -579,7 +579,7 @@ export default function ProductoDetallePage() {
                       <span className="text-lg sm:text-xl text-gray-600">COP</span>
                     </div>
                     <p className="text-xs sm:text-sm text-gray-600">
-                      Envío gratis • Entrega en 3-5 días hábiles
+                      Entregas en 3-5 días hábiles
                     </p>
                   </div>
 
@@ -681,7 +681,7 @@ export default function ProductoDetallePage() {
                     <div className="space-y-2.5">
                       <div className="flex items-center gap-2.5 text-sm text-gray-700">
                         <div className="w-2 h-2 bg-teal-500 rounded-full flex-shrink-0"></div>
-                        <span>Envío gratis a todo el país</span>
+                        <span>Envíos a todo el país</span>
                       </div>
                       <div className="flex items-center gap-2.5 text-sm text-gray-700">
                         <div className="w-2 h-2 bg-teal-500 rounded-full flex-shrink-0"></div>

@@ -383,7 +383,7 @@ export default function CarritoPage() {
 
                 <div className="flex justify-between">
                   <span>Envío:</span>
-                  <span className="text-green-600">Gratis</span>
+                  <span className="text-gray-600 text-sm">A convenir</span>
                 </div>
 
                 <hr />
@@ -394,9 +394,7 @@ export default function CarritoPage() {
                 </div>
               </div>
 
-              <div className="mb-4 sm:mb-6 p-2 sm:p-3 bg-green-50 border border-green-200 rounded-lg">
-                <p className="text-xs sm:text-sm text-green-700">🎉 ¡Envío gratis en todos los pedidos!</p>
-              </div>
+              {/* Se eliminó la alerta de envío gratis */}
 
               {/* Alerta de monto mínimo solo en producción */}
               {!isDevelopment && total < 1500 && (

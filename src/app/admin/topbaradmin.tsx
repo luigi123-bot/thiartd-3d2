@@ -311,11 +311,12 @@ export default function AdminTopbar() {
               Ir a la tienda
             </Link>
             <Link
-              href="/admin/tracking"
+              href="/admin/envios"
               className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors"
+              onClick={() => setMenuOpen(false)}
             >
               <Truck className="w-5 h-5 text-gray-600" />
-              <span>Tracking de Envíos</span>
+              <span>Gestión de Envíos</span>
             </Link>
           </div>
         </nav>
