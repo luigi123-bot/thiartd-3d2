@@ -1,11 +1,376 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>THIART 3D | Ideas con Propósito y Diseño Sostenible</title>
+    <meta name="description"
+        content="Transformamos botellas plásticas en piezas 3D únicas. Diseño circular, alta tecnología e impacto ambiental positivo.">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800;900&display=swap"
+        rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
-    <h1>Welcome to the Landing Page</h1>
+
+    <nav id="main-nav">
+        <div class="container">
+            <a href="#inicio" class="logo-container">
+                <div class="logo-box">
+                    <img src="faviconT.ico" alt="Logo T">
+                </div>
+                <div class="logo">Thiart<span>3D</span></div>
+            </a>
+            <ul class="nav-links">
+                <li><a href="#inicio">Inicio</a></li>
+                <li><a href="#para-quien">Segmentos</a></li>
+                <li><a href="#que-hacemos">Servicios</a></li>
+                <li><a href="#portafolio">Portafolio</a></li>
+            </ul>
+            <a href="#contacto" class="btn btn-primary" style="padding: 0.7rem 1.8rem; font-size: 0.85rem;">Cotiza
+                ahora</a>
+        </div>
+    </nav>
+
+    <!-- HERO -->
+    <section class="hero" id="inicio">
+        <div class="blob" style="top: -10%; left: -5%;"></div>
+        <div id="hero-particles"></div>
+        <div class="container">
+            <div class="hero-wrapper">
+                <div class="hero-content">
+                    <div class="badge-eco reveal"><i class="fas fa-recycle"></i> Hecho con plástico 100% reciclado</div>
+                    <h1 class="reveal">Ideas con un impacto <span>sostenible.</span></h1>
+                    <p class="reveal">Transformamos botellas plásticas en piezas 3D únicas para marcas y personas que
+                        quieren diseño con propósito y valor estético.</p>
+                    <div class="hero-btns reveal">
+                        <a href="#contacto" class="btn btn-primary">Quiero mi pieza 3D sostenible</a>
+                        <a href="#portafolio" class="btn btn-secondary">Ver portafolio</a>
+                    </div>
+                    <div class="segment-toggle reveal">
+                        <button onclick="scrollToId('b2b-segment')" class="btn-toggle">Soy marca / empresa</button>
+                        <button onclick="scrollToId('b2c-segment')" class="btn-toggle">Soy particular (B2C)</button>
+                    </div>
+                </div>
+                <div class="hero-image reveal">
+                    <div class="image-3d-wrapper">
+                        <!-- Imagen representativa de botellas en diseño 3D -->
+                        <img src="Modelaje-3D-en-plastico.png" alt="Modelaje 3D">
+                        <div class="floating-badge"><i class="fas fa-cubes"></i> Innovación rPET</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- SEGMENTATION -->
+    <section id="para-quien">
+        <div class="container">
+            <div class="section-title reveal">
+                <h2>¿Para quién es THIART?</h2>
+                <div class="underline"></div>
+            </div>
+            <div class="grid">
+                <div class="card card-premium reveal" id="b2b-segment" style="padding-top: 4rem;">
+                    <div class="icon-box"><i class="fas fa-building"></i></div>
+                    <h3>Empresas y Marcas</h3>
+                    <ul>
+                        <li><i class="fas fa-check-circle"></i> Merchandising ecológico disruptivo.</li>
+                        <li><i class="fas fa-check-circle"></i> Activaciones de marca con impacto.</li>
+                        <li><i class="fas fa-check-circle"></i> Prototipos y piezas industriales rPET.</li>
+                    </ul>
+                    <a href="#portafolio" class="btn-primary btn"
+                        style="padding: 0.8rem 1.5rem; border-radius: 12px; margin-top: 1rem;">Ver soluciones B2B</a>
+                </div>
+                <div class="card card-premium reveal" id="b2c-segment" style="padding-top: 4rem;">
+                    <div class="icon-box"><i class="fas fa-palette"></i></div>
+                    <h3>Personas Conscientes</h3>
+                    <ul>
+                        <li><i class="fas fa-check-circle"></i> Decoración de alta gama y única.</li>
+                        <li><i class="fas fa-check-circle"></i> Regalos con historia y conciencia.</li>
+                        <li><i class="fas fa-check-circle"></i> Coleccionables y arte regenerativo.</li>
+                    </ul>
+                    <a href="#portafolio" class="btn-primary btn"
+                        style="padding: 0.8rem 1.5rem; border-radius: 12px; margin-top: 1rem;">Ver productos B2C</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- PROBLEM / SOLUTION -->
+    <section class="section-alternate" id="propuesta">
+        <div class="container">
+            <div class="split-content reveal">
+                <div>
+                    <h2 class="title-error">El problema de lo <br>“bonito pero desechable”</h2>
+                    <p style="font-size: 1.1rem;">Vivimos rodeados de merchandising genérico, plástico sin sentido y
+                        productos que no cuentan ninguna historia. Es hora de cambiar el paradigma del consumo.</p>
+                </div>
+                <div class="solution-box">
+                    <h2 class="title-success"><i class="fas fa-shield-heart" style="margin-right: 15px;"></i>Nuestra
+                        Solución</h2>
+                    <ul class="eco-list">
+                        <li><strong>Reinvención:</strong> Convertimos plástico PET en arte funcional de alto diseño.
+                        </li>
+                        <li><strong>Narrativa:</strong> Cada pieza cuenta una historia de transformación y cuidado.</li>
+                        <li><strong>Calidad:</strong> Diseño experto desde la conceptualización hasta el acabado final.
+                        </li>
+                    </ul>
+                    <a href="#contacto" class="btn-primary btn" style="margin-top: 1.5rem;">Crea tu idea en 3D</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- WHAT WE DO -->
+    <section id="que-hacemos">
+        <div class="container">
+            <div class="section-title reveal">
+                <h2>Catálogo de Propósito</h2>
+                <div class="underline"></div>
+            </div>
+
+            <div class="grid">
+                <!-- Card 1 -->
+                <div class="card reveal">
+                    <div class="icon-box"><i class="fas fa-award"></i></div>
+                    <h3>Trofeos rPET</h3>
+                    <p>Reconocimientos memorables que reflejan el compromiso sostenible de tu empresa.</p>
+                </div>
+                <!-- Card 2 -->
+                <div class="card reveal">
+                    <div class="icon-box"><i class="fas fa-couch"></i></div>
+                    <h3>Eco-Decoración</h3>
+                    <p>Lámparas y macetas con geometrías complejas imposibles de crear sin impresión 3D.</p>
+                </div>
+                <!-- Card 3 -->
+                <div class="card reveal">
+                    <div class="icon-box"><i class="fas fa-gift"></i></div>
+                    <h3>Regalos Únicos</h3>
+                    <p>Personalización total para obsequios corporativos o personales con alma ecológica.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- HOW IT WORKS -->
+    <section class="section-alternate">
+        <div class="container">
+            <div class="section-title reveal">
+                <h2>Proceso Circular</h2>
+                <div class="underline"></div>
+            </div>
+            <div class="steps-container">
+                <div class="step-card reveal">
+                    <div class="step-number">1</div>
+                    <h4>Conceptualizamos</h4>
+                    <p>Escuchamos tu idea y la transformamos en un diseño digital 3D.</p>
+                </div>
+                <div class="step-card reveal">
+                    <div class="step-number">2</div>
+                    <h4>Transformamos</h4>
+                    <p>Procesamos botellas para obtener el filamento rPET de alta calidad.</p>
+                </div>
+                <div class="step-card reveal">
+                    <div class="step-number">3</div>
+                    <h4>Materializamos</h4>
+                    <p>Imprimimos capa a capa tu pieza con precisión milimétrica.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- IMPACT -->
+    <section id="impacto">
+        <div class="container">
+            <div class="impact-showcase reveal">
+                <div class="grid" style="grid-template-columns: repeat(3, 1fr);">
+                    <div>
+                        <div class="stat-number count-num" data-target="8200" data-suffix="">0</div>
+                        <div class="stat-label">Botellas Recicladas</div>
+                    </div>
+                    <div>
+                        <div class="stat-number count-num" data-target="390" data-suffix="kg">0</div>
+                        <div class="stat-label">Plástico Reutilizado</div>
+                    </div>
+                    <div>
+                        <div class="stat-number count-num" data-target="240" data-suffix="+">0</div>
+                        <div class="stat-label">Aliados de Impacto</div>
+                    </div>
+                </div>
+                <div style="margin-top: 4rem;">
+                    <p style="font-size: 1.5rem; font-weight: 300;">"Cambiando el destino del plástico, un diseño a la
+                        vez."</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- PORTFOLIO -->
+    <section id="portafolio">
+        <div class="container">
+            <div class="section-title reveal">
+                <h2>Portafolio Digital</h2>
+                <div class="underline"></div>
+            </div>
+            <div class="portfolio-grid">
+                <div class="portfolio-card reveal">
+                    <img src="Lampara-Vortice.png" alt="Lámpara Vórtice"
+                        style="width: 100%; height: 100%; object-fit: cover;">
+                    <div class="tag-bottle" style="position: absolute; top: 20px; left: 20px;">12 botellas reutilizadas
+                    </div>
+                    <div class="overlay">
+                        <h3>Lámpara Vórtice</h3>
+                        <p>Diseño geométrico para iluminación de interiores modernos.</p>
+                    </div>
+                </div>
+                <div class="portfolio-card reveal">
+                    <img src="https://images.unsplash.com/photo-1485955900006-10f4d324d411?auto=format&fit=crop&q=80&w=800"
+                        alt="Maceta Fractal" style="width: 100%; height: 100%; object-fit: cover;">
+                    <div class="tag-bottle" style="position: absolute; top: 20px; left: 20px;">8 botellas reutilizadas
+                    </div>
+                    <div class="overlay">
+                        <h3>Maceta Fractal</h3>
+                        <p>Inspirada en la naturaleza para espacios de trabajo eco-amigables.</p>
+                    </div>
+                </div>
+                <div class="portfolio-card reveal">
+                    <img src="https://images.unsplash.com/photo-1623939012331-99933580c86e?auto=format&fit=crop&q=80&w=800"
+                        alt="Trofeo Corporativo" style="width: 100%; height: 100%; object-fit: cover;">
+                    <div class="tag-bottle" style="position: absolute; top: 20px; left: 20px;">Trofeo Corporativo</div>
+                    <div class="overlay">
+                        <h3>Reconocimiento Sostenibilidad</h3>
+                        <p>Diseño exclusivo para marcas con compromiso circular.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- TESTIMONIALS -->
+    <section class="section-alternate" id="testimonios">
+        <div class="container">
+            <div class="section-title reveal">
+                <h2>Lo que dicen de THIART</h2>
+                <div class="underline"></div>
+            </div>
+            <div class="grid">
+                <div class="testimonial-card reveal">
+                    <div class="quote-icon"><i class="fas fa-quote-left"></i></div>
+                    <p>"Buscábamos merchandising que no terminara en la basura. Thiart nos entregó piezas que nuestros
+                        clientes realmente valoran y exhiben."</p>
+                    <div class="client-info">
+                        <img src="https://i.pravatar.cc/150?u=1" alt="Cliente">
+                        <div>
+                            <h4>Carlos Mendoza</h4>
+                            <span>Director de Sustentabilidad, EcoCorp</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="testimonial-card reveal">
+                    <div class="quote-icon"><i class="fas fa-quote-left"></i></div>
+                    <p>"La precisión del diseño 3D con plástico reciclado es impresionante. Es el regalo perfecto para
+                        alguien que valora la innovación y el planeta."</p>
+                    <div class="client-info">
+                        <img src="https://i.pravatar.cc/150?u=2" alt="Cliente">
+                        <div>
+                            <h4>Ana Sofia Ruiz</h4>
+                            <span>Diseñadora de Interiores</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="testimonial-card reveal">
+                    <div class="quote-icon"><i class="fas fa-quote-left"></i></div>
+                    <p>"Transformaron nuestra visión en un trofeo espectacular. El acabado rPET tiene una textura única
+                        que comunica calidad y conciencia."</p>
+                    <div class="client-info">
+                        <img src="https://i.pravatar.cc/150?u=3" alt="Cliente">
+                        <div>
+                            <h4>Javier Lopez</h4>
+                            <span>CEO, GreenTech Solutions</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- LEAD SECTION -->
+    <section id="contacto">
+        <div class="container">
+            <div class="lead-section reveal">
+                <div class="lead-text">
+                    <h2 style="font-size: 3rem; font-weight: 900; margin-bottom: 2rem;">¿Listo para innovar con
+                        propósito?</h2>
+                    <p style="font-size: 1.2rem; margin-bottom: 2rem;">Agenda una consultoría de 15 min gratuita o
+                        recibe nuestro catálogo de soluciones 3D.</p>
+                    <div style="display: flex; gap: 1rem;">
+                        <i class="fas fa-leaf"></i> 100% Sostenible
+                        <i class="fas fa-clock" style="margin-left: 20px;"></i> Respuesta rápida
+                    </div>
+                </div>
+                <form class="lead-form">
+                    <input type="text" placeholder="Tu Nombre Completo" required>
+                    <input type="email" placeholder="Tu Correo Electrónico" required>
+                    <select required>
+                        <option value="">¿Cómo nos visualizas?</option>
+                        <option value="empresa">Proyecto para mi Empresa</option>
+                        <option value="personal">Proyecto Personal</option>
+                    </select>
+                    <button type="submit" class="btn-primary btn" style="width: 100%; background: #0f172a;">Quiero mi
+                        asesoría / catálogo</button>
+                </form>
+            </div>
+        </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer>
+        <div class="container">
+            <div class="footer-top reveal">
+                <h2>¿Iniciamos tu impacto?</h2>
+                <div class="footer-btns">
+                    <a href="#contacto" class="btn btn-primary">Cotiza tu Proyecto Ahora</a>
+                    <a href="#portafolio" class="btn btn-aguamarina">Ver casos de éxito</a>
+                </div>
+            </div>
+            <div class="footer-bottom reveal">
+                <a href="#inicio" class="logo-container">
+                    <div class="logo-box" style="width:40px; height:40px;">
+                        <img src="faviconT.ico" alt="Logo T" style="width:30px; height:30px;">
+                    </div>
+                    <div class="logo" style="font-size: 1.5rem;">Thiart<span>3D</span></div>
+                </a>
+                <div class="social-links">
+                    <a href="#"><i class="fab fa-instagram"></i></a>
+                    <a href="#"><i class="fab fa-linkedin"></i></a>
+                </div>
+                <p style="opacity: 0.5;">&copy; 2026 THIART 3D - Diseño Sostenible e Innovación Circular.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- FLOATERS -->
+    <a href="https://wa.me/xxx" class="whatsapp-float"><i class="fab fa-whatsapp"></i></a>
+
+    <script src="main.js"></script>
+    <script>
+        function scrollToId(id) {
+            const el = document.getElementById(id);
+            if (el) {
+                window.scrollTo({
+                    top: el.offsetTop - 100,
+                    behavior: 'smooth'
+                });
+            }
+        }
+    </script>
 </body>
+
 </html>
