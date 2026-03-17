@@ -1,120 +1,109 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { sendWelcomeEmail } from "../../../lib/email-service";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-if (!supabaseServiceKey) {
-  console.warn("Warning: SUPABASE_SERVICE_ROLE_KEY not set. Endpoint may fail due to RLS/permissions.");
-}
-const supabase = createClient(supabaseUrl, supabaseServiceKey ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+
+// Cliente con service_role y config de servidor (sin persistencia de sesión)
+const getAdminClient = () => {
+  const key = supabaseServiceKey ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  return createClient(supabaseUrl, key, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+};
 
 export async function POST(req: Request) {
   try {
-    const body = (await req.json()) as { nombre: string; email: string; password: string; role?: string };
-    const { nombre, email, password, role } = body;
+    const body = (await req.json()) as { nombre: string; email: string; password: string; role?: string; role_label?: string };
+    const { nombre, email, password, role, role_label } = body;
+
     if (!nombre || !email || !password) {
       return NextResponse.json({ error: "Nombre, email y password son obligatorios" }, { status: 400 });
     }
 
-    // Validar que el role exista en la tabla de roles (si se envió)
-    const desiredRole = (role ?? "cliente").toString();
-    if (desiredRole) {
-      let found = false;
-      const roleTables = ["roles", "role"];
-      for (const t of roleTables) {
-        try {
-          const r = await supabase.from(t).select("*");
-          const rErr = (r as { error?: { message?: string } | null })?.error ?? null;
-          const rData = (r as { data?: Record<string, unknown>[] | null })?.data ?? null;
-          if (rErr) {
-            const msg = String(rErr.message ?? "").toLowerCase();
-            if (msg.includes("does not exist") || msg.includes("relation")) continue;
-            // other error -> stop
-            return NextResponse.json({ error: rErr.message ?? JSON.stringify(rErr) }, { status: 500 });
-          }
-          if (Array.isArray(rData)) {
-            const match = rData.find((row: Record<string, unknown>) => {
-              const candidates = [
-                row.name,
-                row.role,
-                row.key,
-                row.id,
-                row.label,
-                row.title,
-                row.nombre,
-              ].map((x) =>
-                (typeof x === "string" || typeof x === "number" || typeof x === "boolean" ? String(x) : "").toLowerCase()
-              );
-              return candidates.includes(desiredRole.toLowerCase());
-            });
-            if (match) { found = true; break; }
-          }
-        } catch {
-          continue;
-        }
-      }
-      if (!found) {
-        return NextResponse.json({ error: `Role '${desiredRole}' no encontrado en la tabla de roles.` }, { status: 400 });
-      }
+    if (!supabaseServiceKey) {
+      console.warn("SUPABASE_SERVICE_ROLE_KEY no configurada — auth.admin no disponible.");
     }
 
-    // Intentar crear usuario en Auth (requiere service_role key)
-    let authUserId: string | undefined = undefined;
+    const supabase = getAdminClient();
+    // Normalize role: use role_label if provided (slug), otherwise fallback to role id/string
+    const desiredRole = (role_label ?? role ?? "cliente").toString().toLowerCase();
+
+    // 1. Crear usuario en Supabase Auth (requiere service_role key)
+    let authUserId: string | undefined;
     try {
-      type AdminCreateParams = { email: string; password: string; user_metadata?: Record<string, unknown> };
-      type AdminCreateResult = { data?: unknown; error?: { message?: string } | null; user?: { id?: string } | null };
+      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: { nombre },
+      });
 
-      const maybeCreate = (supabase as unknown as { auth?: { admin?: { createUser?: (p: AdminCreateParams) => Promise<AdminCreateResult> } } })
-        .auth?.admin?.createUser;
+      if (authError) {
+        console.warn("auth.admin.createUser error:", authError.message);
+      } else if (authData?.user?.id) {
+        authUserId = authData.user.id;
+        console.log("✅ Usuario creado en Auth:", authUserId);
+      }
+    } catch (err) {
+      console.warn("Error llamando auth.admin.createUser:", err);
+    }
 
-      if (typeof maybeCreate === "function") {
-        const resp = await maybeCreate({ email, password, user_metadata: { nombre } });
-        if (resp?.error) {
-          console.warn("auth.createUser error:", resp.error.message);
-        } else if (
-          resp?.user &&
-          typeof resp.user === "object" &&
-          "id" in resp.user &&
-          typeof (resp.user as { id?: unknown }).id === "string"
-        ) {
-          authUserId = (resp.user as { id: string }).id;
-        } else if (
-          resp?.data &&
-          typeof (resp.data as { user?: { id?: string } }).user?.id === "string"
-        ) {
-          // algunos adaptadores devuelven data.user
-          authUserId = (resp.data as { user: { id: string } }).user.id;
-        }
+    // 2. Insertar en tabla usuarios
+    const insertBody: { nombre: string; email: string; role: string; auth_id?: string } = {
+      nombre,
+      email,
+      role: desiredRole,
+    };
+    if (authUserId) insertBody.auth_id = authUserId;
+
+    interface Usuario {
+      id: string;
+      nombre: string;
+      email: string;
+      role: string;
+      auth_id?: string;
+      creado_en?: string;
+    }
+
+    const { data: insertData, error: insertError } = await supabase
+      .from("usuarios")
+      .insert([insertBody])
+      .select()
+      .single<Usuario>();
+
+    if (insertError) {
+      console.error("Error insertando usuario:", insertError.message);
+      return NextResponse.json({ error: insertError.message }, { status: 500 });
+    }
+
+    // 3. Enviar correo de bienvenida con las credenciales
+    try {
+      const emailResult = await sendWelcomeEmail({ 
+        to: email, 
+        nombre, 
+        password, 
+        role: desiredRole,
+        roleLabel: role_label
+      });
+      if (!emailResult.success) {
+        console.warn("No se pudo enviar correo de bienvenida:", emailResult.error);
       } else {
-        console.warn("Supabase client does not expose admin.createUser; skipping auth creation.");
+        console.log("✅ Correo de bienvenida enviado a:", email);
       }
-    } catch (err) {
-      console.warn("No se pudo crear auth user con admin.createUser, intentando crear con insert en tabla 'usuarios' - error:", err);
+    } catch (emailErr) {
+      console.warn("Error enviando correo de bienvenida:", emailErr);
     }
 
-    // Insertar en tabla usuarios
-    try {
-      type InsertUser = { nombre: string; email: string; role: string; auth_id?: string };
-      const insertBody: InsertUser = { nombre, email, role: role ?? "cliente" };
-      if (authUserId) insertBody.auth_id = authUserId;
+    return NextResponse.json({ user: insertData, emailSent: true });
 
-      const insertRes = await supabase
-        .from("usuarios")
-        .insert([insertBody])
-        .select();
-      const insertError = insertRes.error ?? null;
-      const insertData = insertRes.data as InsertUser[] | null;
-      if (insertError) {
-        console.error("Error insertando usuario en tabla usuarios:", insertError.message ?? insertError);
-        return NextResponse.json({ error: insertError.message ?? JSON.stringify(insertError) }, { status: 500 });
-      }
-      return NextResponse.json({ user: Array.isArray(insertData) ? insertData[0] : insertData });
-    } catch (err) {
-      console.error("Error inesperado creando usuario:", err);
-      return NextResponse.json({ error: "Error inesperado creando usuario" }, { status: 500 });
-    }
   } catch (err) {
     console.error("Error en /api/crear-usuario:", err);
     return NextResponse.json({ error: "Error inesperado" }, { status: 500 });
   }
 }
+

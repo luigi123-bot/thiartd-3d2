@@ -131,6 +131,8 @@ function CarritoProvider({ children }: { children: React.ReactNode }) {
       console.log("💾 Guardando en localStorage...");
       setCarrito(nuevoCarrito);
       localStorage.setItem("carrito", JSON.stringify(nuevoCarrito));
+      // Notificar a otros componentes (como el Topbar)
+      window.dispatchEvent(new CustomEvent("cart-updated"));
       console.log("✅ Carrito guardado:", JSON.parse(localStorage.getItem("carrito") ?? "[]"));
     } else {
       console.log("❌ No se pudo agregar el producto");

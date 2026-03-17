@@ -6,9 +6,9 @@ import { Input } from "~/components/ui/input";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader } from "~/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
-import { Dialog, DialogContent } from "~/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "~/components/ui/dialog";
 import { motion } from "framer-motion";
-import { X } from "lucide-react";
+import { X, Eye, EyeOff } from "lucide-react";
 import Image from "next/image";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
@@ -34,6 +34,10 @@ export default function SupabaseAuth({ onAuth, open = false, onOpenChange }: {
   const [error, setError] = useState<string>("");
   const [success, setSuccess] = useState<string>("");
   const [resetToken, setResetToken] = useState<string>("");
+  const [showPasswords, setShowPasswords] = useState({ password: false, confirmPassword: false, newPassword: false });
+
+  const togglePass = (field: keyof typeof showPasswords) =>
+    setShowPasswords(prev => ({ ...prev, [field]: !prev[field] }));
 
   useEffect(() => {
     // Solo ejecutar si el modal está abierto
@@ -357,12 +361,12 @@ export default function SupabaseAuth({ onAuth, open = false, onOpenChange }: {
             </motion.div>
 
             {/* Título */}
-            <h2 className="text-2xl font-semibold text-center text-gray-800">
+            <DialogTitle className="text-2xl font-semibold text-center text-gray-800">
               {tab === "login" || tab === "register" ? "Bienvenido a Thiart 3D" : 
                tab === "reset" ? "Recuperar contraseña" :
                tab === "verify-code" ? "Verificar código" :
                "Nueva contraseña"}
-            </h2>
+            </DialogTitle>
           </CardHeader>
 
           <CardContent className="px-6 pb-6 pt-2">
@@ -415,16 +419,26 @@ export default function SupabaseAuth({ onAuth, open = false, onOpenChange }: {
                       <label htmlFor="login-password" className="text-sm font-medium text-gray-700">
                         Contraseña
                       </label>
-                      <Input 
-                        id="login-password"
-                        name="password" 
-                        placeholder="••••••••" 
-                        type="password" 
-                        value={form.password} 
-                        onChange={handleChange} 
-                        required 
-                        className="h-11 border-gray-300 focus:ring-[#009688] focus:border-[#009688]"
-                      />
+                      <div className="relative">
+                        <Input 
+                          id="login-password"
+                          name="password" 
+                          placeholder="••••••••" 
+                          type={showPasswords.password ? "text" : "password"} 
+                          value={form.password} 
+                          onChange={handleChange} 
+                          required 
+                          className="h-11 pr-10 border-gray-300 focus:ring-[#009688] focus:border-[#009688]"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => togglePass("password")}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                          aria-label={showPasswords.password ? "Ocultar contraseña" : "Mostrar contraseña"}
+                        >
+                          {showPasswords.password ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
                     </div>
                     
                     <div className="flex justify-end">
@@ -499,17 +513,27 @@ export default function SupabaseAuth({ onAuth, open = false, onOpenChange }: {
                       <label htmlFor="register-password" className="text-sm font-medium text-gray-700">
                         Contraseña
                       </label>
-                      <Input 
-                        id="register-password"
-                        name="password" 
-                        placeholder="••••••••" 
-                        type="password" 
-                        value={form.password} 
-                        onChange={handleChange} 
-                        required 
-                        minLength={6}
-                        className="h-11 border-gray-300 focus:ring-[#009688] focus:border-[#009688]"
-                      />
+                      <div className="relative">
+                        <Input 
+                          id="register-password"
+                          name="password" 
+                          placeholder="••••••••" 
+                          type={showPasswords.password ? "text" : "password"} 
+                          value={form.password} 
+                          onChange={handleChange} 
+                          required 
+                          minLength={6}
+                          className="h-11 pr-10 border-gray-300 focus:ring-[#009688] focus:border-[#009688]"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => togglePass("password")}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                          aria-label={showPasswords.password ? "Ocultar contraseña" : "Mostrar contraseña"}
+                        >
+                          {showPasswords.password ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
                       <p className="text-xs text-gray-500">Mínimo 6 caracteres</p>
                     </div>
 
@@ -517,17 +541,27 @@ export default function SupabaseAuth({ onAuth, open = false, onOpenChange }: {
                       <label htmlFor="register-confirm-password" className="text-sm font-medium text-gray-700">
                         Confirmar contraseña
                       </label>
-                      <Input 
-                        id="register-confirm-password"
-                        name="confirmPassword" 
-                        placeholder="••••••••" 
-                        type="password" 
-                        value={form.confirmPassword} 
-                        onChange={handleChange} 
-                        required 
-                        minLength={6}
-                        className="h-11 border-gray-300 focus:ring-[#009688] focus:border-[#009688]"
-                      />
+                      <div className="relative">
+                        <Input 
+                          id="register-confirm-password"
+                          name="confirmPassword" 
+                          placeholder="••••••••" 
+                          type={showPasswords.confirmPassword ? "text" : "password"} 
+                          value={form.confirmPassword} 
+                          onChange={handleChange} 
+                          required 
+                          minLength={6}
+                          className="h-11 pr-10 border-gray-300 focus:ring-[#009688] focus:border-[#009688]"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => togglePass("confirmPassword")}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                          aria-label={showPasswords.confirmPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                        >
+                          {showPasswords.confirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
                     </div>
 
                     <Button 
@@ -705,34 +739,54 @@ export default function SupabaseAuth({ onAuth, open = false, onOpenChange }: {
                   <label htmlFor="new-password" className="text-sm font-medium text-gray-700">
                     Nueva contraseña
                   </label>
-                  <Input 
-                    id="new-password"
-                    name="newPassword" 
-                    placeholder="••••••••" 
-                    type="password" 
-                    value={form.newPassword} 
-                    onChange={handleChange} 
-                    required 
-                    minLength={6}
-                    className="h-11 border-gray-300 focus:ring-[#009688] focus:border-[#009688]"
-                  />
+                  <div className="relative">
+                    <Input 
+                      id="new-password"
+                      name="newPassword" 
+                      placeholder="••••••••" 
+                      type={showPasswords.newPassword ? "text" : "password"} 
+                      value={form.newPassword} 
+                      onChange={handleChange} 
+                      required 
+                      minLength={6}
+                      className="h-11 pr-10 border-gray-300 focus:ring-[#009688] focus:border-[#009688]"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => togglePass("newPassword")}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                      aria-label={showPasswords.newPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                    >
+                      {showPasswords.newPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
 
                 <div className="space-y-2">
                   <label htmlFor="confirm-new-password" className="text-sm font-medium text-gray-700">
                     Confirmar contraseña
                   </label>
-                  <Input 
-                    id="confirm-new-password"
-                    name="confirmPassword" 
-                    placeholder="••••••••" 
-                    type="password" 
-                    value={form.confirmPassword} 
-                    onChange={handleChange} 
-                    required 
-                    minLength={6}
-                    className="h-11 border-gray-300 focus:ring-[#009688] focus:border-[#009688]"
-                  />
+                  <div className="relative">
+                    <Input 
+                      id="confirm-new-password"
+                      name="confirmPassword" 
+                      placeholder="••••••••" 
+                      type={showPasswords.confirmPassword ? "text" : "password"} 
+                      value={form.confirmPassword} 
+                      onChange={handleChange} 
+                      required 
+                      minLength={6}
+                      className="h-11 pr-10 border-gray-300 focus:ring-[#009688] focus:border-[#009688]"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => togglePass("confirmPassword")}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                      aria-label={showPasswords.confirmPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                    >
+                      {showPasswords.confirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
                 
                 <Button 

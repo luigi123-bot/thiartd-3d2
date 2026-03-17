@@ -23,36 +23,76 @@ export default function PagoExitosoPage() {
   const verificarEstadoPago = async (pedido: string, transactionId: string | null): Promise<void> => {
     try {
       console.log("🔍 Verificando estado del pago para pedido:", pedido);
-      console.log("💳 Transaction ID de Wompi:", transactionId);
       
-      // Esperar un momento para que el webhook procese
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Consultar el estado del pedido
-      const response = await fetch(`/api/pedidos?id=${pedido}`);
-      if (!response.ok) {
-        throw new Error("Error al verificar el pago");
+      let finalStatus = "pendiente_pago";
+      let paymentId = transactionId ?? "";
+      let paymentMethod = "";
+
+      // 1. Si tenemos transactionId, consultar directamente a Wompi (vía nuestro proxy)
+      if (transactionId) {
+        console.log("💳 Consultando Wompi directamente para transacción:", transactionId);
+        try {
+          const wompiRes = await fetch(`/api/pago-wompi/verificar?id=${transactionId}`);
+          if (wompiRes.ok) {
+            interface WompiVerificationData {
+              status?: string;
+              id?: string;
+              payment_method_type?: string;
+            }
+            const wompiData = (await wompiRes.json()) as WompiVerificationData;
+            console.log("📡 Respuesta de Wompi API:", wompiData);
+            
+            if (wompiData.status === "APPROVED") {
+              finalStatus = "pagado";
+              paymentId = wompiData.id ?? paymentId;
+              paymentMethod = wompiData.payment_method_type ?? "";
+              
+              // 2. FORZAR actualización en nuestra BD por si el webhook se retrasa
+              console.log("🚀 Pago aprobado en Wompi. Asegurando actualización en BD...");
+              await fetch("/api/pedidos", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  pedidoId: pedido,
+                  estado: "pagado",
+                  payment_id: paymentId,
+                  payment_method: paymentMethod
+                })
+              });
+            } else if (wompiData.status === "DECLINED") {
+              finalStatus = "pago_rechazado";
+            } else if (wompiData.status === "VOIDED") {
+              finalStatus = "pago_cancelado";
+            }
+          }
+        } catch (wompiErr) {
+          console.warn("⚠️ Error consultando Wompi API directo:", wompiErr);
+        }
       }
+
+      // 3. Consultar el estado final del pedido en nuestra base de datos
+      const response = await fetch(`/api/pedidos?id=${pedido}`);
+      if (!response.ok) throw new Error("Error al consultar pedido");
       
       const data = await response.json() as { pedido?: { estado: string; payment_id?: string } };
       const pedidoData = data.pedido;
       
-      if (!pedidoData) {
-        throw new Error("Pedido no encontrado");
-      }
+      if (!pedidoData) throw new Error("Pedido no encontrado");
       
-      console.log("📦 Estado del pedido:", pedidoData);
-      
+      const displayStatus = (pedidoData.estado === "pendiente_pago" && finalStatus === "pagado") 
+        ? "pagado" 
+        : pedidoData.estado;
+
       let mensaje = "";
-      switch (pedidoData.estado) {
+      switch (displayStatus) {
         case "pagado":
           mensaje = "Tu pago ha sido confirmado exitosamente";
           break;
         case "pendiente_pago":
-          mensaje = "Tu pedido está pendiente de confirmación de pago";
+          mensaje = "Estamos procesando tu pago. Por favor espera un momento...";
           break;
         case "pago_rechazado":
-          mensaje = "Tu pago fue rechazado. Intenta con otro método de pago";
+          mensaje = "Tu pago fue rechazado. Revisa con tu entidad bancaria.";
           break;
         case "pago_cancelado":
           mensaje = "El pago fue cancelado";
@@ -62,12 +102,19 @@ export default function PagoExitosoPage() {
       }
       
       setEstadoPago({
-        estado: pedidoData.estado,
-        payment_id: pedidoData.payment_id,
+        estado: displayStatus,
+        payment_id: pedidoData.payment_id ?? paymentId,
         mensaje
       });
       
-      if (pedidoData.estado === "pago_rechazado" || pedidoData.estado === "pago_cancelado") {
+      // Polling si sigue pendiente
+      if (displayStatus === "pendiente_pago") {
+        setTimeout(() => { void verificarEstadoPago(pedido, transactionId); }, 5000);
+      } else {
+         setCargando(false);
+      }
+
+      if (displayStatus === "pago_rechazado" || displayStatus === "pago_cancelado") {
         toast({
           title: "Pago no completado",
           description: mensaje,
@@ -79,31 +126,30 @@ export default function PagoExitosoPage() {
       console.error("Error verificando estado del pago:", error);
       setEstadoPago({
         estado: "error",
-        mensaje: "No pudimos verificar el estado del pago. Revisa tu email o contacta con soporte."
+        mensaje: "Error de conexión. Tu pedido se actualizará en unos minutos."
       });
-    } finally {
       setCargando(false);
     }
   };
 
   useEffect(() => {
     const pedido = searchParams.get("pedido");
-    const transactionId = searchParams.get("id"); // Wompi devuelve el transaction ID
+    const transactionId = searchParams.get("id");
     
     if (pedido) {
       setPedidoId(pedido);
       void verificarEstadoPago(pedido, transactionId);
       
-      // Limpiar carrito si el pago fue exitoso
       if (typeof window !== "undefined") {
         localStorage.removeItem("carrito");
         localStorage.removeItem("pedido_pendiente");
       }
+    } else {
+      setCargando(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
-  // Determinar el color y mensaje según el estado
   const getEstadoUI = () => {
     if (cargando) {
       return {
@@ -168,7 +214,6 @@ export default function PagoExitosoPage() {
   return (
     <div className="min-h-screen bg-gray-50 py-6 sm:py-8 md:py-12 px-4">
       <div className="max-w-2xl mx-auto">
-        {/* Header de éxito */}
         <div className="text-center mb-6 sm:mb-8">
           <div className={`inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 ${estadoUI.bgColor} rounded-full mb-4 sm:mb-6`}>
             {estadoUI.icon}
@@ -185,7 +230,6 @@ export default function PagoExitosoPage() {
           )}
         </div>
 
-        {/* Información del pedido */}
         <Card className="p-4 sm:p-6 md:p-8 mb-6 sm:mb-8 overflow-hidden">
           <div className="text-center mb-4 sm:mb-6">
             {pedidoId && (
@@ -200,7 +244,6 @@ export default function PagoExitosoPage() {
             )}
           </div>
 
-          {/* Pasos del proceso */}
           <div className="grid grid-cols-1 xs:grid-cols-3 gap-4 sm:gap-6 text-center mb-6 sm:mb-8">
             <div className="flex flex-col items-center">
               <div className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 bg-blue-100 rounded-full flex items-center justify-center mb-2 sm:mb-3">
@@ -233,7 +276,6 @@ export default function PagoExitosoPage() {
             </div>
           </div>
 
-          {/* Información adicional */}
           <div className="border-t pt-4 sm:pt-6">
             <h3 className="text-sm sm:text-base font-semibold mb-3 sm:mb-4 text-center">¿Qué sigue?</h3>
             <div className="space-y-2 sm:space-y-3 max-w-md mx-auto">
@@ -257,7 +299,6 @@ export default function PagoExitosoPage() {
           </div>
         </Card>
 
-        {/* Acciones */}
         <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
           <Button size="lg" asChild className="bg-[#00a19a] hover:bg-[#007973] text-sm sm:text-base">
             <Link href="/tienda/productos">
@@ -284,7 +325,6 @@ export default function PagoExitosoPage() {
           </Button>
         </div>
 
-        {/* Nota de agradecimiento */}
         <div className="mt-6 sm:mt-8 p-4 sm:p-6 bg-gradient-to-r from-[#00a19a] to-[#007973] rounded-lg text-white text-center">
           <h3 className="text-base sm:text-lg font-bold mb-2">¡Gracias por tu compra!</h3>
           <p className="text-xs sm:text-sm opacity-90">

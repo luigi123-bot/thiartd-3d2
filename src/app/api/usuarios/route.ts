@@ -4,6 +4,7 @@ import { Webhook } from "svix";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const CLERK_WEBHOOK_SECRET = process.env.CLERK_WEBHOOK_SECRET!;
 
 export async function GET(req: Request) {
@@ -122,5 +123,61 @@ export async function POST(req: Request) {
       usuario: data,
       message: "Usuario creado correctamente. Revisa tu correo para confirmar tu cuenta antes de iniciar sesión."
     });
+  }
+}
+
+export async function DELETE(req: Request) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get("id");
+
+    if (!id) {
+      return NextResponse.json({ error: "ID de usuario es requerido" }, { status: 400 });
+    }
+
+    if (!supabaseServiceKey) {
+      return NextResponse.json({ error: "No se puede eliminar: SUPABASE_SERVICE_ROLE_KEY no configurada" }, { status: 500 });
+    }
+
+    // Cliente admin para saltar RLS si es necesario
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { autoRefreshToken: false, persistSession: false }
+    });
+
+    // 1. Obtener el usuario para ver si tiene auth_id
+    const { data: user, error: fetchErr } = await supabaseAdmin
+      .from("usuarios")
+      .select("auth_id")
+      .eq("id", id)
+      .single<{ auth_id?: string }>();
+
+    if (fetchErr || !user) {
+      console.warn("No se encontró el usuario para eliminar:", fetchErr?.message);
+    }
+
+    // 2. Si tiene auth_id, intentar eliminar de Supabase Auth
+    if (user?.auth_id) {
+      const { error: authErr } = await supabaseAdmin.auth.admin.deleteUser(user.auth_id);
+      if (authErr) {
+        console.warn("No se pudo eliminar de Auth (probablemente ya no existe):", authErr.message);
+      } else {
+        console.log("✅ Usuario eliminado de Supabase Auth:", user.auth_id);
+      }
+    }
+
+    // 3. Eliminar de la tabla usuarios
+    const { error: deleteErr } = await supabaseAdmin
+      .from("usuarios")
+      .delete()
+      .eq("id", id);
+
+    if (deleteErr) {
+      return NextResponse.json({ error: deleteErr.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, message: "Usuario eliminado correctamente" });
+  } catch (err) {
+    console.error("Error en DELETE /api/usuarios:", err);
+    return NextResponse.json({ error: "Error inesperado al eliminar usuario" }, { status: 500 });
   }
 }

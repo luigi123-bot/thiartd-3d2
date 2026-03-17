@@ -71,12 +71,38 @@ export default function CheckoutPage() {
         };
         setUsuario(user);
         
-        // Pre-llenar formulario con datos del usuario
+        // Pre-llenar formulario con datos básicos
         setDatosCheckout(prev => ({
           ...prev,
           nombre: user.nombre ?? "",
           email: user.email ?? ""
         }));
+
+        interface UsuarioContactoDB {
+          telefono: string | null;
+          direccion: string | null;
+          ciudad: string | null;
+          departamento: string | null;
+          codigo_postal: string | null;
+        }
+
+        // Buscar datos adicionales en la tabla usuarios para pre-llenar
+        const { data: usuarioDb } = await supabase
+          .from("usuarios")
+          .select("telefono, direccion, ciudad, departamento, codigo_postal")
+          .eq("auth_id", data.user.id)
+          .single<UsuarioContactoDB>();
+
+        if (usuarioDb) {
+          setDatosCheckout(prev => ({
+            ...prev,
+            telefono: usuarioDb.telefono ?? "",
+            direccion: usuarioDb.direccion ?? "",
+            ciudad: usuarioDb.ciudad ?? "",
+            departamento: usuarioDb.departamento ?? "",
+            codigoPostal: usuarioDb.codigo_postal ?? ""
+          }));
+        }
       }
     })();
   }, []);
@@ -121,8 +147,9 @@ export default function CheckoutPage() {
       return;
     }
 
-    // Detectar si estamos en desarrollo
-    const isDevelopment = process.env.NODE_ENV === 'development' || window.location.hostname === 'localhost';
+    // Determinar si debemos saltarnos Wompi. Ahora solo lo saltamos si NO están las variables de Wompi.
+    const hasWompiKeys = !!process.env.NEXT_PUBLIC_WOMPI_PUBLIC_KEY;
+    const isDevelopment = (process.env.NODE_ENV === 'development' || window.location.hostname === 'localhost') && !hasWompiKeys;
 
     // En producción, validar monto mínimo de Wompi ($1,500 COP)
     if (!isDevelopment && total < 1500) {

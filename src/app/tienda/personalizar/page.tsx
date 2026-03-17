@@ -1,6 +1,7 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { FiSend } from "react-icons/fi";
+import { createClient } from "@supabase/supabase-js";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import {
@@ -9,7 +10,12 @@ import {
 	DialogHeader,
 	DialogTitle,
 	DialogFooter
-} from "~/components/ui/dialog"; // Ajusta la ruta si es necesario
+} from "~/components/ui/dialog";
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 const PRESUPUESTOS = [
 	"Menos de $20.000",
@@ -43,7 +49,27 @@ export default function PersonalizarPage() {
 	const [mensaje, setMensaje] = useState("");
 	const [loading, setLoading] = useState(false);
 	const [showPago, setShowPago] = useState(false);
-	const [usuario] = useState<{ id?: string; nombre?: string; email?: string } | null>(null);
+	const [usuario, setUsuario] = useState<{ id?: string; nombre?: string; email?: string } | null>(null);
+
+	// Detectar usuario de Supabase
+	useEffect(() => {
+		const checkUser = async () => {
+			const { data: { user } } = await supabase.auth.getUser();
+			if (user) {
+				const metadata = user.user_metadata as { nombre?: string } | undefined;
+				setUsuario({
+					id: user.id,
+					nombre: metadata?.nombre ?? user.email?.split('@')[0],
+					email: user.email
+				});
+				setNombre(metadata?.nombre ?? "");
+				setEmail(user.email ?? "");
+			}
+		};
+		// El cliente de supabase ya existe globalmente o se puede importar. 
+		// Viendo otros archivos, usan createClient. Importamos lo necesario.
+		void checkUser();
+	}, []);
 
 	// El historial de mensajes se maneja globalmente por el ChatWidget
 
@@ -60,16 +86,13 @@ export default function PersonalizarPage() {
 		setLoading(true);
 		setMensaje("");
 
-		if (!usuario) {
-			setMensaje("Debes iniciar sesión para enviar una solicitud. Por favor, inicia sesión e inténtalo de nuevo.");
-			setLoading(false);
-			return;
-		}
+		// Eliminamos restricción de usuario obligatorio
+		setMensaje("");
 
 		try {
 			// Construimos el cuerpo del pedido para "Cotización"
 			const orderPayload = {
-				cliente_id: usuario.id,
+				cliente_id: usuario?.id ?? "guest",
 				productos: [
 					{
 						nombre: `Cotización: ${tipoProyecto || "Proyecto Personalizado"}`,

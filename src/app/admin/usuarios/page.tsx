@@ -15,7 +15,8 @@ import {
   ArrowUpRight,
   MoreVertical,
   Mail,
-  Shield
+  Shield,
+  Trash2
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -84,6 +85,25 @@ export default function AdminUsuariosPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [syncing, setSyncing] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const deleteUsuario = async (id: string) => {
+    if (!confirm("¿Estás seguro de que deseas eliminar este usuario?")) return;
+    setDeletingId(id);
+    try {
+      const res = await fetch(`/api/usuarios?id=${id}`, { method: "DELETE" });
+      if (res.ok) {
+        setUsuarios(prev => prev.filter(u => u.id !== id));
+      } else {
+        const data = await res.json() as { error?: string };
+        alert(data.error ?? "Error al eliminar el usuario");
+      }
+    } catch {
+      alert("Error de red al eliminar el usuario");
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   const fetchUsuarios = useCallback(async () => {
     setLoading(true);
@@ -229,7 +249,7 @@ export default function AdminUsuariosPage() {
               <thead>
                 <tr className="bg-slate-50/50">
                   <th className="px-10 py-6 text-left text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Identidad</th>
-                  <th className="px-10 py-6 text-left text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Contacto & ID</th>
+                  <th className="px-10 py-6 text-left text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Contacto</th>
                   <th className="px-10 py-6 text-left text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Rol / Permisos</th>
                   <th className="px-10 py-6 text-left text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Registro</th>
                   <th className="px-10 py-6 text-center text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Acciones</th>
@@ -254,8 +274,28 @@ export default function AdminUsuariosPage() {
                     </tr>
                   ) : (
                     filteredUsuarios.map((u, idx) => {
-                      const rol = (u.role ?? u.rol ?? "user").toLowerCase();
+                      const rol = (u.role ?? u.rol ?? "cliente").toLowerCase();
                       const isRecent = u.creado_en && (new Date().getTime() - new Date(u.creado_en).getTime() < 24 * 60 * 60 * 1000);
+
+                      const getRoleBadge = (r: string) => {
+                        const configMap: Record<string, { color: string; icon: React.ComponentType<IconProps> }> = {
+                          admin: { color: "text-emerald-700 bg-emerald-50 border-emerald-100", icon: ShieldCheck as React.ComponentType<IconProps> },
+                          creador: { color: "text-[#00a19a] bg-[#00a19a]/5 border-[#00a19a]/10", icon: UserPlus as React.ComponentType<IconProps> },
+                          cliente: { color: "text-slate-600 bg-slate-50 border-slate-100", icon: UserCheck as React.ComponentType<IconProps> },
+                        };
+                        const isUUID = r.length > 20 || /^[0-9a-fA-F-]{30,}$/.test(r);
+                        const displayRole = isUUID ? "cliente" : r;
+                        
+                        const config = configMap[displayRole] ?? configMap.cliente!;
+                        
+                        const Icon = config.icon;
+                        return (
+                          <span className={`inline-flex items-center px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${config.color}`}>
+                            <Icon className="w-3.5 h-3.5 mr-2" />
+                            {displayRole}
+                          </span>
+                        );
+                      };
 
                       return (
                         <motion.tr
@@ -289,20 +329,10 @@ export default function AdminUsuariosPage() {
                                 <Mail className="w-3.5 h-3.5 text-slate-400" />
                                 {u.email}
                               </div>
-                              <div className="text-[10px] font-black text-slate-400 uppercase tracking-tighter bg-slate-100 px-2 py-0.5 rounded-md w-fit">
-                                Clerk ID: {u.clerk_id?.substring(0, 12)}...
-                              </div>
                             </div>
                           </td>
                           <td className="px-10 py-8">
-                            <span className={`inline-flex items-center px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border ${
-                              rol === 'admin' 
-                                ? "bg-emerald-50 text-emerald-700 border-emerald-100" 
-                                : "bg-slate-50 text-slate-600 border-slate-100"
-                            }`}>
-                              <div className={`w-1.5 h-1.5 rounded-full mr-2.5 ${rol === 'admin' ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
-                              {rol}
-                            </span>
+                            {getRoleBadge(rol)}
                           </td>
                           <td className="px-10 py-8">
                             <div className="flex items-center gap-2 text-sm font-black text-slate-900">
@@ -315,12 +345,24 @@ export default function AdminUsuariosPage() {
                             </div>
                           </td>
                           <td className="px-10 py-8 text-center">
-                            <div className="flex justify-center gap-2">
+                            <div className="flex justify-center gap-2 lg:opacity-40 group-hover:opacity-100 transition-opacity">
                               <Button
                                 variant="outline"
                                 className="h-10 w-10 p-0 border-2 border-slate-100 hover:border-slate-900 rounded-xl transition-all"
+                                title="Ver detalles"
                               >
                                 <MoreVertical className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                onClick={() => u.id && void deleteUsuario(u.id)}
+                                disabled={deletingId === u.id}
+                                className="h-10 w-10 p-0 border-2 border-red-50 hover:border-red-500 hover:bg-red-50 text-red-500 rounded-xl transition-all"
+                                title="Eliminar usuario"
+                              >
+                                {deletingId === u.id
+                                  ? <span className="w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full animate-spin inline-block" />
+                                  : <Trash2 className="w-4 h-4" />}
                               </Button>
                             </div>
                           </td>

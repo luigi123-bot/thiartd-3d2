@@ -32,6 +32,9 @@ export default function ChatWidget({
   const [hasNew, setHasNew] = useState(false);
   const [ticketModal, setTicketModal] = useState(false);
   const chatRef = useRef<HTMLDivElement>(null);
+  // Ref to always have current 'open' value inside Realtime callback without re-subscribing
+  const openRef = useRef(open);
+  useEffect(() => { openRef.current = open; }, [open]);
 
   // Initial fetch
   useEffect(() => {
@@ -44,7 +47,7 @@ export default function ChatWidget({
       .then(({ data }) => setMensajes(Array.isArray(data) ? data : []));
   }, [clienteEmail, open]);
 
-  // Suscripción Realtime Global (Escucha siempre)
+  // Suscripción Realtime Global (Escucha siempre, solo depende de clienteEmail)
   useEffect(() => {
     if (!clienteEmail) return;
     
@@ -61,8 +64,8 @@ export default function ChatWidget({
               if (prev.some(m => m.id === newMessage.id)) return prev;
               return [...prev, newMessage];
             });
-            // Si el mensaje es del admin y el chat está cerrado, marcamos notificación
-            if (newMessage.nombre === "Admin" && !open) setHasNew(true);
+            // Usa openRef.current para no re-suscribir al cambiar open
+            if (newMessage.nombre === "Admin" && !openRef.current) setHasNew(true);
           }
         }
       )
@@ -71,7 +74,7 @@ export default function ChatWidget({
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [clienteEmail, open]); // RE-subscribing on open/close ensures we always have correct 'open' state for notifications
+  }, [clienteEmail]); // Solo depende de clienteEmail - open se lee via openRef
 
   useEffect(() => {
     if (open) setHasNew(false);

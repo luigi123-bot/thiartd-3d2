@@ -82,40 +82,39 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Faltan campos obligatorios." }, { status: 400 });
     }
 
-    // Verificar si el usuario existe en la tabla usuario, si no, crearlo (solo si cliente_id existe)
-    if (cliente_id) {
-      const { data: usuarioExistente } = await supabase
-        .from("usuario")
-        .select("id")
-        .eq("id", cliente_id)
-        .single();
+    // Actualizar datos del usuario si está registrado
+    if (cliente_id && cliente_id !== "guest") {
+      try {
+        // Verificar si el usuario existe en la tabla usuarios usando su auth_id
+        const { data: usuarioExistente } = await supabase
+          .from("usuarios")
+          .select("id, telefono, direccion")
+          .eq("auth_id", cliente_id)
+          .single();
 
-      if (!usuarioExistente) {
-        console.log("Usuario no existe en tabla 'usuario', creándolo...");
-        // Obtener datos del usuario de Supabase Auth
-        const { data: authUser } = await supabase.auth.admin.getUserById(cliente_id);
-
-        if (authUser?.user) {
-          const userMetadata = authUser.user.user_metadata as { nombre?: string } | undefined;
-          const nombreUsuario = userMetadata?.nombre ?? authUser.user.email?.split('@')[0] ?? 'Usuario';
-
-          const { error: insertUserError } = await supabase
-            .from("usuario")
-            .insert([{
-              id: cliente_id,
-              email: authUser.user.email ?? '',
-              nombre: nombreUsuario,
-              password: '', // Password vacío porque usa Supabase Auth
-              role: 'user'
-            }]);
-
-          if (insertUserError) {
-            console.error("Error creando usuario:", insertUserError);
-            // Continuar de todas formas, el pedido es más importante
+        if (!usuarioExistente) {
+          console.log("Usuario no existe en tabla 'usuarios', omitiendo actualización o puedes crearlo aquí si lo deseas.");
+        } else {
+          console.log("✅ Usuario encontrado. Actualizando datos de contacto y envío en perfil...");
+          const { error: updateError } = await supabase
+            .from("usuarios")
+            .update({
+              telefono: datos_contacto.telefono || datos_envio.telefono,
+              direccion: datos_envio.direccion,
+              ciudad: datos_envio.ciudad,
+              departamento: datos_envio.departamento,
+              codigo_postal: datos_envio.codigoPostal
+            })
+            .eq("auth_id", cliente_id);
+            
+          if (updateError) {
+            console.warn("No se pudieron actualizar los datos del usuario. ¿Agregaste las columnas?", updateError.message);
           } else {
-            console.log("✅ Usuario creado en tabla 'usuario'");
+            console.log("✅ Perfil de usuario actualizado con los datos de esta compra.");
           }
         }
+      } catch (err) {
+        console.warn("Excepción al intentar actualizar datos del usuario:", err);
       }
     }
 

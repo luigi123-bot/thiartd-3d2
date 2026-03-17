@@ -81,6 +81,36 @@ export default function CarritoPage() {
             : (data.user.email ?? ""),
           email: data.user.email ?? ""
         }));
+
+        interface UsuarioContactoDB {
+          telefono: string | null;
+          direccion: string | null;
+          ciudad: string | null;
+          departamento: string | null;
+          codigo_postal: string | null;
+        }
+
+        // Buscar datos adicionales en la tabla usuarios para pre-llenar
+        const { data: usuarioDb } = await supabase
+          .from("usuarios")
+          .select("telefono, direccion, ciudad, departamento, codigo_postal")
+          .eq("auth_id", data.user.id)
+          .single<UsuarioContactoDB>();
+
+        if (usuarioDb) {
+          setDatosContacto(prev => ({
+            ...prev,
+            telefono: usuarioDb.telefono ?? ""
+          }));
+          setDatosEnvio(prev => ({
+            ...prev,
+            telefono: usuarioDb.telefono ?? "",
+            direccion: usuarioDb.direccion ?? "",
+            ciudad: usuarioDb.ciudad ?? "",
+            departamento: usuarioDb.departamento ?? "",
+            codigoPostal: usuarioDb.codigo_postal ?? ""
+          }));
+        }
       } else {
         console.log("⚠️ No hay usuario autenticado");
       }
@@ -146,18 +176,26 @@ export default function CarritoPage() {
       return;
     }
 
-    setCarrito(prev =>
-      prev.map(item =>
+    setCarrito(prev => {
+      const updated = prev.map(item =>
         item.id === id
           ? { ...item, cantidad: Math.min(nuevaCantidad, item.stock) }
           : item
-      )
-    );
+      );
+      // Notificar cambio
+      window.dispatchEvent(new CustomEvent("cart-updated"));
+      return updated;
+    });
   };
 
   // Eliminar producto
   const eliminarProducto = (id: string) => {
-    setCarrito(prev => prev.filter(item => item.id !== id));
+    setCarrito(prev => {
+      const updated = prev.filter(item => item.id !== id);
+      // Notificar cambio
+      window.dispatchEvent(new CustomEvent("cart-updated"));
+      return updated;
+    });
   };
 
   // Aplicar cupón

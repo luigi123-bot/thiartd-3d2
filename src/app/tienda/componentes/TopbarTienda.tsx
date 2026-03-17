@@ -19,7 +19,7 @@ import {
   IoMdLogOut,
 } from "react-icons/io";
 import { FiSettings } from "react-icons/fi";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import SupabaseAuth from "~/components/SupabaseAuth";
 
@@ -37,8 +37,10 @@ export default function TopbarTienda() {
   const [role, setRole] = useState<string | null>(null);
   const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const [cartCount, setCartCount] = useState(0);
 
   const router = useRouter();
+  const pathname = usePathname();
   const sidebarRef = useRef<HTMLDivElement>(null);
   const avatarMenuRef = useRef<HTMLDivElement>(null);
 
@@ -86,12 +88,17 @@ export default function TopbarTienda() {
               ? (data.user.user_metadata as { avatar_url?: string }).avatar_url
               : undefined,
         });
+        interface UsuarioDb {
+          role: string;
+        }
+
         // Consultar el role en la tabla usuarios
         const { data: userDb } = await supabase
           .from("usuarios")
           .select("role")
           .eq("email", data.user.email)
-          .single();
+          .single<UsuarioDb>();
+
         console.log("Role obtenido:", userDb?.role);
         if (userDb?.role && typeof userDb.role === "string") setRole(userDb.role);
         else setRole(null);
@@ -102,17 +109,33 @@ export default function TopbarTienda() {
     })();
   }, [authModalOpen]);
 
-  // Cerrar menú de avatar al hacer click fuera
+  // Calcular contador del carrito
   useEffect(() => {
-    if (!avatarMenuOpen) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      if (avatarMenuRef.current && !avatarMenuRef.current.contains(e.target as Node)) {
-        setAvatarMenuOpen(false);
+    const updateCartCount = () => {
+      try {
+        const carrito = JSON.parse(localStorage.getItem("carrito") ?? "[]") as { cantidad: number }[];
+        const total = carrito.reduce((acc, item) => acc + (item.cantidad ?? 0), 0);
+        setCartCount(total);
+      } catch (err) {
+        console.error("Error al leer carrito:", err);
+        setCartCount(0);
       }
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [avatarMenuOpen]);
+
+    updateCartCount();
+
+    // Escuchar cambios en otras pestañas
+    window.addEventListener("storage", updateCartCount);
+    // Escuchar cambios personalizados (emitidos por el botón Agregar al Carrito)
+    window.addEventListener("cart-updated", updateCartCount);
+
+    return () => {
+      window.removeEventListener("storage", updateCartCount);
+      window.removeEventListener("cart-updated", updateCartCount);
+    };
+  }, []);
+
+  // Cerrar menú de avatar al hacer click fuera
 
   if (!isMounted) return null;
 
@@ -184,10 +207,15 @@ export default function TopbarTienda() {
                 variant="ghost"
                 size="icon"
                 onClick={() => router.push("/tienda/carrito")}
-                className="text-white hover:bg-white/10"
+                className="text-white hover:bg-white/10 relative"
                 aria-label="Carrito"
               >
                 <IoIosCart className="w-5 h-5 sm:w-6 sm:h-6" />
+                {cartCount > 0 && pathname !== "/tienda/carrito" && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-black h-5 w-5 rounded-full flex items-center justify-center border-2 border-[#00a19a] shadow-sm animate-in zoom-in duration-300">
+                    {cartCount > 99 ? "99+" : cartCount}
+                  </span>
+                )}
               </Button>
 
               {/* Notifications icon */}
