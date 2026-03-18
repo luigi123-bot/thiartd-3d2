@@ -248,11 +248,11 @@ export default function AdminUsuariosPage() {
             <table className="w-full border-collapse">
               <thead>
                 <tr className="bg-slate-50/50">
-                  <th className="px-10 py-6 text-left text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Identidad</th>
-                  <th className="px-10 py-6 text-left text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Contacto</th>
-                  <th className="px-10 py-6 text-left text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Rol / Permisos</th>
-                  <th className="px-10 py-6 text-left text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Registro</th>
-                  <th className="px-10 py-6 text-center text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Acciones</th>
+                  <th className="px-4 md:px-10 py-4 md:py-6 text-left text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Identidad</th>
+                  <th className="px-4 md:px-10 py-4 md:py-6 text-left text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Contacto</th>
+                  <th className="px-4 md:px-10 py-4 md:py-6 text-left text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Rol / Permisos</th>
+                  <th className="px-4 md:px-10 py-4 md:py-6 text-left text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Registro</th>
+                  <th className="px-4 md:px-10 py-4 md:py-6 text-center text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -305,7 +305,7 @@ export default function AdminUsuariosPage() {
                           transition={{ delay: idx * 0.03 }}
                           className="hover:bg-slate-50/80 transition-all group"
                         >
-                          <td className="px-10 py-8">
+                          <td className="px-4 md:px-10 py-4 md:py-8">
                             <div className="flex items-center gap-5">
                               <div className="w-12 h-12 bg-slate-900 rounded-2xl flex items-center justify-center text-white font-black text-lg shadow-lg group-hover:scale-110 transition-transform relative">
                                 {(u.nombre ?? u.email ?? 'U').charAt(0).toUpperCase()}
@@ -323,7 +323,7 @@ export default function AdminUsuariosPage() {
                               </div>
                             </div>
                           </td>
-                          <td className="px-10 py-8">
+                          <td className="px-4 md:px-10 py-4 md:py-8">
                             <div className="flex flex-col gap-1.5">
                               <div className="flex items-center gap-2 text-sm font-bold text-slate-700">
                                 <Mail className="w-3.5 h-3.5 text-slate-400" />
@@ -331,10 +331,10 @@ export default function AdminUsuariosPage() {
                               </div>
                             </div>
                           </td>
-                          <td className="px-10 py-8">
+                          <td className="px-4 md:px-10 py-4 md:py-8">
                             {getRoleBadge(rol)}
                           </td>
-                          <td className="px-10 py-8">
+                          <td className="px-4 md:px-10 py-4 md:py-8">
                             <div className="flex items-center gap-2 text-sm font-black text-slate-900">
                               <Calendar className="w-4 h-4 text-slate-400" />
                               {u.creado_en ? new Date(u.creado_en).toLocaleDateString('es-ES', {
@@ -344,7 +344,7 @@ export default function AdminUsuariosPage() {
                               }) : '-'}
                             </div>
                           </td>
-                          <td className="px-10 py-8 text-center">
+                          <td className="px-4 md:px-10 py-4 md:py-8 text-center">
                             <div className="flex justify-center gap-2 lg:opacity-40 group-hover:opacity-100 transition-opacity">
                               <Button
                                 variant="outline"

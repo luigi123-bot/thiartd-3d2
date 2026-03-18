@@ -1,50 +1,45 @@
-import nodemailer, { type Transporter, type SentMessageInfo } from "nodemailer";
+import { sendOrderConfirmationEmail } from "~/lib/email-service";
 
-export async function enviarEmailConfirmacionNodemailer({
-  to,
-  subject,
-  html
-}: {
+import type { SentMessageInfo } from "nodemailer";
+
+interface ProductoPedido {
+  nombre: string;
+  cantidad: number;
+  precio: number;
+  imagen?: string;
+}
+
+interface EmailConfirmacionParams {
   to: string;
-  subject: string;
-  html: string;
-}) {
-  // Configura el transporter con tus credenciales de Gmail
-   
-  const transporter: Transporter = nodemailer.createTransport({
-    service: "gmail",
-    auth: {
-      user: process.env.GMAIL_USER,
-      pass: process.env.GMAIL_PASS
-    }
+  pedidoId: number;
+  nombreCliente: string;
+  productos: ProductoPedido[];
+  total: number;
+  metodoPago: string;
+  transaccionId: string;
+  referencia: string;
+  direccionEnvio?: string;
+  ciudadEnvio?: string;
+  fechaPago?: string;
+  currency?: string;
+}
+
+export async function enviarEmailConfirmacion(params: EmailConfirmacionParams): Promise<SentMessageInfo> {
+  console.log("📤 Iniciando envío de correo de confirmación (usando email-service)...");
+  
+  const result = await sendOrderConfirmationEmail({
+    ...params,
+    to: params.to
   });
 
-  const mailOptions = {
-    from: `Thiartd 3D <${process.env.GMAIL_USER}>`,
-    to,
-    subject,
-    html
-  };
-
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const info: SentMessageInfo = await transporter.sendMail(mailOptions);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    if (typeof info.response === "string") {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      console.log("📧 Email enviado:", info.response);
-    } else {
-      console.log("📧 Email enviado:", info);
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-    return info;
-  } catch (error: unknown) {
-    if (error instanceof Error) {
-      console.error("❌ Error enviando email:", error.message);
-      throw new Error(error.message);
-    } else {
-      console.error("❌ Error enviando email desconocido:", error);
-      throw error;
-    }
+  if (!result.success) {
+    console.error("❌ Falló el envío del correo:", result.error);
+    throw new Error(result.error);
   }
+
+   
+  return result.data;
 }
+
+// Mantener compatibilidad con el nombre antiguo
+export const enviarEmailConfirmacionNodemailer = enviarEmailConfirmacion;

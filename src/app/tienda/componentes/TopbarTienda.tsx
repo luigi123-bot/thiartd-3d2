@@ -21,6 +21,7 @@ import {
 import { FiSettings } from "react-icons/fi";
 import { useRouter, usePathname } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
+import { useCarrito } from "~/components/providers/CarritoProvider";
 import SupabaseAuth from "~/components/SupabaseAuth";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
@@ -37,7 +38,9 @@ export default function TopbarTienda() {
   const [role, setRole] = useState<string | null>(null);
   const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
-  const [cartCount, setCartCount] = useState(0);
+
+  const { carrito } = useCarrito();
+  const cartCount = carrito.reduce((acc, item) => acc + (item.cantidad ?? 0), 0);
 
   const router = useRouter();
   const pathname = usePathname();
@@ -108,34 +111,6 @@ export default function TopbarTienda() {
       }
     })();
   }, [authModalOpen]);
-
-  // Calcular contador del carrito
-  useEffect(() => {
-    const updateCartCount = () => {
-      try {
-        const carrito = JSON.parse(localStorage.getItem("carrito") ?? "[]") as { cantidad: number }[];
-        const total = carrito.reduce((acc, item) => acc + (item.cantidad ?? 0), 0);
-        setCartCount(total);
-      } catch (err) {
-        console.error("Error al leer carrito:", err);
-        setCartCount(0);
-      }
-    };
-
-    updateCartCount();
-
-    // Escuchar cambios en otras pestañas
-    window.addEventListener("storage", updateCartCount);
-    // Escuchar cambios personalizados (emitidos por el botón Agregar al Carrito)
-    window.addEventListener("cart-updated", updateCartCount);
-
-    return () => {
-      window.removeEventListener("storage", updateCartCount);
-      window.removeEventListener("cart-updated", updateCartCount);
-    };
-  }, []);
-
-  // Cerrar menú de avatar al hacer click fuera
 
   if (!isMounted) return null;
 

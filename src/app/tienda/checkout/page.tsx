@@ -147,36 +147,27 @@ export default function CheckoutPage() {
       return;
     }
 
-    // Determinar si debemos saltarnos Wompi. Ahora solo lo saltamos si NO están las variables de Wompi.
     const hasWompiKeys = !!process.env.NEXT_PUBLIC_WOMPI_PUBLIC_KEY;
     const isDevelopment = (process.env.NODE_ENV === 'development' || window.location.hostname === 'localhost') && !hasWompiKeys;
-
-    // En producción, validar monto mínimo de Wompi ($1,500 COP)
-    if (!isDevelopment && total < 1500) {
-      toast({
-        title: "Monto mínimo no alcanzado",
-        description: "El monto mínimo para procesar pagos es de $1,500 COP. Por favor agrega más productos.",
-        variant: "destructive"
-      });
-      return;
-    }
 
     setLoading(true);
 
     try {
-      // 1. Crear el pedido en la base de datos con información de envío estructurada
+      // 1. Crear el pedido en la base de datos PRIMERO (siempre)
       const pedidoData = {
         cliente_id: usuario?.id ?? "guest",
         productos: carrito.map(prod => ({
           nombre: prod.nombre,
           cantidad: prod.cantidad,
           precio_unitario: prod.precio,
-          categoria: prod.categoria
+          precio: prod.precio,
+          categoria: prod.categoria,
+          imagen: prod.imagen,
         })),
         subtotal,
         costo_envio: envio,
         total,
-        estado: isDevelopment ? "pagado" : "pendiente_pago", // En desarrollo, marcar como pagado automáticamente
+        estado: "pendiente_pago",
         datos_contacto: {
           nombre: datosCheckout.nombre,
           email: datosCheckout.email,
@@ -199,53 +190,52 @@ export default function CheckoutPage() {
       });
 
       if (!pedidoResponse.ok) {
-        throw new Error("Error al crear el pedido");
+        const pedidoError = await pedidoResponse.json() as { error: string; hint?: string };
+        throw new Error(`Error al crear el pedido: ${pedidoError.error}${pedidoError.hint ? ` (${pedidoError.hint})` : ""}`);
       }
 
       const pedidoResult = await pedidoResponse.json() as { pedido: { id: number } };
-      
-      // En DESARROLLO: Aprobar automáticamente sin Wompi
+      const pedidoId = pedidoResult.pedido.id;
+      console.log("✅ Pedido creado con ID:", pedidoId);
+
+      // Limpiar carrito una vez que el pedido está guardado
+      localStorage.removeItem("carrito");
+
+      // 2a. MODO DESARROLLO: aprobar automáticamente sin Wompi
       if (isDevelopment) {
         console.log("🔧 MODO DESARROLLO: Aprobando pedido automáticamente");
-        
-        // Actualizar el pedido con datos de pago simulados
         await fetch("/api/pedidos", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            pedidoId: pedidoResult.pedido.id,
+            pedidoId,
             estado: "pagado",
             payment_id: `DEV-AUTO-${Date.now()}`,
             payment_method: "DEVELOPMENT_MODE",
           }),
         });
-
-        // Limpiar carrito
-        localStorage.removeItem("carrito");
-        
-        // Mostrar mensaje de éxito
-        toast({
-          title: "✅ Pedido aprobado (Desarrollo)",
-          description: "Tu pedido fue aprobado automáticamente en modo desarrollo",
-        });
-
-        // Redirigir a página de éxito
-        setTimeout(() => {
-          window.location.href = `/tienda/pago-exitoso?pedido=${pedidoResult.pedido.id}&dev=true`;
-        }, 1000);
-        
+        toast({ title: "✅ Pedido aprobado (Desarrollo)", description: "Tu pedido fue aprobado automáticamente" });
+        setTimeout(() => { window.location.href = `/tienda/pago-exitoso?pedido=${pedidoId}&dev=true`; }, 1000);
         return;
       }
 
-      // 2. En PRODUCCIÓN: Procesar pago con Wompi
+      // 2b. PRODUCCIÓN: procesar pago con Wompi
+      const reference = `PEDIDO-${pedidoId}-${Date.now()}`;
       const pagoData = {
         amount: total,
         customer_email: datosCheckout.email,
         customer_name: datosCheckout.nombre,
         customer_phone: datosCheckout.telefono,
-        reference: `PEDIDO-${pedidoResult.pedido.id}-${Date.now()}`,
-        redirect_url: `${window.location.origin}/tienda/pago-exitoso?pedido=${pedidoResult.pedido.id}`
+        reference,
+        redirect_url: `${window.location.origin}/tienda/pago-exitoso?pedido=${pedidoId}`
       };
+
+      // Guardar la referencia en el pedido para poder matchearla en el webhook
+      await fetch("/api/pedidos", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pedidoId, payment_id: reference }),
+      });
 
       const pagoResponse = await fetch("/api/pago-wompi", {
         method: "POST",
@@ -253,25 +243,28 @@ export default function CheckoutPage() {
         body: JSON.stringify(pagoData)
       });
 
-      if (!pagoResponse.ok) {
-        throw new Error("Error al procesar el pago");
+      const pagoResult = await pagoResponse.json() as { permalink?: string; error?: string; wompi_error?: unknown };
+
+      if (!pagoResponse.ok || !pagoResult.permalink) {
+        // El pedido ya está guardado, solo falla el pago → aviso al usuario
+        console.error("Error Wompi:", pagoResult);
+        toast({
+          title: "Pedido guardado, error en pago",
+          description: `Tu pedido #${pedidoId} fue guardado pero hubo un problema al redirigir a Wompi: ${pagoResult.error ?? "Error desconocido"}. Contáctanos para completar tu pago.`,
+          variant: "destructive"
+        });
+        // Redirigir a la página de pago exitoso indicando que está pendiente
+        setTimeout(() => { window.location.href = `/tienda/pago-exitoso?pedido=${pedidoId}&pendiente=true`; }, 2000);
+        return;
       }
 
-      const pagoResult = await pagoResponse.json() as { permalink?: string };
-
-      if (pagoResult.permalink) {
-        // Limpiar carrito antes de redirigir
-        localStorage.removeItem("carrito");
-        // Redirigir a Wompi
-        window.location.href = pagoResult.permalink;
-      } else {
-        throw new Error("No se recibió URL de pago");
-      }
+      // 3. Redirigir a Wompi
+      window.location.href = pagoResult.permalink;
 
     } catch (error) {
       console.error("Error en procesarPago:", error);
       toast({
-        title: "Error al procesar pago",
+        title: "Error al procesar",
         description: error instanceof Error ? error.message : "Error desconocido",
         variant: "destructive"
       });

@@ -269,11 +269,11 @@ export default function AdminPedidosPage() {
             <table className="w-full border-collapse">
               <thead>
                 <tr className="bg-slate-50/50">
-                  <th className="px-10 py-6 text-left text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Cliente & Referencia</th>
-                  <th className="px-10 py-6 text-left text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Destino & Fecha</th>
-                  <th className="px-10 py-6 text-left text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Estado</th>
-                  <th className="px-10 py-6 text-right text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Total Inversión</th>
-                  <th className="px-10 py-6 text-center text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Acciones</th>
+                  <th className="px-4 md:px-10 py-4 md:py-6 text-left text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Cliente & Referencia</th>
+                  <th className="px-4 md:px-10 py-4 md:py-6 text-left text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Destino & Fecha</th>
+                  <th className="px-4 md:px-10 py-4 md:py-6 text-left text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Estado</th>
+                  <th className="px-4 md:px-10 py-4 md:py-6 text-right text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Total Inversión</th>
+                  <th className="px-4 md:px-10 py-4 md:py-6 text-center text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -302,7 +302,7 @@ export default function AdminPedidosPage() {
                         transition={{ delay: idx * 0.05 }}
                         className="hover:bg-slate-50/80 transition-all group"
                       >
-                        <td className="px-10 py-8">
+                        <td className="px-4 md:px-10 py-4 md:py-8">
                           <div className="flex items-center gap-5">
                             <div className="w-12 h-12 bg-slate-900 rounded-2xl flex items-center justify-center text-white font-black text-lg shadow-lg group-hover:scale-110 transition-transform">
                               {(datosContacto.nombre ?? 'U').charAt(0).toUpperCase()}
@@ -320,7 +320,7 @@ export default function AdminPedidosPage() {
                             </div>
                           </div>
                         </td>
-                        <td className="px-10 py-8">
+                        <td className="px-4 md:px-10 py-4 md:py-8">
                           <div className="text-sm font-black text-slate-900 leading-tight mb-1">
                             {p.ciudad_envio ?? '-'}
                           </div>
@@ -333,7 +333,7 @@ export default function AdminPedidosPage() {
                             })}
                           </div>
                         </td>
-                        <td className="px-10 py-8">
+                        <td className="px-4 md:px-10 py-4 md:py-8">
                           <span className={`inline-flex items-center px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border ${estadoColors[p.estado] ?? 'bg-slate-50 text-slate-600 border-slate-100'}`}>
                             <div className={`w-1.5 h-1.5 rounded-full mr-2.5 ${p.estado === 'pagado' ? 'bg-emerald-500 animate-pulse' :
                               p.estado === 'pendiente_pago' ? 'bg-amber-500' : 'bg-rose-500'
@@ -341,7 +341,7 @@ export default function AdminPedidosPage() {
                             {p.estado.replace(/_/g, ' ')}
                           </span>
                         </td>
-                        <td className="px-10 py-8 text-right">
+                        <td className="px-4 md:px-10 py-4 md:py-8 text-right">
                           <div className="text-2xl font-black text-slate-900 tracking-tighter">
                             ${Number(p.total).toLocaleString('es-CO')}
                           </div>
@@ -349,7 +349,7 @@ export default function AdminPedidosPage() {
                             {pParsed.length} ARTÍCULOS
                           </div>
                         </td>
-                        <td className="px-10 py-8">
+                        <td className="px-4 md:px-10 py-4 md:py-8">
                           <div className="flex justify-center gap-3">
                             <Button
                               onClick={() => setDetallePedido(p)}

@@ -7,7 +7,6 @@ import {
   FiShoppingCart,
   FiMessageCircle,
   FiHome,
-  FiAlertCircle,
   FiBell,
   FiMenu,
   FiX,
@@ -27,7 +26,6 @@ const MENU = [
   { href: "/admin/inventario", label: "Inventario", icon: FiLayers },
   { href: "/admin/envios", label: "Envíos", icon: FiTruck },
   { href: "/admin/pedidos", label: "Pedidos", icon: FiShoppingCart },
-  { href: "/admin/tickets", label: "Tickets", icon: FiAlertCircle },
   { href: "/admin/mensajes", label: "Mensajes", icon: FiMessageCircle },
 ];
 

@@ -8,6 +8,7 @@ import { ToastProvider } from "~/components/ui/use-toast";
 import SyncUser from "../components/SyncUser";
 import Footer from "~/components/Footer";
 import { UiProvider } from "~/components/providers/UiProvider";
+import { CarritoProvider } from "~/components/providers/CarritoProvider";
 import ClientChatWidgetWrapper from "~/components/ClientChatWidgetWrapper";
 
 export const metadata: Metadata = {
@@ -30,9 +31,11 @@ export default function RootLayout({
           <SyncUser />
           <ToastProvider>
             <UiProvider>
-              {children}
-              <Footer />
-              <ClientChatWidgetWrapper />
+              <CarritoProvider>
+                {children}
+                <Footer />
+                <ClientChatWidgetWrapper />
+              </CarritoProvider>
             </UiProvider>
           </ToastProvider>
         </body>

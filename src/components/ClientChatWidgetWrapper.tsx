@@ -4,9 +4,6 @@ import ChatWidget from "./ChatWidget";
 // Recibe datos del usuario por props o contexto propio
 import { useUser } from "@clerk/nextjs";
 import { useEffect, useState } from "react";
-import { v5 as uuidv5 } from "uuid";
-
-const UUID_NAMESPACE = "1b671a64-40d5-491e-99b0-da01ff1f3341";
 
 export default function ClientChatWidgetWrapper() {
   const { user, isLoaded } = useUser();
@@ -26,8 +23,6 @@ export default function ClientChatWidgetWrapper() {
 
   if (!isLoaded || (!user && !guestId)) return null;
 
-  const rawId = user?.id ?? guestId ?? "anon";
-  const clienteId = rawId.startsWith("user_") ? uuidv5(rawId, UUID_NAMESPACE) : rawId;
   const clienteNombre = user?.fullName ?? user?.firstName ?? "Invitado";
   
   // Si es invitado, usamos un correo único basado en su ID para que no vea chats de otros invitados
@@ -36,7 +31,6 @@ export default function ClientChatWidgetWrapper() {
 
   return (
     <ChatWidget
-      clienteId={clienteId}
       clienteNombre={clienteNombre}
       clienteEmail={clienteEmail}
     />

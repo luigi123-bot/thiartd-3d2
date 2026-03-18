@@ -207,10 +207,10 @@ function NotificacionesMensajes() {
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="flex flex-col min-h-screen bg-gray-50 w-full">
       <AdminSidebar />
-      <main className="flex-1">
-        <div className="flex justify-end items-center gap-4 p-4 border-b bg-white">
+      <main className="flex-1 w-full max-w-[100vw] overflow-x-hidden flex flex-col">
+        <div className="flex justify-end items-center gap-4 p-4 border-b bg-white relative z-10">
           <NotificacionesMensajes />
           <Notificaciones />
         </div>

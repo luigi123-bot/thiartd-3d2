@@ -1,8 +1,9 @@
 "use client";
-import { useEffect, useRef, useState, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { BadgeDollarSign, ChevronLeft, ChevronRight, ShoppingCart, Eye } from "lucide-react";
+import { motion } from "framer-motion";
+import { ChevronLeft, ChevronRight, ShoppingCart, Eye} from "lucide-react";
 import clsx from "clsx";
 import { createClient } from "@supabase/supabase-js";
 
@@ -28,37 +29,37 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 const mockProductos: Producto[] = [
   {
     id: 1,
-    nombre: "Figura Dragón",
-    descripcion: "Figura 3D de dragón pintada a mano.",
-    categoria: "Grandes",
-    precio: 350,
+    nombre: "Figura Dragón Místico",
+    descripcion: "Figura 3D de piezas ensambladas con acabado metálico.",
+    categoria: "Figuras",
+    precio: 85000,
     destacado: true,
     image_url: "/Logo%20Thiart%20Tiktok.png",
   },
   {
     id: 2,
-    nombre: "Miniatura Robot",
-    descripcion: "Mini robot articulado, ideal para escritorio.",
-    categoria: "Pequeños",
-    precio: 120,
+    nombre: "Robot Articulado X-1",
+    descripcion: "Mini robot con 12 puntos de articulación.",
+    categoria: "Juguetes",
+    precio: 45000,
     destacado: false,
     image_url: "/Logo%20Thiart%20Tiktok.png",
   },
   {
     id: 3,
-    nombre: "Jarrón Moderno",
-    descripcion: "Jarrón impreso en 3D con diseño geométrico.",
-    categoria: "Medianos",
-    precio: 200,
+    nombre: "Jarrón Geométrico V2",
+    descripcion: "Decoración moderna con patrón de Voronoi.",
+    categoria: "Decoración",
+    precio: 65000,
     destacado: false,
     image_url: "/Logo%20Thiart%20Tiktok.png",
   },
   {
     id: 4,
-    nombre: "Lámpara Luna",
-    descripcion: "Lámpara LED con forma de luna, personalizada.",
+    nombre: "Lámpara Lunar LED",
+    descripcion: "Textura realista de la luna con base de madera.",
     categoria: "Personalizados",
-    precio: 450,
+    precio: 120000,
     destacado: true,
     image_url: "/Logo%20Thiart%20Tiktok.png",
   },
@@ -72,48 +73,10 @@ export default function ProductosCarrusel({ soloDestacados = false }: ProductosC
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isPaused, setIsPaused] = useState(false);
 
-  // Añadir más productos mock para el movimiento continuo
-
-  const extendedMock = useMemo(
-    () => [
-      ...mockProductos,
-      {
-        id: 5,
-        nombre: "Soporte Celular",
-        descripcion: "Soporte impreso en 3D para tu smartphone.",
-        categoria: "Pequeños",
-        precio: 90,
-        destacado: false,
-        image_url: "/Logo%20Thiart%20Tiktok.png",
-      },
-      {
-        id: 6,
-        nombre: "Organizador Escritorio",
-        descripcion: "Organizador modular para oficina.",
-        categoria: "Medianos",
-        precio: 180,
-        destacado: false,
-        image_url: "/Logo%20Thiart%20Tiktok.png",
-      },
-      {
-        id: 7,
-        nombre: "Maceta Geométrica",
-        descripcion: "Maceta decorativa con diseño moderno.",
-        categoria: "Grandes",
-        precio: 220,
-        destacado: true,
-        image_url: "/Logo%20Thiart%20Tiktok.png",
-      },
-    ],
-    []
-  );
-
-  // Nueva función para alternar destacado
   useEffect(() => {
     const fetchProductos = async () => {
       setLoading(true);
       try {
-        // Traer productos desde Supabase
         const { data } = await supabase
           .from("productos")
           .select("id, nombre, descripcion, categoria, precio, destacado, image_url, usuarios:user_id(nombre)");
@@ -144,39 +107,26 @@ export default function ProductosCarrusel({ soloDestacados = false }: ProductosC
         if (!!soloDestacados) {
           productosFiltrados = productosFiltrados.filter((p: Producto) => p.destacado);
         }
-        // Si no hay productos, usar mock
+        
         if (!productosFiltrados.length) {
-          productosFiltrados = (soloDestacados
-            ? extendedMock.filter((p) => p.destacado)
-            : extendedMock
-          ).map((p) => ({
-            ...p,
-            destacado: p.destacado ?? false,
-          }));
+          productosFiltrados = soloDestacados ? mockProductos.filter(p => p.destacado) : mockProductos;
         }
-        // Destacados primero
-        const destacados = productosFiltrados.filter((p: Producto) => p.destacado);
-        const normales = productosFiltrados.filter((p: Producto) => !p.destacado);
-        setProductos([...destacados, ...normales]);
+
+        setProductos(productosFiltrados);
       } catch {
-        // Si hay error, usar mock
-        setProductos(
-          soloDestacados
-            ? extendedMock.filter((p) => p.destacado)
-            : extendedMock
-        );
+        setProductos(soloDestacados ? mockProductos.filter(p => p.destacado) : mockProductos);
       }
       setLoading(false);
     };
     void fetchProductos();
-  }, [soloDestacados, extendedMock]);
+  }, [soloDestacados]);
 
-  // Responsive: tarjetas por vista
   const [cardsPerView, setCardsPerView] = useState(1);
   useEffect(() => {
     function handleResize() {
       if (window.innerWidth < 640) setCardsPerView(1);
       else if (window.innerWidth < 1024) setCardsPerView(2);
+      else if (window.innerWidth < 1280) setCardsPerView(3);
       else setCardsPerView(4);
     }
     handleResize();
@@ -184,16 +134,14 @@ export default function ProductosCarrusel({ soloDestacados = false }: ProductosC
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // Movimiento automático continuo
   useEffect(() => {
-    if (isPaused || productos.length <= 1) return;
+    if (isPaused || productos.length <= cardsPerView) return;
     const interval = setInterval(() => {
-      setCurrent((prev) => (prev + 1) % productos.length);
-    }, 2500);
+      setCurrent((prev) => (prev + 1) % (productos.length - cardsPerView + 1));
+    }, 4000);
     return () => clearInterval(interval);
-  }, [isPaused, productos.length]);
+  }, [isPaused, productos.length, cardsPerView]);
 
-  // Scroll a la tarjeta current
   useEffect(() => {
     if (scrollRef.current) {
       const cardWidth = scrollRef.current.offsetWidth / cardsPerView;
@@ -204,172 +152,133 @@ export default function ProductosCarrusel({ soloDestacados = false }: ProductosC
     }
   }, [current, cardsPerView]);
 
-  // Funcionalidad de botones
-  const handleVerDetalles = (producto: Producto) => {
-    router.push(`/tienda/productos/${producto.id}`);
-  };
-  const handleAnadir = (producto: Producto) => {
-    alert(`Añadido al carrito: ${producto.nombre}`);
-  };
-
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center py-16">
-        <span className="text-gray-400">Cargando productos...</span>
-      </div>
-    );
-  }
-
-  if (!productos.length) {
-    return (
-      <div className="flex justify-center items-center py-16">
-        <span className="text-gray-400">No hay productos para mostrar.</span>
-      </div>
-    );
-  }
-
-  // Paginación
-  const totalPages = Math.max(1, productos.length - cardsPerView + 1);
+  if (loading) return (
+    <div className="flex justify-center items-center py-20">
+      <div className="w-10 h-10 border-4 border-[#00a19a]/20 border-t-[#00a19a] rounded-full animate-spin" />
+    </div>
+  );
 
   return (
-    <div className="w-full flex flex-col items-center bg-white">
+    <section className="relative w-full max-w-[1400px] mx-auto py-10 px-4 sm:px-8 overflow-hidden group">
+      {/* Botones de navegación minimalistas */}
+      <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 flex justify-between px-2 z-20 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+        <button
+          onClick={() => setCurrent(c => Math.max(0, c - 1))}
+          className="p-4 bg-white/90 backdrop-blur-md rounded-full shadow-2xl pointer-events-auto hover:bg-[#00a19a] hover:text-white transition-all transform hover:scale-110 active:scale-95 text-slate-800"
+          disabled={current === 0}
+        >
+          <ChevronLeft className="w-6 h-6" />
+        </button>
+        <button
+          onClick={() => setCurrent(c => Math.min(productos.length - cardsPerView, c + 1))}
+          className="p-4 bg-white/90 backdrop-blur-md rounded-full shadow-2xl pointer-events-auto hover:bg-[#00a19a] hover:text-white transition-all transform hover:scale-110 active:scale-95 text-slate-800"
+          disabled={current >= productos.length - cardsPerView}
+        >
+          <ChevronRight className="w-6 h-6" />
+        </button>
+      </div>
+
+      {/* Carrusel */}
       <div
-        className={clsx(
-          "relative w-full max-w-7xl group transition-colors",
-          "bg-white rounded-2xl py-10 px-2 sm:px-6"
-        )}
+        ref={scrollRef}
+        className="flex overflow-x-hidden transition-all duration-500 gap-6"
         onMouseEnter={() => setIsPaused(true)}
         onMouseLeave={() => setIsPaused(false)}
       >
-        {/* Flechas laterales */}
-        <button
-          className={clsx(
-            "absolute left-2 top-1/2 -translate-y-1/2 z-10 p-2 bg-white border border-gray-300 rounded-full shadow-md flex items-center justify-center",
-            "hover:bg-gray-100 transition",
-            current === 0 && "opacity-30 pointer-events-none"
-          )}
-          aria-label="Anterior"
-          onClick={() => setCurrent((c) => Math.max(0, c - 1))}
-        >
-          <ChevronLeft className="w-6 h-6 text-black" />
-        </button>
-        <button
-          className={clsx(
-            "absolute right-2 top-1/2 -translate-y-1/2 z-10 p-2 bg-white border border-gray-300 rounded-full shadow-md flex items-center justify-center",
-            "hover:bg-gray-100 transition",
-            current >= totalPages - 1 && "opacity-30 pointer-events-none"
-          )}
-          aria-label="Siguiente"
-          onClick={() => setCurrent((c) => Math.min(totalPages - 1, c + 1))}
-        >
-          <ChevronRight className="w-6 h-6 text-black" />
-        </button>
-        {/* Carrusel */}
-        <div
-          ref={scrollRef}
-          className="flex overflow-x-auto scroll-smooth no-scrollbar snap-x snap-mandatory gap-4 px-2"
-        >
-          {productos.map((prod, i) => (
-            <div
-              key={prod.id + "-" + i}
-              className={clsx(
-                "relative flex flex-col items-center bg-white rounded-xl shadow-md transition-all duration-500 ease-in-out group/card overflow-hidden",
-                "min-w-[90vw] max-w-[90vw] sm:min-w-[340px] sm:max-w-[340px] lg:min-w-[270px] lg:max-w-[270px] snap-center",
-                "hover:z-10 min-h-[340px]",
-                i === 0 && "ml-auto",
-                i === productos.length - 1 && "mr-auto"
-              )}
-              onMouseEnter={() => setIsPaused(true)}
-              onMouseLeave={() => setIsPaused(false)}
-            >
-              {/* Badge Destacado */}
-              {prod.destacado && (
-                <span className="absolute top-4 right-4 bg-black text-white text-xs font-semibold px-3 py-1 rounded-full z-10 shadow">
-                  Destacado
-                </span>
-              )}
-              {/* Imagen */}
-              <div className="flex items-center justify-center w-full pt-6 pb-3 px-4">
-                <Image
+        {productos.map((prod, idx) => (
+          <motion.div
+            key={prod.id}
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: idx * 0.1 }}
+            className={clsx(
+              "flex-shrink-0 relative bg-white border border-slate-100 rounded-[2.5rem] p-6 shadow-sm hover:shadow-2xl hover:shadow-[#00a19a]/10 transition-all duration-500",
+              cardsPerView === 1 ? "w-full" : 
+              cardsPerView === 2 ? "w-[calc(50%-12px)]" :
+              cardsPerView === 3 ? "w-[calc(33.33%-16px)]" : "w-[calc(25%-18px)]"
+            )}
+          >
+            {/* Image Wrap */}
+            <div className="relative aspect-square rounded-3xl overflow-hidden bg-slate-50 mb-6 group/img">
+               <Image
                   src={prod.image_url ?? "/Logo%20Thiart%20Tiktok.png"}
                   alt={prod.nombre}
-                  width={120}
-                  height={120}
-                  className="object-contain w-28 h-28 rounded-xl bg-gray-50"
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement;
-                    if (target.src !== window.location.origin + "/Logo%20Thiart%20Tiktok.png") {
-                      target.src = "/Logo%20Thiart%20Tiktok.png";
-                    }
-                  }}
-                  priority={i < 2}
+                  fill
+                  className="object-cover transition-transform duration-700 group-hover/img:scale-110"
                 />
-              </div>
-              {/* Nombre */}
-              <div className="flex flex-col items-center justify-center w-full mb-1 px-4">
-                <span className="text-[10px] font-medium text-[#00a19a] uppercase tracking-wider mb-0.5">By {prod.usuarios?.nombre ?? "Thiart"}</span>
-                <span className="text-base font-bold text-center text-black w-full truncate">{prod.nombre}</span>
-              </div>
-              {/* Descripción */}
-              <div className="text-gray-500 text-xs text-center mb-2 px-4 line-clamp-2">{prod.descripcion}</div>
-              {/* Chips de categoría */}
-              <div className="flex flex-wrap justify-center gap-2 mb-2 px-4">
-                <span className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-gray-100 text-gray-700">{prod.categoria}</span>
-              </div>
-              {/* Precio */}
-              <div className="flex items-center justify-end w-full mb-4 px-4">
-                <span className="flex items-center gap-1 text-sm font-semibold text-black">
-                  <BadgeDollarSign className="w-4 h-4" /> ${prod.precio?.toFixed(2)}
+                
+                {prod.destacado && (
+                  <div className="absolute top-4 left-4">
+                    <span className="bg-[#00a19a] text-white text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full shadow-lg">
+                      Top Obras
+                    </span>
+                  </div>
+                )}
+
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity duration-300 flex items-center justify-center gap-4">
+                  <motion.button 
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={() => router.push(`/tienda/productos/${prod.id}`)}
+                    className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-[#00a19a] shadow-xl"
+                  >
+                    <Eye className="w-5 h-5" />
+                  </motion.button>
+                  <motion.button 
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    className="w-12 h-12 bg-[#00a19a] rounded-2xl flex items-center justify-center text-white shadow-xl"
+                  >
+                    <ShoppingCart className="w-5 h-5" />
+                  </motion.button>
+                </div>
+            </div>
+
+            {/* Content */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black text-[#00a19a] uppercase tracking-widest">
+                  {prod.categoria}
                 </span>
+                <span className="text-[10px] text-slate-400 font-medium">By {prod.usuarios?.nombre ?? "Thiart"}</span>
               </div>
-              {/* Overlay al hacer hover */}
-              <div className="absolute inset-0 bg-black/30 opacity-0 group-hover/card:opacity-100 transition-opacity rounded-xl pointer-events-none z-10"></div>
-              {/* Botones */}
-              <div className="flex w-full gap-2 px-4 pb-6 z-20">
-                <button
-                  className="flex-1 flex items-center justify-center gap-2 border border-gray-300 rounded-md bg-white text-black py-2 text-xs font-semibold hover:bg-gray-100 transition relative z-20"
-                  type="button"
-                  onClick={() => handleAnadir(prod)}
-                >
-                  <ShoppingCart className="w-4 h-4" /> Añadir
-                </button>
-                <button
-                  className="flex-1 flex items-center justify-center gap-2 rounded-md bg-black text-white py-2 text-xs font-semibold hover:bg-gray-900 transition relative z-20"
-                  type="button"
-                  onClick={() => handleVerDetalles(prod)}
-                >
-                  <Eye className="w-4 h-4" /> Ver detalles
-                </button>
+              
+              <h3 className="text-lg font-bold text-slate-900 line-clamp-1">
+                {prod.nombre}
+              </h3>
+              
+              <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">
+                {prod.descripcion}
+              </p>
+
+              <div className="pt-4 flex items-center justify-between">
+                <div className="flex items-baseline gap-1">
+                  <span className="text-sm font-bold text-[#00a19a]">$</span>
+                  <span className="text-xl font-black text-slate-900">{prod.precio.toLocaleString()}</span>
+                </div>
+                <div className="flex gap-1">
+                  <div className="w-1.5 h-1.5 rounded-full bg-[#00a19a]" />
+                  <div className="w-1.5 h-1.5 rounded-full bg-slate-200" />
+                </div>
               </div>
             </div>
-          ))}
-        </div>
-        {/* Indicadores de paginación */}
-        <div className="flex justify-center items-center gap-2 mt-6">
-          {Array.from({ length: totalPages }).map((_, idx) => (
-            <button
-              key={idx}
-              className={clsx(
-                "h-2 rounded-full transition-all duration-300",
-                current === idx
-                  ? "bg-black w-6 min-w-[24px]"
-                  : "bg-gray-300 w-2 min-w-[8px]"
-              )}
-              onClick={() => setCurrent(idx)}
-              aria-label={`Ir a la página ${idx + 1}`}
-            />
-          ))}
-        </div>
+          </motion.div>
+        ))}
       </div>
-      <style jsx global>{`
-        .no-scrollbar::-webkit-scrollbar {
-          display: none;
-        }
-        .no-scrollbar {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
-      `}</style>
-    </div>
+      
+      {/* Indicadores de progreso minimalistas */}
+      <div className="flex justify-center gap-2 mt-12 pb-2">
+        {Array.from({ length: Math.max(0, productos.length - cardsPerView + 1) }).map((_, i) => (
+          <button
+            key={i}
+            onClick={() => setCurrent(i)}
+            className={clsx(
+              "h-1.5 transition-all duration-500 rounded-full",
+              current === i ? "w-10 bg-[#00a19a]" : "w-1.5 bg-slate-200"
+            )}
+          />
+        ))}
+      </div>
+    </section>
   );
 }

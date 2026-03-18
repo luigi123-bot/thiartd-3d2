@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { FiSend, FiUser, FiSearch, FiMoreVertical, FiCheck, FiMessageCircle } from "react-icons/fi";
+import { FiSend, FiUser, FiSearch, FiMoreVertical, FiCheck, FiMessageCircle, FiArrowLeft } from "react-icons/fi";
 import { MdDoneAll } from "react-icons/md";
 import { createClient } from "@supabase/supabase-js";
 import Loader from "~/components/providers/UiProvider";
@@ -49,10 +49,15 @@ export default function AdminMensajesPage() {
 	const chatRef = useRef<HTMLDivElement>(null);
 	const { toast } = useToast();
 
+	const selectedEmailRef = useRef<string | null>(null);
+	useEffect(() => {
+		selectedEmailRef.current = selectedEmail;
+	}, [selectedEmail]);
+
 	// Cargar hilos de conversación (agrupados por email del cliente)
 	useEffect(() => {
-		async function fetchThreads() {
-			setLoading(true);
+		async function fetchThreads(showLoading = true) {
+			if (showLoading) setLoading(true);
 			const { data, error } = await supabase
 				.from("mensajes")
 				.select("*")
@@ -60,7 +65,7 @@ export default function AdminMensajesPage() {
 
 			if (error) {
 				console.error("Error fetching messages for threads:", error);
-				setLoading(false);
+				if (showLoading) setLoading(false);
 				return;
 			}
 
@@ -78,21 +83,36 @@ export default function AdminMensajesPage() {
 			});
 
 			setThreads(Array.from(grouped.values()));
-			setLoading(false);
+			if (showLoading) setLoading(false);
 		}
 		void fetchThreads();
 
-		// Realtime para actualizar la lista de hilos
+		// Realtime para actualizar TODO (Lista de hilos y Mensajes del chat seleccionados)
+		// Nombre de canal fijo para el administrador
 		const channel = supabase
-			.channel("threads-update")
+			.channel('admin-global-mensajes')
 			.on(
 				"postgres_changes",
 				{ event: "INSERT", schema: "public", table: "mensajes" },
-				() => {
-					void fetchThreads();
+				(payload) => {
+					console.log("[Admin Realtime] Mensaje detectado en tabla:", payload);
+					const newMessage = payload.new as Mensaje;
+					
+					// 1. Actualizar lista de hilos sin el loading para que no parpadee
+					void fetchThreads(false);
+
+					// 2. Si el mensaje es para el correo actualmente seleccionado, agregarlo al chat
+					if (newMessage.email === selectedEmailRef.current) {
+						setMensajes((prev) => {
+							if (prev.some((m) => m.id === newMessage.id)) return prev;
+							return [...prev, newMessage];
+						});
+					}
 				}
 			)
-			.subscribe();
+			.subscribe((status) => {
+				console.log(`[Admin Realtime] Estado conexión Global:`, status);
+			});
 
 		return () => {
 			void supabase.removeChannel(channel);
@@ -112,32 +132,6 @@ export default function AdminMensajesPage() {
 			setMensajes(Array.isArray(data) ? data : []);
 		};
 		void fetchMensajes();
-
-		console.log(`[Admin Realtime] Iniciando canal para: ${selectedEmail}`);
-		const channel = supabase
-			.channel(`mensajes-admin-room-${selectedEmail}`)
-			.on(
-				"postgres_changes",
-				{ event: "INSERT", schema: "public", table: "mensajes" },
-				(payload) => {
-					console.log("[Admin Realtime] Mensaje detectado en tabla:", payload);
-					const newMessage = payload.new as Mensaje;
-					if (newMessage.email === selectedEmail) {
-						setMensajes((prev) => {
-							if (prev.some((m) => m.id === newMessage.id)) return prev;
-							return [...prev, newMessage];
-						});
-					}
-				}
-			)
-			.subscribe((status) => {
-				console.log(`[Admin Realtime] Estado conexión (${selectedEmail}):`, status);
-			});
-
-		return () => {
-			console.log(`[Admin Realtime] Limpiando canal: ${selectedEmail}`);
-			void supabase.removeChannel(channel);
-		};
 	}, [selectedEmail]);
 
 	useEffect(() => {
@@ -177,9 +171,9 @@ export default function AdminMensajesPage() {
 	}
 
 	return (
-		<div className="min-h-screen bg-gray-50 flex flex-col md:flex-row h-screen overflow-hidden">
+		<div className="bg-gray-50 flex flex-col md:flex-row h-[calc(100vh-64px)] overflow-hidden w-full">
 			{/* Sidebar Izquierda */}
-			<div className="w-full md:w-96 bg-white border-r flex flex-col shadow-sm z-10">
+			<div className={`w-full md:w-96 bg-white border-r flex flex-col shadow-sm z-10 h-full ${selectedEmail ? 'hidden md:flex' : 'flex'}`}>
 				<div className="p-6 border-b bg-white/50 backdrop-blur-md sticky top-0">
 					<div className="flex items-center justify-between mb-6">
 						<h1 className="text-2xl font-black text-gray-900 tracking-tight">Chats</h1>
@@ -249,18 +243,26 @@ export default function AdminMensajesPage() {
 			</div>
 
 			{/* Área de Chat Derecha */}
-			<div className="flex-1 flex flex-col relative bg-[#f8fafc]">
+			<div className={`flex-1 flex flex-col relative bg-[#f8fafc] h-full ${!selectedEmail ? 'hidden md:flex' : 'flex'}`}>
 				{selectedThread ? (
 					<>
 						{/* Header del Chat */}
-						<div className="h-20 bg-white/80 backdrop-blur-md border-b flex items-center justify-between px-8 sticky top-0 z-10">
-							<div className="flex items-center gap-4 cursor-pointer" onClick={() => setModalUser(selectedThread)}>
-								<div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center text-white font-bold shadow-sm">
-									{getInitial(selectedThread.nombre)}
-								</div>
-								<div>
-									<h2 className="font-bold text-gray-900 leading-none mb-1 group-hover:text-emerald-600 transition-colors">{selectedThread.nombre}</h2>
-									<p className="text-xs text-emerald-600 font-semibold">{selectedThread.email}</p>
+						<div className="h-20 bg-white/80 backdrop-blur-md border-b flex items-center justify-between px-4 md:px-8 sticky top-0 z-10">
+							<div className="flex items-center gap-3">
+								<button 
+									className="md:hidden p-2 rounded-full hover:bg-gray-100 text-gray-500 transition-colors"
+									onClick={() => setSelectedEmail(null)}
+								>
+									<FiArrowLeft className="text-xl" />
+								</button>
+								<div className="flex items-center gap-4 cursor-pointer" onClick={() => setModalUser(selectedThread)}>
+									<div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center text-white font-bold shadow-sm">
+										{getInitial(selectedThread.nombre)}
+									</div>
+									<div className="hidden sm:block">
+										<h2 className="font-bold text-gray-900 leading-none mb-1 group-hover:text-emerald-600 transition-colors">{selectedThread.nombre}</h2>
+										<p className="text-xs text-emerald-600 font-semibold">{selectedThread.email}</p>
+									</div>
 								</div>
 							</div>
 							<div className="flex items-center gap-2">
@@ -348,7 +350,7 @@ export default function AdminMensajesPage() {
 									<input
 										type="text"
 										placeholder="Escribe un mensaje aquí..."
-										className="w-full pl-6 pr-12 py-4 bg-gray-50 border-transparent rounded-2xl text-sm focus:bg-white focus:ring-2 focus:ring-black/5 transition-all outline-none"
+										className="w-full pl-4 md:pl-6 pr-10 md:pr-12 mx-auto py-3 md:py-4 bg-gray-50 border-transparent rounded-2xl text-sm focus:bg-white focus:ring-2 focus:ring-black/5 transition-all outline-none"
 										value={msg}
 										onChange={(e) => setMsg(e.target.value)}
 									/>
@@ -356,9 +358,9 @@ export default function AdminMensajesPage() {
 								<button
 									type="submit"
 									disabled={!msg.trim()}
-									className="bg-black text-white w-14 h-14 rounded-2xl flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-lg shadow-black/10 disabled:opacity-50 disabled:scale-100"
+									className="bg-black text-white w-12 h-12 md:w-14 md:h-14 shrink-0 rounded-2xl flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-lg shadow-black/10 disabled:opacity-50 disabled:scale-100"
 								>
-									<FiSend className="text-xl" />
+									<FiSend className="text-lg md:text-xl" />
 								</button>
 							</form>
 						</div>

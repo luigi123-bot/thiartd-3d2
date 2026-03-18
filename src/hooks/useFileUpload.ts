@@ -6,7 +6,6 @@ import {
   uploadProductImage,
   uploadSTLFile,
   uploadAvatar,
-  uploadTicketImage,
   uploadChatFile,
   uploadModel3D,
   uploadProductVideo,
@@ -102,10 +101,6 @@ export function useFileUpload(options: UseFileUploadOptions) {
             url = await uploadAvatar(fileToUpload, metadata?.userId ?? 'temp')
             break
 
-          case StorageBucket.TICKETS:
-            url = await uploadTicketImage(fileToUpload, metadata?.entityId ?? 'temp')
-            break
-
           case StorageBucket.CHAT:
             url = await uploadChatFile(fileToUpload, metadata?.entityId ?? 'temp')
             break
@@ -176,15 +171,6 @@ export function useAvatarUpload(userId: string, onSuccess?: (url: string) => voi
     onSuccess,
     optimizeImages: true,
     maxWidth: 400,
-  })
-}
-
-// Hook simplificado para upload de imágenes de tickets
-export function useTicketImageUpload(ticketId: string, onSuccess?: (url: string) => void) {
-  return useFileUpload({
-    bucket: StorageBucket.TICKETS,
-    onSuccess,
-    optimizeImages: true,
   })
 }
 

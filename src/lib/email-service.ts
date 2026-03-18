@@ -222,3 +222,268 @@ export async function sendWelcomeEmail({
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
 }
+
+interface ProductoPedido {
+  nombre: string;
+  cantidad: number;
+  precio: number;
+  imagen?: string;
+}
+
+interface SendOrderConfirmationEmailParams {
+  to: string;
+  pedidoId: number;
+  nombreCliente: string;
+  productos: ProductoPedido[];
+  total: number;
+  metodoPago: string;
+  transaccionId: string;
+  referencia: string;
+  direccionEnvio?: string;
+  ciudadEnvio?: string;
+  fechaPago?: string;
+  currency?: string;
+}
+
+export async function sendOrderConfirmationEmail(params: SendOrderConfirmationEmailParams): Promise<{ success: true; data: SentMessageInfo } | { success: false; error: string }> {
+  const {
+    to,
+    pedidoId,
+    nombreCliente,
+    productos,
+    total,
+    metodoPago,
+    transaccionId,
+    referencia,
+    direccionEnvio,
+    ciudadEnvio,
+    fechaPago,
+    currency = "COP",
+  } = params;
+
+  try {
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.GMAIL_USER!,
+        pass: process.env.GMAIL_APP_PASSWORD!,
+      },
+    });
+
+    const fechaFormateada = fechaPago
+      ? new Date(fechaPago).toLocaleDateString("es-CO", {
+          day: "2-digit",
+          month: "long",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        })
+      : new Date().toLocaleDateString("es-CO", {
+          day: "2-digit",
+          month: "long",
+          year: "numeric",
+        });
+
+    const metodoPagoLabel: Record<string, string> = {
+      CARD: "Tarjeta de crédito/débito",
+      NEQUI: "Nequi",
+      PSE: "PSE",
+      BANCOLOMBIA_TRANSFER: "Bancolombia Transfer",
+      BANCOLOMBIA_COLLECT: "Bancolombia Collect",
+      CASH: "Efectivo (Efecty / Baloto)",
+    };
+
+    const filaProductos = productos
+      .map(
+        (p) => `
+      <tr>
+        <td style="padding: 14px 16px; border-bottom: 1px solid #f1f5f9;">
+          <div style="font-weight: 700; color: #0f172a; font-size: 14px;">${p.nombre}</div>
+          <div style="color: #64748b; font-size: 12px; margin-top: 2px;">Cant: ${p.cantidad}</div>
+        </td>
+        <td style="padding: 14px 16px; border-bottom: 1px solid #f1f5f9; text-align: right;">
+          <span style="font-weight: 800; color: #0f172a; font-size: 14px;">
+            $${(p.precio * p.cantidad).toLocaleString("es-CO")}
+          </span>
+        </td>
+      </tr>`
+      )
+      .join("");
+
+    const html = `
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Confirmación de Pedido #${pedidoId}</title>
+</head>
+<body style="margin:0; padding:0; background-color:#f8fafc; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f8fafc; padding: 40px 16px;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px; width:100%;">
+
+          <!-- HEADER -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); border-radius: 20px 20px 0 0; padding: 40px 48px; text-align: center;">
+              <div style="font-size: 28px; font-weight: 900; color: #ffffff; letter-spacing: -1px; margin-bottom: 4px;">
+                Thiart<span style="color: #14b8a6;">3D</span>
+              </div>
+              <div style="font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 3px; font-weight: 700;">
+                Impresión 3D Premium
+              </div>
+              <div style="margin-top: 28px; background: rgba(20, 184, 166, 0.1); border: 1px solid rgba(20, 184, 166, 0.3); border-radius: 50px; display: inline-block; padding: 10px 24px;">
+                <span style="color: #14b8a6; font-size: 13px; font-weight: 800; letter-spacing: 1px;">✅ PAGO APROBADO</span>
+              </div>
+            </td>
+          </tr>
+
+          <!-- BODY -->
+          <tr>
+            <td style="background: #ffffff; padding: 40px 48px;">
+
+              <p style="font-size: 22px; font-weight: 900; color: #0f172a; margin: 0 0 8px 0; letter-spacing: -0.5px;">
+                ¡Gracias, ${nombreCliente}! 🎉
+              </p>
+              <p style="font-size: 15px; color: #475569; margin: 0 0 32px 0; line-height: 1.6;">
+                Tu pedido ha sido confirmado y ya está siendo procesado. Te notificaremos cuando sea enviado.
+              </p>
+
+              <!-- ORDEN INFO -->
+              <table width="100%" cellpadding="0" cellspacing="0" style="background: #f8fafc; border-radius: 16px; margin-bottom: 32px; overflow: hidden;">
+                <tr>
+                  <td style="padding: 20px 24px; border-bottom: 1px solid #e2e8f0;">
+                    <span style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 2px; color: #94a3b8;">Resumen del Pedido</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 20px 24px;">
+                    <table width="100%" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td style="padding: 6px 0;">
+                          <span style="font-size: 13px; color: #64748b;">Número de pedido</span>
+                        </td>
+                        <td style="padding: 6px 0; text-align: right;">
+                          <span style="font-size: 13px; font-weight: 800; color: #0f172a;">#${pedidoId}</span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 6px 0;">
+                          <span style="font-size: 13px; color: #64748b;">ID Transacción Wompi</span>
+                        </td>
+                        <td style="padding: 6px 0; text-align: right;">
+                          <span style="font-size: 12px; font-weight: 700; color: #0f172a; font-family: monospace;">${transaccionId}</span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 6px 0;">
+                          <span style="font-size: 13px; color: #64748b;">Referencia</span>
+                        </td>
+                        <td style="padding: 6px 0; text-align: right;">
+                          <span style="font-size: 12px; font-weight: 700; color: #0f172a; font-family: monospace;">${referencia}</span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 6px 0;">
+                          <span style="font-size: 13px; color: #64748b;">Método de pago</span>
+                        </td>
+                        <td style="padding: 6px 0; text-align: right;">
+                          <span style="font-size: 13px; font-weight: 700; color: #0f172a;">${metodoPagoLabel[metodoPago] ?? metodoPago}</span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 6px 0;">
+                          <span style="font-size: 13px; color: #64748b;">Fecha</span>
+                        </td>
+                        <td style="padding: 6px 0; text-align: right;">
+                          <span style="font-size: 13px; font-weight: 700; color: #0f172a;">${fechaFormateada}</span>
+                        </td>
+                      </tr>
+                      ${
+                        direccionEnvio
+                          ? `<tr>
+                        <td style="padding: 6px 0; vertical-align: top;">
+                          <span style="font-size: 13px; color: #64748b;">Dirección de envío</span>
+                        </td>
+                        <td style="padding: 6px 0; text-align: right;">
+                          <span style="font-size: 13px; font-weight: 700; color: #0f172a;">${direccionEnvio}${ciudadEnvio ? ", " + ciudadEnvio : ""}</span>
+                        </td>
+                      </tr>`
+                          : ""
+                      }
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- PRODUCTOS -->
+              <p style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 2px; color: #94a3b8; margin: 0 0 12px 0;">Detalle de productos</p>
+              <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; margin-bottom: 32px;">
+                ${filaProductos}
+                <!-- TOTAL ROW -->
+                <tr style="background: #0f172a;">
+                  <td style="padding: 18px 16px;">
+                    <span style="font-size: 13px; font-weight: 800; color: #14b8a6; text-transform: uppercase; letter-spacing: 1px;">Total pagado</span>
+                  </td>
+                  <td style="padding: 18px 16px; text-align: right;">
+                    <span style="font-size: 20px; font-weight: 900; color: #ffffff;">
+                      $${total.toLocaleString("es-CO")} <span style="font-size: 13px; color: #64748b; font-weight: 600;">${currency}</span>
+                    </span>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- NEXT STEPS -->
+              <table width="100%" cellpadding="0" cellspacing="0" style="background: linear-gradient(135deg, #f0fdfa 0%, #f0fdfa 100%); border: 1px solid #ccfbf1; border-radius: 16px; padding: 24px; margin-bottom: 32px;">
+                <tr>
+                  <td>
+                    <p style="font-size: 13px; font-weight: 800; color: #0f766e; margin: 0 0 12px 0; text-transform: uppercase; letter-spacing: 1px;">¿Qué sigue?</p>
+                    <p style="font-size: 13px; color: #0d9488; margin: 6px 0;">📦 Tu pedido entra en producción de inmediato.</p>
+                    <p style="font-size: 13px; color: #0d9488; margin: 6px 0;">🖨️ Imprimiremos tus piezas con la mayor calidad.</p>
+                    <p style="font-size: 13px; color: #0d9488; margin: 6px 0;">🚚 Te enviaremos el número de seguimiento cuando sea despachado.</p>
+                    <p style="font-size: 13px; color: #0d9488; margin: 6px 0;">💬 Puedes escribirnos desde el chat en la tienda si tienes dudas.</p>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="font-size: 13px; color: #94a3b8; text-align: center; margin: 0;">
+                ¿Necesitas ayuda? Escríbenos a <a href="mailto:thiart3d@gmail.com" style="color: #14b8a6; text-decoration: none; font-weight: 700;">thiart3d@gmail.com</a>
+              </p>
+
+            </td>
+          </tr>
+
+          <!-- FOOTER -->
+          <tr>
+            <td style="background: #f1f5f9; border-radius: 0 0 20px 20px; padding: 24px 48px; text-align: center; border-top: 1px solid #e2e8f0;">
+              <p style="margin: 0; font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: 2px; font-weight: 700;">
+                Thiart3D · Impresión 3D Premium
+              </p>
+              <p style="margin: 8px 0 0 0; font-size: 11px; color: #cbd5e1;">
+                © 2025 Thiart 3D - Todos los derechos reservados
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `;
+
+    const info = await transporter.sendMail({
+      from: `"Thiart 3D" <${process.env.GMAIL_USER}>`,
+      to,
+      subject: `✅ Pedido #${pedidoId} confirmado – Thiart 3D`,
+      html,
+    });
+    console.log('✅ Correo de confirmación enviado:', info.messageId);
+    return { success: true, data: info };
+  } catch (err: unknown) {
+    console.error('❌ Error en sendOrderConfirmationEmail:', err);
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}

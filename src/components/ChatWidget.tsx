@@ -2,7 +2,6 @@
 import { useState, useEffect, useRef } from "react";
 import { FiMessageCircle, FiSend, FiX, FiCheck } from "react-icons/fi";
 import { createClient } from "@supabase/supabase-js";
-import ReportarErrorModal from "./ReportarErrorModal";
 import { motion, AnimatePresence } from "framer-motion";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "TU_SUPABASE_URL";
@@ -10,11 +9,9 @@ const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "TU_SUPABASE_AN
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 export default function ChatWidget({
-  clienteId,
   clienteNombre,
   clienteEmail,
 }: {
-  clienteId?: string;
   clienteNombre: string;
   clienteEmail: string;
 }) {
@@ -30,7 +27,6 @@ export default function ChatWidget({
   const [mensajes, setMensajes] = useState<Mensaje[]>([]);
   const [msg, setMsg] = useState("");
   const [hasNew, setHasNew] = useState(false);
-  const [ticketModal, setTicketModal] = useState(false);
   const chatRef = useRef<HTMLDivElement>(null);
   // Ref to always have current 'open' value inside Realtime callback without re-subscribing
   const openRef = useRef(open);
@@ -47,34 +43,47 @@ export default function ChatWidget({
       .then(({ data }) => setMensajes(Array.isArray(data) ? data : []));
   }, [clienteEmail, open]);
 
-  // Suscripción Realtime Global (Escucha siempre, solo depende de clienteEmail)
+  const clienteEmailRef = useRef(clienteEmail);
+  useEffect(() => { clienteEmailRef.current = clienteEmail; }, [clienteEmail]);
+
+  // Suscripción Realtime Global
   useEffect(() => {
     if (!clienteEmail) return;
     
-    const channelName = `global-chat-${clienteEmail.replace(/[@.]/g, '-')}`;
+    // Usamos un ID único por correo electrónico pero que se mantenga estable entre recargas
+    const safeEmail = clienteEmail.replace(/[^a-zA-Z0-9]/g, '');
+    const channelId = `chat-client-${safeEmail}`;
+    
     const channel = supabase
-      .channel(channelName)
+      .channel(channelId)
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "mensajes" },
         (payload) => {
+          console.log("[Client Realtime] Nuevo mensaje detectado:", payload);
           const newMessage = payload.new as Mensaje;
-          if (newMessage.email === clienteEmail) {
+          
+          if (newMessage.email === clienteEmailRef.current) {
             setMensajes(prev => {
               if (prev.some(m => m.id === newMessage.id)) return prev;
               return [...prev, newMessage];
             });
-            // Usa openRef.current para no re-suscribir al cambiar open
-            if (newMessage.nombre === "Admin" && !openRef.current) setHasNew(true);
+            
+            // Notificar si está cerrado y lo envía el admin
+            if (newMessage.nombre === "Admin" && !openRef.current) {
+               setHasNew(true);
+            }
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log("[Client Realtime] Estado conexión:", status);
+      });
 
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [clienteEmail]); // Solo depende de clienteEmail - open se lee via openRef
+  }, [clienteEmail]); // Depender de clienteEmail asegura que se inicie cuando haya correo
 
   useEffect(() => {
     if (open) setHasNew(false);
@@ -108,23 +117,6 @@ export default function ChatWidget({
 
   return (
     <div className="fixed bottom-6 right-6 z-[9999] flex flex-col items-end gap-3 font-sans">
-      <AnimatePresence>
-        {!ticketModal && (
-          <motion.button
-            initial={{ opacity: 0, scale: 0.8, y: 10 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.8 }}
-            className="w-12 h-12 bg-red-500/10 backdrop-blur-md border border-red-500/20 text-red-500 rounded-2xl flex items-center justify-center shadow-xl hover:bg-red-500/20 transition-all mb-1 group"
-            onClick={() => setTicketModal(true)}
-            title="Reportar problema"
-          >
-            <span className="text-xl group-hover:rotate-12 transition-transform">🐞</span>
-          </motion.button>
-        )}
-      </AnimatePresence>
-
-      <ReportarErrorModal open={ticketModal} onOpenChangeAction={setTicketModal} clienteId={clienteId} />
-
       <AnimatePresence>
         {open && (
           <motion.div

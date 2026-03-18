@@ -3,7 +3,7 @@
 
 import React, { Suspense, useRef, useState } from 'react'
 import { Canvas, useFrame, useLoader } from '@react-three/fiber'
-import { OrbitControls, useGLTF, Stage, Grid, Environment, Center } from '@react-three/drei'
+import { OrbitControls, useGLTF, Stage, Environment } from '@react-three/drei'
 import { Button } from '~/components/ui/button'
 import { FiRotateCw, FiZoomIn, FiZoomOut, FiMaximize2 } from 'react-icons/fi'
 import type * as THREE from 'three'
@@ -72,19 +72,11 @@ function Model({ url, autoRotate = false }: Model3DProps) {
   const extension = getFileExtension(url)
   
   if (extension === 'stl') {
-    return (
-      <Center>
-        <STLModel url={url} autoRotate={autoRotate} />
-      </Center>
-    )
+    return <STLModel url={url} autoRotate={autoRotate} />
   }
   
   if (extension === 'glb' || extension === 'gltf') {
-    return (
-      <Center>
-        <GLTFModel url={url} autoRotate={autoRotate} />
-      </Center>
-    )
+    return <GLTFModel url={url} autoRotate={autoRotate} />
   }
   
   // Si no es un formato reconocido
@@ -123,10 +115,10 @@ export function Model3DViewer({
   }
 
   return (
-    <div className={`relative ${className}`}>
+    <div className={`relative ${height === '100%' ? 'h-full' : ''} ${className}`}>
       {/* Canvas 3D */}
       <div 
-        className={`w-full rounded-lg overflow-hidden border border-gray-200 bg-gradient-to-b from-gray-50 to-gray-100 ${
+        className={`w-full overflow-hidden transition-all duration-500 ${
           height === '400px' ? 'h-[400px]' : 
           height === '200px' ? 'h-[200px]' : 
           height === '500px' ? 'h-[500px]' :
@@ -134,41 +126,32 @@ export function Model3DViewer({
         }`}
       >
         <Canvas
-          camera={{ position: [0, 0, 5], fov: 50 }}
+          camera={{ position: [5, 5, 5], fov: 40 }}
           shadows
           dpr={[1, 2]}
+          gl={{ preserveDrawingBuffer: true }}
         >
           <Suspense fallback={null}>
             {/* Iluminación */}
-            <ambientLight intensity={0.5} />
+            <ambientLight intensity={0.7} />
             <spotLight
               position={[10, 10, 10]}
               angle={0.15}
               penumbra={1}
-              intensity={1}
+              intensity={2}
               castShadow
             />
-            <pointLight position={[-10, -10, -10]} intensity={0.5} />
+            <pointLight position={[-10, -10, -10]} intensity={1} />
 
             {/* Modelo 3D */}
-            <Stage environment="city" intensity={0.6}>
+            <Stage 
+                environment="city" 
+                intensity={0.5} 
+                adjustCamera 
+                shadows="contact"
+            >
               <Model url={modelUrl} autoRotate={rotate} />
             </Stage>
-
-            {/* Grid opcional */}
-            <Grid
-              renderOrder={-1}
-              position={[0, -1.85, 0]}
-              infiniteGrid
-              cellSize={0.6}
-              cellThickness={0.6}
-              sectionSize={3.3}
-              sectionThickness={1.5}
-              sectionColor="#8080ff"
-              fadeDistance={25}
-              fadeStrength={1}
-              followCamera={false}
-            />
 
             {/* Environment mapping para reflejos */}
             <Environment preset="sunset" />
@@ -180,7 +163,7 @@ export function Model3DViewer({
               maxPolarAngle={Math.PI / 1.75}
               enableZoom={true}
               enablePan={true}
-              zoomSpeed={0.5}
+              zoomSpeed={0.8}
             />
           </Suspense>
         </Canvas>

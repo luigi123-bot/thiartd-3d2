@@ -1,16 +1,18 @@
 "use client";
 
-import React, { useEffect, useState, Suspense } from "react";
+import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import { createClient } from "@supabase/supabase-js";
-import { ArrowLeft, ShoppingCart, Package, Ruler, Tag, Star, Sparkles, Video, Heart, Minus, Plus } from "lucide-react";
+import { ArrowLeft,  Package, Ruler, Tag, Star, Sparkles, Video, Heart, Minus, Plus, Share2, ExternalLink, Check } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
-import { Badge } from "~/components/ui/badge";
 import { Model3DViewer } from "~/components/Model3DViewer";
 import ProductosCarrusel from "~/components/ProductosCarrusel";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+import { useCarrito } from "~/components/providers/CarritoProvider";
+import { toast } from "sonner";
+import Link from "next/link";
 
 // Componente de error boundary simple
 class ErrorBoundary extends React.Component<
@@ -45,8 +47,8 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Helper para verificar si hay un modelo 3D válido
 const hasValidModel = (url?: string | null): boolean => {
-  if (!url) return false; // Maneja null, undefined y cadenas vacías
-  if (typeof url !== 'string') return false; // Asegura que sea string
+  if (!url) return false;
+  if (typeof url !== 'string') return false;
   const trimmed = url.trim();
   return trimmed.length > 0 && trimmed !== 'null' && trimmed !== 'undefined';
 };
@@ -79,7 +81,7 @@ interface ProductoData {
   detalles: string | null;
   image_url: string | null;
   modelo_url: string | null;
-  model_url?: string | null; // Algunos lugares usan `model_url` (inglés). Soporte ambos nombres.
+  model_url?: string | null;
   video_url: string | null;
   usuarios: { nombre: string } | null;
 }
@@ -87,14 +89,14 @@ interface ProductoData {
 export default function ProductoDetallePage() {
   const params = useParams();
   const router = useRouter();
+  const { addToCarrito } = useCarrito();
   const [producto, setProducto] = useState<Producto | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showModel, setShowModel] = useState(false);
-  const [imageZoom, setImageZoom] = useState(false);
-  const [selectedImage, setSelectedImage] = useState(0);
   const [showVideo, setShowVideo] = useState(false);
   const [cantidad, setCantidad] = useState(1);
+  const [isFavorite, setIsFavorite] = useState(false);
 
   useEffect(() => {
     const fetchProducto = async () => {
@@ -110,31 +112,8 @@ export default function ProductoDetallePage() {
         if (error) throw error;
 
         if (data) {
-          // Compatibilidad: la DB/otros endpoints pueden usar `modelo_url` o `model_url`.
           const resolvedModelUrl = (data.modelo_url ?? data.model_url) ?? undefined;
-          const isValid = hasValidModel(resolvedModelUrl);
-          console.log('📦 Datos del producto:', {
-            id: data.id,
-            nombre: data.nombre,
-            modelo_url: data.modelo_url,
-            model_url: data.model_url,
-            resolvedModelUrl,
-            modelo_url_type: typeof data.modelo_url,
-            resolved_type: typeof resolvedModelUrl,
-            modelo_url_length: data.modelo_url?.length,
-            hasValidModel: isValid,
-            video_url: data.video_url,
-            video_url_type: typeof data.video_url,
-            video_url_length: data.video_url?.length,
-            hasVideoUrl: !!data.video_url,
-            mensaje: isValid
-              ? '✅ Modelo 3D válido encontrado'
-              : '❌ No hay modelo 3D - El campo está NULL o vacío. Para agregar un modelo, sube un archivo STL/GLB/GLTF a Supabase Storage y actualiza este campo.',
-            videoMensaje: data.video_url
-              ? '✅ Video encontrado'
-              : '⚠️ No hay video - El campo video_url está NULL o vacío. Para agregar un video, sube un archivo de video a Supabase Storage desde el modal de crear/editar producto.'
-          });
-
+          
           setProducto({
             id: data.id,
             nombre: data.nombre ?? "",
@@ -146,12 +125,10 @@ export default function ProductoDetallePage() {
             destacado: data.destacado ?? false,
             detalles: data.detalles ?? "",
             image_url: data.image_url ?? "",
-            // Guardamos la URL resuelta (soporta ambos nombres de campo)
             modelo_url: resolvedModelUrl,
             video_url: data.video_url ?? undefined,
             usuarios: data.usuarios,
           });
-
         }
       } catch (err) {
         console.error("Error al cargar producto:", err);
@@ -163,6 +140,63 @@ export default function ProductoDetallePage() {
 
     void fetchProducto();
   }, [params.id]);
+
+  const handleAddToCart = async () => {
+    if (!producto) return;
+    const ok = await addToCarrito({
+      id: String(producto.id),
+      nombre: producto.nombre,
+      precio: producto.precio,
+      imagen: producto.image_url,
+      cantidad: cantidad,
+      stock: producto.stock,
+      categoria: producto.categoria,
+      destacado: producto.destacado,
+    });
+    if (ok) {
+      toast.success("Producto añadido al carrito", {
+        description: `${cantidad} x ${producto.nombre} agregados correctamente.`,
+      });
+    } else {
+      toast.error("No se pudo añadir al carrito", {
+        description: "Verifica el stock disponible.",
+      });
+    }
+  };
+
+  const handleBuyNow = async () => {
+    if (!producto) return;
+    const ok = await addToCarrito({
+      id: String(producto.id),
+      nombre: producto.nombre,
+      precio: producto.precio,
+      imagen: producto.image_url,
+      cantidad: cantidad,
+      stock: producto.stock,
+      categoria: producto.categoria,
+      destacado: producto.destacado,
+    });
+    if (ok) {
+      router.push("/tienda/carrito");
+    }
+  };
+
+  const handleShare = async () => {
+    if (typeof navigator.share !== 'undefined') {
+      try {
+        await navigator.share({
+          title: producto?.nombre,
+          text: producto?.descripcion,
+          url: window.location.href,
+        });
+      } catch (err) {
+        console.error(err);
+      }
+    } else {
+      await navigator.clipboard.writeText(window.location.href);
+      toast.info("Enlace copiado al portapapeles");
+    }
+  };
 
   if (loading) {
     return (
@@ -196,534 +230,306 @@ export default function ProductoDetallePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-teal-50/30 to-gray-50">
-      {/* Contenedor principal */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
-        {/* Breadcrumb y navegación */}
+    <div className="min-h-screen bg-[#fcfdfd]">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-12">
+        {/* Breadcrumb Mejorado */}
         <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-          className="mb-4 sm:mb-6"
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
         >
-          <Button
-            variant="ghost"
-            onClick={() => router.back()}
-            className="mb-3 hover:bg-teal-50 text-gray-700 -ml-2"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Volver a productos
-          </Button>
-          <div className="text-xs sm:text-sm text-gray-500 flex items-center flex-wrap gap-2">
-            <span className="hover:text-teal-600 cursor-pointer transition-colors">Inicio</span>
-            <span>›</span>
-            <span className="hover:text-teal-600 cursor-pointer transition-colors">{producto.categoria}</span>
-            <span>›</span>
-            <span className="text-gray-900 font-medium">{producto.nombre}</span>
+          <div className="flex items-center gap-3">
+             <Button
+                variant="ghost"
+                onClick={() => router.back()}
+                className="h-10 w-10 p-0 rounded-full hover:bg-teal-50 text-slate-600"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </Button>
+              <div className="h-4 w-[1px] bg-slate-200 hidden sm:block mx-1" />
+              <div className="text-xs sm:text-sm flex items-center gap-2 overflow-hidden">
+                <Link href="/" className="text-slate-400 hover:text-teal-600 transition-colors">Inicio</Link>
+                <span className="text-slate-300">/</span>
+                <Link href="/tienda/productos" className="text-slate-400 hover:text-teal-600 transition-colors">Tienda</Link>
+                <span className="text-slate-300">/</span>
+                <span className="text-slate-900 font-bold truncate">{producto.nombre}</span>
+              </div>
+          </div>
+          
+          <div className="flex items-center gap-2 self-end sm:self-auto">
+             <Button 
+                variant="outline" 
+                size="sm" 
+                className="rounded-full h-9 gap-2 border-slate-200 hover:bg-slate-50 text-slate-600"
+                onClick={handleShare}
+              >
+                <Share2 className="w-3.5 h-3.5" />
+                Compartir
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className={`rounded-full h-9 gap-2 border-slate-200 transition-all ${isFavorite ? "border-red-100 bg-red-50 text-red-600" : "hover:bg-slate-50 text-slate-600"}`}
+                onClick={() => setIsFavorite(!isFavorite)}
+              >
+                <Heart className={`w-3.5 h-3.5 ${isFavorite ? "fill-red-600" : ""}`} />
+                {isFavorite ? "Favorito" : "Guardar"}
+              </Button>
           </div>
         </motion.div>
 
-        {/* Grid principal: 2 columnas en desktop */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
           {/* ========================================
-              COLUMNA IZQUIERDA: GALERÍA CON VIDEO INTEGRADO
+              GALERÍA
           ======================================== */}
           <motion.div
-            initial={{ opacity: 0, x: -20 }}
+            initial={{ opacity: 0, x: -25 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5 }}
-            className="lg:col-span-7 space-y-4"
+            className="lg:col-span-7"
           >
-            {/* Card principal de galería */}
-            <Card className="overflow-hidden border border-gray-200 shadow-lg bg-white rounded-2xl">
-              <CardContent className="p-4 sm:p-6">
-                <div className="flex gap-3 sm:gap-4">
-                  {/* Miniaturas verticales */}
-                  <div className="flex flex-col gap-2 sm:gap-3 w-14 sm:w-20">
-                    {/* Miniatura: Imagen principal */}
-                    <button
-                      onClick={() => {
-                        setSelectedImage(0);
-                        setShowModel(false);
-                        setShowVideo(false);
-                      }}
-                      aria-label="Ver imagen principal"
-                      className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all ${selectedImage === 0 && !showModel && !showVideo
-                          ? "border-teal-600 shadow-md ring-2 ring-teal-100"
-                          : "border-gray-200 hover:border-teal-300"
-                        }`}
+            <div className="sticky top-28 space-y-6">
+                <div className="relative aspect-square sm:aspect-[4/3] lg:aspect-square bg-slate-50 rounded-[2.5rem] overflow-hidden border border-slate-100 shadow-sm group">
+                  <AnimatePresence mode="wait">
+                  {showModel ? (
+                    <motion.div 
+                        key="model"
+                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                        className="w-full h-full"
                     >
-                      {producto.image_url ? (
-                        <Image
-                          src={producto.image_url}
-                          alt="Vista principal"
-                          fill
-                          className="object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full bg-gray-100 flex items-center justify-center">
-                          <Package className="w-5 h-5 sm:w-6 sm:h-6 text-gray-300" />
-                        </div>
-                      )}
-                    </button>
+                       <ErrorBoundary fallback={<div className="flex h-full items-center justify-center">Error cargando modelo</div>}>
+                          <Model3DViewer modelUrl={producto.modelo_url!} height="100%" showControls autoRotate />
+                       </ErrorBoundary>
+                    </motion.div>
+                  ) : showVideo ? (
+                    <motion.div 
+                        key="video"
+                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                        className="w-full h-full bg-slate-900"
+                    >
+                      <video controls autoPlay className="w-full h-full object-contain" src={producto.video_url} />
+                    </motion.div>
+                  ) : (
+                    <motion.div 
+                        key="image"
+                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                        className="relative w-full h-full p-8"
+                    >
+                      <Image
+                        src={producto.image_url || "/Logo%20Thiart%20Tiktok.png"}
+                        alt={producto.nombre}
+                        fill
+                        className="object-contain transition-transform duration-500 hover:scale-105"
+                        priority
+                      />
+                    </motion.div>
+                  )}
+                  </AnimatePresence>
 
-                    {/* Miniatura: Modelo 3D */}
+                  {/* Badges Flotantes */}
+                  {producto.destacado && (
+                    <div className="absolute top-6 left-6">
+                      <span className="bg-[#00a19a] text-white text-[10px] font-black uppercase tracking-[0.2em] px-4 py-2 rounded-full shadow-xl">
+                        Edición Especial
+                      </span>
+                    </div>
+                  )}
+                  
+                  {/* Controles de Vista */}
+                  <div className="absolute bottom-6 right-6 flex gap-2">
+                     <button 
+                        className="w-12 h-12 bg-white/90 backdrop-blur rounded-2xl flex items-center justify-center text-slate-800 shadow-xl border border-white hover:bg-[#00a19a] hover:text-white transition-all scale-100 hover:scale-110"
+                        onClick={() => {
+                          // TODO: Implement fullscreen view if needed
+                          console.log("Maximizar vista");
+                        }}
+                        title="Ver en pantalla completa"
+                      >
+                        <ExternalLink className="w-5 h-5" />
+                      </button>
+                  </div>
+                </div>
+
+                {/* Selectores de Medios */}
+                <div className="flex gap-4 px-2">
+                   <MediaThumb 
+                        active={!showModel && !showVideo} 
+                        onClick={() => { setShowModel(false); setShowVideo(false); }}
+                        icon={<Package className="w-5 h-5" />}
+                        label="Imagen" 
+                    />
                     {hasValidModel(producto.modelo_url) && (
-                      <button
-                        onClick={() => {
-                          setSelectedImage(1);
-                          setShowModel(true);
-                          setShowVideo(false);
-                        }}
-                        aria-label="Ver modelo 3D"
-                        className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all ${showModel
-                            ? "border-teal-600 shadow-md ring-2 ring-teal-100"
-                            : "border-gray-200 hover:border-teal-300"
-                          } bg-gradient-to-br from-teal-50 to-cyan-50`}
-                      >
-                        <div className="w-full h-full flex items-center justify-center">
-                          <Sparkles className="w-5 h-5 sm:w-6 sm:h-6 text-teal-600" />
-                        </div>
-                      </button>
-                    )}
-
-                    {/* Miniatura: Video */}
-
-                    {producto.video_url && (
-                      <button
-                        onClick={() => {
-                          setSelectedImage(2);
-                          setShowModel(false);
-                          setShowVideo(true);
-                        }}
-                        aria-label="Ver video"
-                        className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all ${showVideo
-                            ? "border-teal-600 shadow-md ring-2 ring-teal-100"
-                            : "border-gray-200 hover:border-teal-300"
-                          } bg-gradient-to-br from-purple-50 to-pink-50`}
-                      >
-                        <div className="w-full h-full flex items-center justify-center">
-                          <Video className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600" />
-                        </div>
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Visor principal */}
-                  <div className="flex-1">
-                    <div
-                      className={`relative ${showModel ? 'h-[500px]' : 'aspect-square'} bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl overflow-hidden`}
-                      onMouseEnter={() => !showModel && !showVideo && setImageZoom(true)}
-                      onMouseLeave={() => setImageZoom(false)}
-                    >
-                      {/* Mostrar Modelo 3D */}
-                      {showModel ? (
-                        <div className="w-full h-full">
-                          {hasValidModel(producto.modelo_url) ? (
-                            <ErrorBoundary
-                              fallback={
-                                <div className="w-full h-full flex items-center justify-center bg-gray-100">
-                                  <div className="text-center p-6">
-                                    <Package className="w-12 h-12 sm:w-16 sm:h-16 text-gray-400 mx-auto mb-3" />
-                                    <p className="text-gray-600 text-sm mb-3">No se pudo cargar el modelo 3D</p>
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => {
-                                        setShowModel(false);
-                                        setSelectedImage(0);
-                                      }}
-                                      className="border-teal-600 text-teal-600 hover:bg-teal-50"
-                                    >
-                                      Ver imagen
-                                    </Button>
-                                  </div>
-                                </div>
-                              }
-                            >
-                              <Suspense
-                                fallback={
-                                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-teal-50 to-cyan-50">
-                                    <div className="text-center">
-                                      <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 border-teal-600 mx-auto mb-3"></div>
-                                      <p className="text-gray-600 text-sm">Cargando modelo 3D...</p>
-                                    </div>
-                                  </div>
-                                }
-                              >
-                                <Model3DViewer
-                                  modelUrl={producto.modelo_url!}
-                                  height="500px"
-                                  showControls={true}
-                                  autoRotate={true}
-                                />
-                              </Suspense>
-                            </ErrorBoundary>
-                          ) : null}
-                        </div>
-                      ) : showVideo && producto.video_url ? (
-                        /* Mostrar Video */
-                        <div className="w-full h-full bg-black flex items-center justify-center">
-                          <video
-                            controls
-                            autoPlay
-                            className="w-full h-full object-contain"
-                            preload="metadata"
-                          >
-                            <source src={producto.video_url} type="video/mp4" />
-                            <source src={producto.video_url} type="video/webm" />
-                            Tu navegador no soporta la reproducción de videos.
-                          </video>
-                        </div>
-                      ) : producto.image_url ? (
-                        /* Mostrar Imagen */
-                        <Image
-                          src={producto.image_url}
-                          alt={producto.nombre}
-                          fill
-                          className={`object-contain p-4 sm:p-8 transition-transform duration-300 ${imageZoom ? "scale-110" : "scale-100"
-                            }`}
-                          priority
+                       <MediaThumb 
+                            active={showModel} 
+                            onClick={() => { setShowModel(true); setShowVideo(false); }}
+                            icon={<Sparkles className="w-5 h-5" />}
+                            label="Modelo 3D" 
                         />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <Package className="w-16 h-16 sm:w-24 sm:h-24 text-gray-300" />
-                        </div>
-                      )}
-
-                      {/* Indicador de vista actual */}
-                      <div className="absolute bottom-3 sm:bottom-4 left-1/2 -translate-x-1/2 z-10">
-                        <div className="bg-gradient-to-r from-teal-600 to-cyan-600 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-semibold flex items-center gap-2 shadow-lg backdrop-blur-sm">
-                          {showModel ? (
-                            <>
-                              <Sparkles className="w-3 h-3 sm:w-4 sm:h-4" />
-                              <span className="hidden sm:inline">Vista 3D Interactiva</span>
-                              <span className="sm:hidden">3D</span>
-                            </>
-                          ) : showVideo ? (
-                            <>
-                              <Video className="w-3 h-3 sm:w-4 sm:h-4" />
-                              <span className="hidden sm:inline">Video del producto</span>
-                              <span className="sm:hidden">Video</span>
-                            </>
-                          ) : (
-                            <>
-                              <Package className="w-3 h-3 sm:w-4 sm:h-4" />
-                              <span className="hidden sm:inline">Imagen principal</span>
-                              <span className="sm:hidden">Foto</span>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Contador de medios */}
-                    <div className="flex justify-center items-center gap-2 mt-3 sm:mt-4">
-                      <div className="flex gap-1.5">
-                        <div className={`h-1.5 rounded-full transition-all ${!showModel && !showVideo ? "w-6 bg-teal-600" : "w-1.5 bg-gray-300"
-                          }`}></div>
-                        {hasValidModel(producto.modelo_url) && (
-                          <div className={`h-1.5 rounded-full transition-all ${showModel ? "w-6 bg-teal-600" : "w-1.5 bg-gray-300"
-                            }`}></div>
-                        )}
-                        {producto.video_url && (
-                          <div className={`h-1.5 rounded-full transition-all ${showVideo ? "w-6 bg-teal-600" : "w-1.5 bg-gray-300"
-                            }`}></div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Descripción del producto */}
-            <Card className="overflow-hidden border border-gray-200 shadow-md bg-white rounded-2xl">
-              <CardContent className="p-4 sm:p-6">
-                <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
-                  <Package className="w-5 h-5 sm:w-6 sm:h-6 text-teal-600" />
-                  Descripción
-                </h2>
-                <p className="text-gray-700 leading-relaxed text-sm sm:text-base">
-                  {producto.descripcion}
-                </p>
-              </CardContent>
-            </Card>
-
-            {/* Características principales */}
-            <Card className="overflow-hidden border border-gray-200 shadow-md bg-white rounded-2xl">
-              <CardContent className="p-4 sm:p-6">
-                <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4 sm:mb-6 flex items-center gap-2">
-                  <Star className="w-5 h-5 sm:w-6 sm:h-6 text-teal-600" />
-                  Características
-                </h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                  {producto.categoria && (
-                    <div className="flex items-start gap-3 p-3 sm:p-4 bg-gradient-to-br from-teal-50 to-cyan-50 rounded-xl border border-teal-100">
-                      <div className="w-9 h-9 sm:w-10 sm:h-10 bg-teal-600 rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm">
-                        <Tag className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-semibold text-teal-700 uppercase mb-1">Categoría</p>
-                        <p className="text-sm sm:text-base font-semibold text-gray-900 truncate">{producto.categoria}</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {producto.tamano && (
-                    <div className="flex items-start gap-3 p-3 sm:p-4 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl border border-purple-100">
-                      <div className="w-9 h-9 sm:w-10 sm:h-10 bg-purple-600 rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm">
-                        <Ruler className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-semibold text-purple-700 uppercase mb-1">Tamaño</p>
-                        <p className="text-sm sm:text-base font-semibold text-gray-900 truncate">{producto.tamano}</p>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="flex items-start gap-3 p-3 sm:p-4 bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border border-green-100">
-                    <div className="w-9 h-9 sm:w-10 sm:h-10 bg-green-600 rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm">
-                      <Package className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold text-green-700 uppercase mb-1">Material</p>
-                      <p className="text-sm sm:text-base font-semibold text-gray-900">PLA / ABS Premium</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3 p-3 sm:p-4 bg-gradient-to-br from-orange-50 to-amber-50 rounded-xl border border-orange-100">
-                    <div className="w-9 h-9 sm:w-10 sm:h-10 bg-orange-600 rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm">
-                      <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold text-orange-700 uppercase mb-1">Calidad</p>
-                      <p className="text-sm sm:text-base font-semibold text-gray-900">Alta resolución</p>
-                    </div>
-                  </div>
+                    )}
+                    {producto.video_url && (
+                       <MediaThumb 
+                            active={showVideo} 
+                            onClick={() => { setShowModel(false); setShowVideo(true); }}
+                            icon={<Video className="w-5 h-5" />}
+                            label="Video" 
+                        />
+                    )}
                 </div>
 
-                {/* Detalles adicionales */}
-                {producto.detalles && (
-                  <div className="mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-gray-200">
-                    <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-2 sm:mb-3">Detalles adicionales</h3>
-                    <p className="text-gray-700 leading-relaxed text-sm sm:text-base whitespace-pre-line">
-                      {producto.detalles}
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                {/* Descripción Detallada */}
+                <div className="pt-8 border-t border-slate-100">
+                   <h3 className="text-xl font-bold text-slate-900 mb-4 flex items-center gap-3">
+                     <div className="w-1 h-6 bg-teal-500 rounded-full" />
+                     Inspiración y Detalles
+                   </h3>
+                   <p className="text-slate-600 leading-relaxed text-lg">
+                     {producto.descripcion}
+                   </p>
+                   {producto.detalles && (
+                     <p className="mt-4 text-slate-500 text-base border-l-4 border-slate-100 pl-4 italic">
+                       {producto.detalles}
+                     </p>
+                   )}
+                </div>
+            </div>
           </motion.div>
 
           {/* ========================================
-              COLUMNA DERECHA: INFORMACIÓN DE COMPRA
+              COMPRA
           ======================================== */}
           <motion.div
-            initial={{ opacity: 0, x: 20 }}
+            initial={{ opacity: 0, x: 25 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5, delay: 0.1 }}
             className="lg:col-span-5"
           >
-            {/* Card sticky de compra */}
-            <div className="lg:sticky lg:top-6">
-              <Card className="overflow-hidden border border-gray-200 shadow-lg bg-white rounded-2xl">
-                <CardContent className="p-4 sm:p-6">
-                  {/* Estado del producto */}
-                  {producto.destacado && (
-                    <div className="mb-4">
-                      <Badge className="bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white text-xs font-bold px-3 py-1 shadow-md">
-                        ⭐ PRODUCTO DESTACADO
-                      </Badge>
-                    </div>
-                  )}
-
-                  {/* Título */}
-                  <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4 leading-tight">
+            <div className="space-y-8">
+               <div>
+                  <span className="text-[#00a19a] font-black text-xs uppercase tracking-widest mb-2 block">
+                    {producto.categoria}
+                  </span>
+                  <h1 className="text-4xl sm:text-5xl font-black text-slate-900 leading-[1.1] mb-4">
                     {producto.nombre}
                   </h1>
-
-                  {/* Rating y reviews */}
-                  <div className="flex items-center gap-3 mb-6 pb-6 border-b border-gray-200">
+                  <div className="flex items-center gap-4">
                     <div className="flex items-center gap-1">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <Star
-                          key={star}
-                          className={`w-4 h-4 sm:w-5 sm:h-5 ${star <= 4 ? "fill-amber-400 text-amber-400" : "text-gray-300"
-                            }`}
-                        />
-                      ))}
+                      {[1,2,3,4,5].map(s => <Star key={s} className="w-4 h-4 fill-amber-400 text-amber-400" />)}
                     </div>
-                    <span className="text-sm sm:text-base font-semibold text-gray-900">4.8</span>
-                    <span className="text-xs sm:text-sm text-gray-500">
-                      ({Math.min(producto.stock * 5, 250)} valoraciones)
-                    </span>
+                    <span className="text-sm font-bold text-slate-500">4.9 (124 reseñas)</span>
                   </div>
+               </div>
 
-                  {/* Precio */}
-                  <div className="mb-6">
-                    {producto.destacado && (
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-lg sm:text-xl text-gray-400 line-through">
-                          ${Math.round(producto.precio * 1.5).toLocaleString("es-CO")}
+               <div className="p-8 bg-slate-50 rounded-[2.5rem] border border-slate-100">
+                  <div className="flex items-baseline gap-2 mb-8">
+                     <span className="text-sm font-black text-teal-600 mb-4">PRECIO TOTAL</span>
+                     <div className="flex items-baseline gap-2 w-full">
+                        <span className="text-5xl font-black text-slate-900 tracking-tighter">
+                          ${(producto.precio * cantidad).toLocaleString()}
                         </span>
-                        <Badge className="bg-gradient-to-r from-green-500 to-emerald-500 text-white font-bold text-xs sm:text-sm px-2 py-0.5">
-                          -33% OFF
-                        </Badge>
-                      </div>
-                    )}
-                    <div className="flex items-baseline gap-2 mb-2">
-                      <span className="text-4xl sm:text-5xl font-bold bg-gradient-to-r from-teal-600 to-cyan-600 bg-clip-text text-transparent">
-                        ${producto.precio.toLocaleString("es-CO")}
-                      </span>
-                      <span className="text-lg sm:text-xl text-gray-600">COP</span>
-                    </div>
-                    <p className="text-xs sm:text-sm text-gray-600">
-                      Entregas en 3-5 días hábiles
-                    </p>
+                        <span className="text-lg font-bold text-slate-400">COP</span>
+                     </div>
                   </div>
 
-                  {/* Stock disponible */}
-                  <div className="bg-gradient-to-br from-teal-50 to-cyan-50 border border-teal-200 rounded-xl p-3 sm:p-4 mb-6">
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-                        <Package className="w-4 h-4 text-teal-600" />
-                        Stock disponible
-                      </span>
-                      <span className={`text-sm font-bold ${producto.stock > 10 ? "text-green-600" : producto.stock > 0 ? "text-amber-600" : "text-red-600"
-                        }`}>
-                        {producto.stock > 0 ? `${Math.min(producto.stock, 99)}+ unidades` : "Agotado"}
-                      </span>
-                    </div>
+                  <div className="space-y-6">
+                     <div className="flex items-center justify-between">
+                        <span className="text-sm font-bold text-slate-600">Unidades</span>
+                        <div className="flex items-center gap-3 bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm">
+                           <Button 
+                              variant="ghost" size="icon" className="h-10 w-10 rounded-xl"
+                              onClick={() => setCantidad(Math.max(1, cantidad - 1))}
+                              disabled={cantidad <= 1}
+                            >
+                              <Minus className="w-4 h-4" />
+                            </Button>
+                            <span className="w-10 text-center font-black text-slate-900">{cantidad}</span>
+                            <Button 
+                              variant="ghost" size="icon" className="h-10 w-10 rounded-xl"
+                              onClick={() => setCantidad(Math.min(producto.stock, cantidad + 1))}
+                              disabled={cantidad >= producto.stock}
+                            >
+                              <Plus className="w-4 h-4" />
+                            </Button>
+                        </div>
+                     </div>
 
-                    {/* Selector de cantidad */}
-                    <div className="flex items-center gap-3">
-                      <span className="text-sm text-gray-700">Cantidad:</span>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setCantidad(Math.max(1, cantidad - 1))}
-                          disabled={cantidad <= 1 || producto.stock === 0}
-                          className="h-8 w-8 p-0 border-teal-600 text-teal-600 hover:bg-teal-50"
+                     <div className="space-y-3">
+                        <Button 
+                           onClick={handleBuyNow}
+                           className="w-full h-16 rounded-2xl bg-[#00a19a] hover:bg-[#007973] text-white text-lg font-black shadow-xl shadow-[#00a19a]/20 transition-all hover:-translate-y-1"
                         >
-                          <Minus className="w-4 h-4" />
+                           COMPRAR AHORA
                         </Button>
-                        <span className="w-12 text-center font-semibold text-gray-900">{cantidad}</span>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setCantidad(Math.min(producto.stock, cantidad + 1))}
-                          disabled={cantidad >= producto.stock || producto.stock === 0}
-                          className="h-8 w-8 p-0 border-teal-600 text-teal-600 hover:bg-teal-50"
+                        <Button 
+                           variant="outline"
+                           onClick={handleAddToCart}
+                           className="w-full h-16 rounded-2xl border-2 border-slate-200 text-slate-800 text-lg font-black hover:bg-slate-50 transition-all"
                         >
-                          <Plus className="w-4 h-4" />
+                           AGREGAR AL CARRITO
                         </Button>
-                      </div>
-                    </div>
+                     </div>
                   </div>
+               </div>
 
-                  {/* Botones de acción */}
-                  <div className="space-y-3 mb-6">
-                    <Button
-                      onClick={() => {
-                        console.log("Comprar ahora:", producto, "Cantidad:", cantidad);
-                      }}
-                      disabled={producto.stock === 0}
-                      className="w-full bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white py-6 text-base sm:text-lg font-bold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
-                      size="lg"
-                    >
-                      <ShoppingCart className="w-5 h-5 mr-2" />
-                      {producto.stock === 0 ? "Producto agotado" : "Comprar ahora"}
-                    </Button>
+               {/* Características Técnicas */}
+               <div className="grid grid-cols-2 gap-4">
+                  <FeatureBox icon={<Ruler className="w-5 h-5" />} label="Medidas" value={producto.tamano || "Standard"} />
+                  <FeatureBox icon={<Check className="w-5 h-5" />} label="Material" value="PLA Bio" />
+                  <FeatureBox icon={<Package className="w-5 h-5" />} label="En Stock" value={`${producto.stock} unidades`} />
+                  <FeatureBox icon={<Tag className="w-5 h-5" />} label="Boutique" value="Thiart3D" />
+               </div>
 
-                    <Button
-                      onClick={() => {
-                        console.log("Agregar al carrito:", producto, "Cantidad:", cantidad);
-                      }}
-                      disabled={producto.stock === 0}
-                      variant="outline"
-                      className="w-full border-2 border-teal-600 text-teal-600 hover:bg-teal-50 py-6 text-base sm:text-lg font-bold rounded-xl transition-all duration-300"
-                      size="lg"
-                    >
-                      Agregar al carrito
-                    </Button>
+               {/* Garantía */}
+               <div className="flex items-center gap-4 p-6 border-2 border-dashed border-slate-100 rounded-[2rem]">
+                  <div className="h-12 w-12 bg-green-50 rounded-2xl flex items-center justify-center text-green-600">
+                    <Check className="w-6 h-6" />
                   </div>
-
-                  {/* Favoritos */}
-                  <button className="w-full flex items-center justify-center gap-2 text-gray-600 hover:text-teal-600 text-sm font-medium py-3 transition-colors group">
-                    <Heart className="w-4 h-4 group-hover:fill-teal-600 transition-all" />
-                    Agregar a favoritos
-                  </button>
-
-                  {/* Información del vendedor */}
-                  <div className="mt-6 pt-6 border-t border-gray-200">
-                    <div className="flex items-start justify-between mb-3">
-                      <div>
-                        <p className="text-xs text-gray-600 mb-1">Vendido por</p>
-                        <p className="text-base sm:text-lg font-bold text-gray-900">{producto.usuarios?.nombre ?? "Thiart 3D Store"}</p>
-                      </div>
-                      <Badge className="bg-gradient-to-r from-green-100 to-emerald-100 text-green-700 font-bold text-xs">
-                        Verificado ✓
-                      </Badge>
-                    </div>
-                    <div className="flex items-center gap-1 mb-2">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <Star key={star} className="w-3.5 h-3.5 fill-teal-500 text-teal-500" />
-                      ))}
-                      <span className="text-sm text-gray-600 ml-1">5.0 • {Math.min(producto.stock * 15, 1000)}+ ventas</span>
-                    </div>
+                  <div>
+                    <p className="font-bold text-slate-900">Garantía de Satisfacción</p>
+                    <p className="text-sm text-slate-500">Recibe tu producto exactamente como lo viste o te devolvemos el dinero.</p>
                   </div>
-
-                  {/* Garantías y beneficios */}
-                  <div className="mt-6 pt-6 border-t border-gray-200">
-                    <h4 className="text-sm font-bold text-gray-900 mb-3">Beneficios de compra</h4>
-                    <div className="space-y-2.5">
-                      <div className="flex items-center gap-2.5 text-sm text-gray-700">
-                        <div className="w-2 h-2 bg-teal-500 rounded-full flex-shrink-0"></div>
-                        <span>Envíos a todo el país</span>
-                      </div>
-                      <div className="flex items-center gap-2.5 text-sm text-gray-700">
-                        <div className="w-2 h-2 bg-teal-500 rounded-full flex-shrink-0"></div>
-                        <span>Garantía de calidad</span>
-                      </div>
-                      <div className="flex items-center gap-2.5 text-sm text-gray-700">
-                        <div className="w-2 h-2 bg-teal-500 rounded-full flex-shrink-0"></div>
-                        <span>Devolución gratuita</span>
-                      </div>
-                      <div className="flex items-center gap-2.5 text-sm text-gray-700">
-                        <div className="w-2 h-2 bg-teal-500 rounded-full flex-shrink-0"></div>
-                        <span>Pago seguro</span>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+               </div>
             </div>
           </motion.div>
         </div>
 
-        {/* ========================================
-            PRODUCTOS RELACIONADOS
-        ======================================== */}
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.3 }}
-          className="mt-12 lg:mt-16"
-        >
-          <div className="mb-6">
-            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 flex items-center gap-3">
-              <Sparkles className="w-6 h-6 sm:w-8 sm:h-8 text-teal-600" />
-              También te puede interesar
-            </h2>
-            <p className="text-sm sm:text-base text-gray-600 mt-2">
-              Descubre productos similares y complementarios
-            </p>
-          </div>
-          <ProductosCarrusel soloDestacados={false} />
-        </motion.div>
+        {/* Recomendaciones */}
+        <div className="mt-24">
+           <div className="flex items-center justify-between mb-12">
+              <div>
+                <h2 className="text-3xl font-black text-slate-900 mb-2">Recomendaciones Curadas</h2>
+                <p className="text-slate-500">Seleccionamos piezas que complementan tu estilo.</p>
+              </div>
+              <Button variant="ghost" className="text-[#00a19a] font-bold" onClick={() => router.push("/tienda/productos")}>
+                 EXPLORAR TODO <ArrowLeft className="w-4 h-4 ml-2 rotate-180" />
+              </Button>
+           </div>
+           <ProductosCarrusel soloDestacados={false} />
+        </div>
       </div>
+    </div>
+  );
+}
+
+function MediaThumb({ active, onClick, icon, label }: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string }) {
+  return (
+    <button 
+        onClick={onClick}
+        className={`flex-1 flex items-center justify-center gap-3 h-14 rounded-2xl border-2 transition-all font-bold text-sm ${
+            active 
+            ? "bg-[#00a19a] border-[#00a19a] text-white shadow-lg shadow-[#00a19a]/20" 
+            : "bg-white border-slate-100 text-slate-500 hover:border-teal-200 hover:text-teal-600"
+        }`}
+    >
+      {icon}
+      <span className="hidden sm:inline">{label}</span>
+    </button>
+  );
+}
+
+function FeatureBox({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <div className="p-5 bg-white border border-slate-100 rounded-3xl shadow-sm">
+       <div className="text-[#00a19a] mb-2 opacity-70">{icon}</div>
+       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</p>
+       <p className="text-sm font-bold text-slate-800 truncate">{value}</p>
     </div>
   );
 }

@@ -15,7 +15,6 @@ export enum StorageBucket {
   VIDEOS = 'videos',
   PERSONALIZACIONES = 'personalizaciones',
   AVATARES = 'avatares',
-  TICKETS = 'tickets',
   CHAT = 'chat',
 }
 
@@ -51,7 +50,6 @@ const BUCKET_LIMITS = {
   },
   [StorageBucket.PERSONALIZACIONES]: { maxSize: 50 * 1024 * 1024, types: ['model/stl', 'model/obj', 'application/octet-stream'] },
   [StorageBucket.AVATARES]: { maxSize: 2 * 1024 * 1024, types: ['image/jpeg', 'image/png', 'image/webp'] },
-  [StorageBucket.TICKETS]: { maxSize: 5 * 1024 * 1024, types: ['image/jpeg', 'image/png', 'image/webp'] },
   [StorageBucket.CHAT]: { maxSize: 10 * 1024 * 1024, types: ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'] },
 }
 
@@ -299,40 +297,6 @@ export async function uploadAvatar(file: File, userId: string): Promise<string> 
   return publicUrl
 }
 
-/**
- * Subir imagen de ticket
- */
-export async function uploadTicketImage(file: File, ticketId: string): Promise<string> {
-  const validation = validateFile(file, StorageBucket.TICKETS)
-  if (!validation.valid) {
-    throw new Error(validation.error)
-  }
-
-  const fileName = generateFileName(ticketId, file.name)
-
-  const { error } = await supabase.storage
-    .from(StorageBucket.TICKETS)
-    .upload(fileName, file, {
-      cacheControl: '3600',
-      upsert: false
-    })
-
-  if (error) {
-    console.error('Error uploading ticket image:', error)
-    throw new Error(`Error al subir imagen: ${error.message}`)
-  }
-
-  // Generar URL firmada (privada)
-  const { data: signedData, error: signedError } = await supabase.storage
-    .from(StorageBucket.TICKETS)
-    .createSignedUrl(fileName, 86400) // 24 horas
-
-  if (signedError) {
-    throw new Error(`Error al generar URL: ${signedError.message}`)
-  }
-
-  return signedData.signedUrl
-}
 
 /**
  * Subir archivo de chat

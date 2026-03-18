@@ -1,11 +1,16 @@
+"use client";
 import React, { type ReactNode } from "react";
-
-// ...lógica del provider si existe...
+import { Toaster } from "sonner";
 
 type Props = {
   children: ReactNode;
 };
 
 export function ToastProvider({ children }: Props) {
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      <Toaster position="bottom-center" richColors />
+    </>
+  );
 }

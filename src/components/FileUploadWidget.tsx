@@ -294,29 +294,6 @@ export function AvatarUpload({
   )
 }
 
-// Componente especializado para tickets
-export function TicketImageUpload({
-  ticketId,
-  onUploadComplete,
-  className,
-}: {
-  ticketId: string
-  onUploadComplete?: (url: string) => void
-  className?: string
-}) {
-  return (
-    <FileUploadWidget
-      bucket={StorageBucket.TICKETS}
-      entityId={ticketId}
-      acceptedTypes="image/jpeg,image/png,image/webp"
-      maxSizeMB={5}
-      label="Captura de pantalla (opcional)"
-      buttonText="Adjuntar imagen"
-      onUploadComplete={onUploadComplete}
-      className={className}
-    />
-  )
-}
 
 // Componente especializado para videos de productos
 export function ProductVideoUpload({

@@ -62,6 +62,39 @@ interface SupabaseError {
   hint?: string;
 }
 
+interface PedidoResponse {
+  id: number;
+  cliente_id: string | null;
+  productos: string; // JSON string from Supabase
+  total: number;
+  estado: string;
+  datos_contacto: string; // JSON string from Supabase
+  direccion_envio: string;
+  ciudad_envio: string;
+  departamento_envio: string;
+  codigo_postal_envio: string;
+  telefono_envio: string;
+  notas_envio?: string;
+  costo_envio: number;
+  payment_id?: string;
+  payment_method?: string;
+  created_at: string;
+  updated_at?: string;
+}
+
+interface ProductoEnArreglo {
+  nombre?: string;
+  name?: string;
+  cantidad?: number;
+  precio?: number;
+  precio_unitario?: number;
+}
+
+interface ContactoEnPedido {
+  email?: string;
+  nombre?: string;
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json() as PedidoRequestBody;
@@ -145,8 +178,17 @@ export async function POST(req: Request) {
       .single<PedidoInserted>();
 
     if (error) {
-      console.error("Error Supabase pedidos:", error.message);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      console.error("❌ Error Supabase pedidos:", {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+        insertData,
+      });
+      return NextResponse.json(
+        { error: error.message, hint: error.hint, details: error.details },
+        { status: 500 }
+      );
     }
     return NextResponse.json({ pedido: data });
   } catch (err) {
@@ -166,7 +208,7 @@ export async function GET(req: Request) {
         .from("pedidos")
         .select("*")
         .eq("id", pedidoId)
-        .single<Record<string, unknown>>();
+        .single<PedidoResponse>();
 
       if (error) {
         const supabaseError = error as SupabaseError;
@@ -187,7 +229,7 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: supabaseError.message }, { status: 500 });
     }
 
-    return NextResponse.json({ pedidos: data as Record<string, unknown>[] });
+    return NextResponse.json({ pedidos: data as PedidoResponse[] });
   } catch (err) {
     console.error("Error obteniendo pedidos:", err);
     return NextResponse.json({ error: "Error obteniendo pedidos" }, { status: 500 });
@@ -203,54 +245,106 @@ export async function PATCH(req: Request) {
       payment_method?: string;
       estado?: string;
     };
-    console.log("Actualizando pedido:", body);
-
+    
     // Aceptar tanto pedido_id como pedidoId
     const pedidoId = body.pedido_id ?? body.pedidoId;
     const { payment_id, payment_method, estado } = body;
+
+    console.log("➡️ Recibida actualización de pedido:", { pedidoId, estado, payment_id });
 
     if (!pedidoId) {
       return NextResponse.json({ error: "Falta el ID del pedido" }, { status: 400 });
     }
 
     const updateData: {
+      updated_at: string;
       payment_id?: string;
       payment_method?: string;
       estado?: string;
-      updated_at?: string;
     } = {
       updated_at: new Date().toISOString()
     };
 
-    // Solo actualizar los campos que vienen en el body
-    if (payment_id) {
-      updateData.payment_id = payment_id;
-    }
-
-    if (payment_method) {
-      updateData.payment_method = payment_method;
-    }
-
-    if (estado) {
-      updateData.estado = estado;
-    }
+    if (payment_id) updateData.payment_id = payment_id;
+    if (payment_method) updateData.payment_method = payment_method;
+    if (estado) updateData.estado = estado;
 
     const result = await supabase
       .from("pedidos")
       .update(updateData)
       .eq("id", pedidoId)
-      .select()
-      .single();
+      .select("*")
+      .single<PedidoResponse>();
 
     if (result.error) {
-      console.error("Error actualizando pedido:", result.error);
+      console.error("❌ Error actualizando pedido en Supabase:", result.error);
       return NextResponse.json({ error: result.error.message }, { status: 500 });
     }
 
-    console.log("✅ Pedido actualizado:", result.data);
-    return NextResponse.json({ pedido: result.data as Record<string, unknown> });
+    const pedidoActualizado = result.data;
+
+    // 🔥 SI EL PEDIDO PASÓ A "pagado", DISPARAR EL CORREO AUTOMÁTICO
+    if (estado === "pagado" || (pedidoActualizado && pedidoActualizado.estado === "pagado")) {
+      console.log("🚀 El pedido está PAGADO. Iniciando automatización de correo...");
+      
+      try {
+        const { enviarEmailConfirmacion } = await import("../webhooks/wompi/emailConfirmacion");
+        
+        // Extraer datos del contacto
+        let contacto: ContactoEnPedido = {};
+        try {
+          if (pedidoActualizado) {
+            contacto = typeof pedidoActualizado.datos_contacto === 'string' 
+              ? JSON.parse(pedidoActualizado.datos_contacto) as ContactoEnPedido
+              : (pedidoActualizado.datos_contacto as unknown as ContactoEnPedido ?? {});
+          }
+        } catch (e) { console.error("Error parseando contacto:", e); }
+
+        // Extraer productos
+        let productosRaw: ProductoEnArreglo[] = [];
+        try {
+          if (pedidoActualizado) {
+            productosRaw = typeof pedidoActualizado.productos === 'string' 
+              ? JSON.parse(pedidoActualizado.productos) as ProductoEnArreglo[]
+              : (pedidoActualizado.productos as unknown as ProductoEnArreglo[] ?? []);
+          }
+        } catch (e) { console.error("Error parseando productos:", e); }
+
+        const emailDestino = contacto.email;
+        const nombreCliente = contacto.nombre ?? "Cliente";
+
+        if (emailDestino && pedidoActualizado) {
+          console.log(`📧 Enviando factura a ${emailDestino} (Backup desde API Pedidos)...`);
+          await enviarEmailConfirmacion({
+            to: emailDestino,
+            pedidoId: pedidoActualizado.id,
+            nombreCliente,
+            productos: productosRaw.map((p) => ({
+              nombre: p.nombre ?? p.name ?? "Producto",
+              cantidad: p.cantidad ?? 1,
+              precio: p.precio ?? p.precio_unitario ?? 0,
+            })),
+            total: pedidoActualizado.total,
+            metodoPago: pedidoActualizado.payment_method ?? "TARJETA",
+            transaccionId: pedidoActualizado.payment_id ?? `TX-${pedidoActualizado.id}`,
+            referencia: pedidoActualizado.payment_id ?? `REF-${pedidoActualizado.id}`,
+            direccionEnvio: pedidoActualizado.direccion_envio,
+            ciudadEnvio: pedidoActualizado.ciudad_envio,
+            fechaPago: new Date().toISOString()
+          });
+          console.log("✅ Factura enviada automáticamente.");
+        } else {
+          console.warn("⚠️ No se encontró email del cliente en el pedido.");
+        }
+      } catch (emailErr) {
+        console.error("❌ Error en envío automático de factura:", emailErr);
+      }
+    }
+
+    return NextResponse.json({ success: true, pedido: result.data });
   } catch (err) {
-    console.error("Error en PATCH /api/pedidos:", err);
-    return NextResponse.json({ error: "Error actualizando pedido" }, { status: 500 });
+    console.error("❌ Error inesperado en PATCH /api/pedidos:", err);
+    return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
 }
+
