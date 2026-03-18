@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { motion } from "framer-motion";
-import { ChevronLeft, ChevronRight, ShoppingCart, Eye} from "lucide-react";
+import { ChevronLeft, ChevronRight, ShoppingCart, Eye, Sparkles} from "lucide-react";
 import clsx from "clsx";
 import { createClient } from "@supabase/supabase-js";
 
@@ -192,73 +192,75 @@ export default function ProductosCarrusel({ soloDestacados = false }: ProductosC
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: idx * 0.1 }}
             className={clsx(
-              "flex-shrink-0 relative bg-white border border-slate-100 rounded-[2.5rem] p-6 shadow-sm hover:shadow-2xl hover:shadow-[#00a19a]/10 transition-all duration-500",
+              "flex-shrink-0 relative bg-white border border-slate-50 rounded-[2.5rem] p-5 shadow-[0_4px_25px_rgba(0,0,0,0.02)] hover:shadow-[0_25px_50px_rgba(0,161,154,0.12)] transition-all duration-700 group flex flex-col",
               cardsPerView === 1 ? "w-full" : 
               cardsPerView === 2 ? "w-[calc(50%-12px)]" :
               cardsPerView === 3 ? "w-[calc(33.33%-16px)]" : "w-[calc(25%-18px)]"
             )}
           >
-            {/* Image Wrap */}
-            <div className="relative aspect-square rounded-3xl overflow-hidden bg-slate-50 mb-6 group/img">
+            {/* Image Wrap with Gradient Background */}
+            <div className="relative aspect-square rounded-[2rem] overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100 mb-6 group/img p-8">
                <Image
                   src={prod.image_url ?? "/Logo%20Thiart%20Tiktok.png"}
                   alt={prod.nombre}
                   fill
-                  className="object-cover transition-transform duration-700 group-hover/img:scale-110"
+                  className="object-contain transition-transform duration-700 group-hover/img:scale-110 drop-shadow-xl"
                 />
                 
                 {prod.destacado && (
                   <div className="absolute top-4 left-4">
-                    <span className="bg-[#00a19a] text-white text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full shadow-lg">
-                      Top Obras
+                    <span className="bg-black/80 backdrop-blur-md text-white text-[9px] font-black uppercase tracking-[0.15em] px-3.5 py-1.5 rounded-full shadow-xl flex items-center gap-1.5">
+                      <Sparkles className="w-3 h-3 text-teal-400" />
+                      Elite
                     </span>
                   </div>
                 )}
 
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity duration-300 flex items-center justify-center gap-4">
+                <div className="absolute inset-0 bg-white/40 opacity-0 group-hover/img:opacity-100 transition-opacity duration-300 flex items-center justify-center gap-3">
                   <motion.button 
                     whileHover={{ scale: 1.1 }}
                     whileTap={{ scale: 0.9 }}
                     onClick={() => router.push(`/tienda/productos/${prod.id}`)}
-                    className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-[#00a19a] shadow-xl"
+                    className="w-11 h-11 bg-white rounded-2xl flex items-center justify-center text-[#00a19a] shadow-xl border border-white/50"
                   >
                     <Eye className="w-5 h-5" />
                   </motion.button>
                   <motion.button 
                     whileHover={{ scale: 1.1 }}
                     whileTap={{ scale: 0.9 }}
-                    className="w-12 h-12 bg-[#00a19a] rounded-2xl flex items-center justify-center text-white shadow-xl"
+                    className="w-11 h-11 bg-[#00a19a] rounded-2xl flex items-center justify-center text-white shadow-xl"
                   >
                     <ShoppingCart className="w-5 h-5" />
                   </motion.button>
                 </div>
             </div>
 
-            {/* Content */}
-            <div className="space-y-3">
+            {/* Content Details */}
+            <div className="space-y-3 flex-1 flex flex-col">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-black text-[#00a19a] uppercase tracking-widest">
+                <span className="text-[10px] font-black text-[#00a19a] uppercase tracking-widest px-2.5 py-1 bg-teal-50 rounded-lg">
                   {prod.categoria}
                 </span>
-                <span className="text-[10px] text-slate-400 font-medium">By {prod.usuarios?.nombre ?? "Thiart"}</span>
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">Thiart Original</span>
               </div>
               
-              <h3 className="text-lg font-bold text-slate-900 line-clamp-1">
+              <h3 className="text-lg font-black text-slate-900 line-clamp-1 group-hover:text-[#00a19a] transition-colors leading-tight">
                 {prod.nombre}
               </h3>
               
-              <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">
+              <p className="text-[11px] text-slate-500 line-clamp-2 leading-relaxed font-medium mb-4">
                 {prod.descripcion}
               </p>
 
-              <div className="pt-4 flex items-center justify-between">
-                <div className="flex items-baseline gap-1">
-                  <span className="text-sm font-bold text-[#00a19a]">$</span>
-                  <span className="text-xl font-black text-slate-900">{prod.precio.toLocaleString()}</span>
+              <div className="mt-auto pt-4 flex items-center justify-between border-t border-slate-50">
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-xs font-bold text-teal-600">$</span>
+                  <span className="text-2xl font-black text-slate-900 tracking-tighter">{prod.precio.toLocaleString()}</span>
+                  <span className="text-[9px] font-black text-slate-400 ml-0.5">COP</span>
                 </div>
-                <div className="flex gap-1">
-                  <div className="w-1.5 h-1.5 rounded-full bg-[#00a19a]" />
-                  <div className="w-1.5 h-1.5 rounded-full bg-slate-200" />
+                <div className="flex gap-1.5">
+                  <div className="w-1.5 h-1.5 rounded-full bg-teal-500 shadow-[0_0_8px_rgba(20,184,166,0.6)]" />
+                  <div className="w-1.5 h-1.5 rounded-full bg-slate-100" />
                 </div>
               </div>
             </div>

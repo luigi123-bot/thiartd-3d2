@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardTitle, CardDescription } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
-import { ShoppingCart, X, Filter, Sparkles, Package, ArrowRight, Ruler, Tag, BadgeDollarSign } from "lucide-react";
+import { ShoppingCart, X, Filter, Sparkles, Package, Ruler, Tag, BadgeDollarSign } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -271,7 +271,7 @@ function ProductosTiendaPageInner() {
                   <Button variant="outline" onClick={limpiarFiltros} className="rounded-xl">Limpiar búsqueda</Button>
                 </motion.div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-8">
+                <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
                   {productosFiltrados.map((producto, idx) => (
                     <ProductCardModern 
                       key={producto.id} 
@@ -334,157 +334,146 @@ function FilterCheckbox({ label, checked, onChange }: { label: string; checked: 
   );
 }
 
-function ProductCardModern({ 
-  producto, 
-  idx, 
-  router, 
-  addToCarrito, 
-  carrito 
-}: { 
-  producto: Product; 
-  idx: number; 
-  router: AppRouterInstance; 
-  addToCarrito: (item: CarritoItem) => Promise<boolean>; 
-  carrito: CarritoItem[]; 
+// Sub-componente para la Card de Producto (Diseño Minimal Compacto)
+function ProductCardModern({ producto, idx, router, addToCarrito, carrito }: {
+  producto: Product;
+  idx: number;
+  router: AppRouterInstance;
+  addToCarrito: (item: CarritoItem) => Promise<boolean>;
+  carrito: CarritoItem[];
 }) {
   const data = {
-    nombre: producto.nombre ?? producto.name ?? "Sin nombre",
-    desc: producto.descripcion ?? producto.description ?? "",
-    categoria: producto.categoria ?? producto.category ?? "Otros",
-    tamano: producto.tamano ?? producto.size ?? "N/A",
+    id: producto.id,
+    nombre: producto.nombre ?? producto.name ?? "Producto Sin Nombre",
     precio: producto.precio ?? producto.price ?? 0,
+    categoria: producto.categoria ?? producto.category ?? "General",
+    creador: producto.usuarios?.nombre ?? "Thiart",
+    desc: producto.descripcion ?? producto.description ?? "Sin descripción",
     destacado: producto.destacado ?? producto.featured ?? false,
-    creador: producto.usuarios?.nombre ?? "Thiart3D",
+    tamano: "Único"
   };
 
   const enCarrito = carrito.find((p) => String(p.id) === String(producto.id));
   const cantidadEnCarrito = enCarrito?.cantidad ?? 0;
-  const stockDisponible = producto.stock - cantidadEnCarrito;
+  const stockDisponible = (producto.stock ?? 1) - cantidadEnCarrito;
 
   return (
     <motion.div
       layout
-      initial={{ opacity: 0, y: 30 }}
+      initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: idx * 0.05, duration: 0.5 }}
-      whileHover={{ y: -8 }}
+      transition={{ delay: idx * 0.03, duration: 0.4 }}
+      whileHover={{ y: -5 }}
     >
-      <Card className="group relative h-full bg-white border-none shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_20px_50px_rgba(0,161,154,0.12)] rounded-3xl overflow-hidden transition-all duration-500">
-        {/* Image Container */}
-        <div className="h-64 relative bg-slate-50 overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-t from-slate-900/10 to-transparent pointer-events-none" />
+      <Card className="group relative h-full bg-white border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-[#00a19a]/10 rounded-3xl overflow-hidden transition-all duration-500 flex flex-col">
+        {/* Compact Image Container */}
+        <div className="h-44 relative bg-gradient-to-br from-slate-50 to-slate-100/50 overflow-hidden">
           {producto.image_url ? (
-            <Image
-              src={producto.image_url}
-              alt={data.nombre}
-              fill
-              className="object-cover transition-transform duration-700 group-hover:scale-110"
-              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-            />
+            <div className="h-full w-full p-4 relative z-0">
+              <Image
+                src={producto.image_url}
+                alt={data.nombre}
+                fill
+                className="object-contain transition-transform duration-700 group-hover:scale-110 drop-shadow-lg"
+                sizes="(max-width: 768px) 50vw, 25vw"
+              />
+            </div>
           ) : (
-            <div className="flex items-center justify-center h-full text-slate-300">
-              <Package className="w-12 h-12" />
+            <div className="flex items-center justify-center h-full text-slate-200">
+              <Package className="w-8 h-8 stroke-[1.5]" />
             </div>
           )}
 
-          {/* Floating Badges */}
-          <div className="absolute top-4 left-4 flex flex-col gap-2">
+          {/* Minimal Floating Badges */}
+          <div className="absolute top-3 left-3 flex flex-col gap-1 z-20">
             {data.destacado && (
-              <span className="bg-[#00a19a] text-white text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full shadow-lg">
-                Destacado
+              <span className="bg-black/80 backdrop-blur-md text-white text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-full shadow-lg border border-white/10">
+                Elite
               </span>
             )}
             {producto.stock === 0 && (
-              <span className="bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full shadow-lg">
-                Agotado
+              <span className="bg-red-500/90 backdrop-blur-md text-white text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-full shadow-lg">
+                SOLD OUT
               </span>
             )}
           </div>
-
-          <div className="absolute top-4 right-4 group-hover:scale-110 transition-transform">
-             <div className="bg-white/90 backdrop-blur-md text-slate-900 text-xs font-black px-3 py-1.5 rounded-full shadow-lg border border-white">
-                By {data.creador}
-             </div>
-          </div>
         </div>
 
-        {/* Content */}
-        <CardContent className="p-6">
-          <div className="flex gap-2 mb-4">
-            <span className="bg-slate-100 text-slate-500 text-[10px] font-bold uppercase px-2.5 py-1 rounded-lg">
+        {/* Compact Content Body */}
+        <CardContent className="p-4 pt-1 flex flex-col flex-1 relative z-20">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[#00a19a] font-black text-[8px] uppercase tracking-tighter opacity-80">
               {data.categoria}
             </span>
-            <span className="bg-slate-100 text-slate-500 text-[10px] font-bold uppercase px-2.5 py-1 rounded-lg">
-              {data.tamano}
+            <span className="text-slate-300 font-bold text-[8px] uppercase">
+               By {data.creador.split(' ')[0]}
             </span>
           </div>
 
-          <CardTitle className="text-xl font-bold text-slate-900 mb-2 line-clamp-1 group-hover:text-[#00a19a] transition-colors">
+          <CardTitle className="text-sm font-black text-slate-900 mb-1 line-clamp-1 group-hover:text-[#00a19a] transition-colors leading-tight tracking-tight">
             {data.nombre}
           </CardTitle>
           
-          <CardDescription className="text-slate-500 text-sm mb-6 line-clamp-2 h-10 leading-relaxed">
+          <CardDescription className="text-slate-400 text-[10px] mb-3 line-clamp-2 h-7 leading-tight font-medium">
             {data.desc}
           </CardDescription>
 
-          <div className="flex items-center justify-between items-end">
+          <div className="mt-auto pt-3 border-t border-slate-50 flex items-center justify-between">
             <div>
-              <p className="text-xs text-slate-400 font-bold uppercase mb-1">Precio</p>
-              <div className="flex items-center gap-1.5">
-                <span className="text-2xl font-black text-slate-900 tracking-tight">
-                  <span className="text-sm font-bold text-[#00a19a] mr-0.5">$</span>
+              <div className="flex items-center gap-1">
+                <span className="text-sm font-black text-slate-900 tracking-tighter">
+                  <span className="text-[10px] font-bold text-teal-600 mr-0.5">$</span>
                   {data.precio.toLocaleString()}
                 </span>
-                <span className="text-[10px] font-black text-slate-400 mt-2">COP</span>
+                <span className="text-[8px] font-black text-slate-400">COP</span>
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
                {cantidadEnCarrito > 0 && (
-                <div className="w-10 h-10 flex items-center justify-center bg-[#00a19a]/10 text-[#00a19a] rounded-2xl font-black text-xs">
+                <div className="w-7 h-7 flex items-center justify-center bg-teal-50 text-teal-600 rounded-lg font-black text-[9px] border border-teal-100 shadow-sm animate-in zoom-in-50">
                   {cantidadEnCarrito}
                 </div>
               )}
               <motion.button
-                whileTap={{ scale: 0.95 }}
+                whileTap={{ scale: 0.9 }}
                 disabled={stockDisponible <= 0}
-                onClick={async () => {
+                onClick={async (e) => {
+                  e.stopPropagation();
                   const ok = await addToCarrito({
                     id: String(producto.id),
                     nombre: data.nombre,
                     precio: data.precio,
                     imagen: producto.image_url ?? "/Logo%20Thiart%20Tiktok.png",
-                    cantidad: cantidadEnCarrito,
+                    cantidad: 1, 
                     stock: producto.stock,
                     categoria: data.categoria,
                     destacado: data.destacado,
                   });
-                  if (ok) toast.success("Agregado al carrito 🛒");
-                  else toast.warning("Stock agotado ⚠️");
+                  if (ok) toast.success("Añadido ✨");
+                  else toast.warning("Sin stock ⚠️");
                 }}
                 className={`
-                  w-14 h-14 flex items-center justify-center rounded-2xl transition-all duration-300 shadow-xl
+                  w-9 h-9 flex items-center justify-center rounded-xl transition-all duration-300 shadow-lg
                   ${stockDisponible <= 0 
-                    ? "bg-slate-200 text-slate-400 cursor-not-allowed" 
-                    : "bg-[#00a19a] text-white hover:bg-[#007973] hover:shadow-[#00a19a]/30"}
+                    ? "bg-slate-100 text-slate-300 cursor-not-allowed" 
+                    : "bg-black text-white hover:bg-[#00a19a] hover:shadow-teal-100/50"}
                 `}
               >
-                <ShoppingCart className="w-5 h-5" />
+                <ShoppingCart className="w-3.5 h-3.5" />
               </motion.button>
             </div>
           </div>
 
           <Button
             variant="ghost"
-            className="w-full mt-6 rounded-2xl h-11 text-slate-500 font-bold text-xs hover:bg-slate-50 hover:text-[#00a19a] group/btn transition-all"
+            className="w-full mt-3 rounded-lg h-7 text-slate-400 font-bold text-[8px] hover:bg-slate-50 hover:text-teal-600 transition-all border border-transparent hover:border-slate-100 uppercase tracking-widest"
             onClick={() => router.push(`/tienda/productos/${producto.id}`)}
           >
-            VER DETALLES COMPLETOS
-            <ArrowRight className="w-4 h-4 ml-2 transition-transform group-hover/btn:translate-x-1" />
+            Detalles
           </Button>
         </CardContent>
       </Card>
     </motion.div>
   );
 }
-
