@@ -1,7 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 interface PedidoNotificacion {
@@ -47,12 +47,11 @@ export class NotificationService {
     }
   ): Promise<void> {
     try {
-      // Obtener datos del pedido
-      const { data: pedido } = await supabase
+      const { data: pedido } = (await supabase
         .from("pedidos")
-        .select("*")
+        .select("id, estado, datos_contacto, usuario_id")
         .eq("id", pedidoId)
-        .single<PedidoNotificacion>();
+        .single()) as { data: { id: number; estado: string; datos_contacto: string; usuario_id: string | null } | null };
 
       if (!pedido) return;
 
@@ -64,10 +63,12 @@ export class NotificationService {
       }
 
       // Crear mensaje según el estado
-      const { titulo, mensaje } = this.generarMensajeEstado(nuevoEstado, pedido, datosAdicionales);
+      const pedidoParaNotif = pedido as unknown as { id: number; estado: string; datos_contacto: string };
+      const { titulo, mensaje } = this.generarMensajeEstado(nuevoEstado, pedidoParaNotif, datosAdicionales);
 
       // Guardar notificación en la base de datos
       const notificacion: Omit<NotificacionData, 'id' | 'created_at'> = {
+        usuario_id: pedido.usuario_id ?? "", // <--- Guardamos el ID del usuario
         pedido_id: pedidoId,
         tipo: 'email',
         titulo,

@@ -28,6 +28,7 @@ interface Pedido {
   codigo_postal_envio?: string;
   telefono_envio?: string;
   notas_envio?: string;
+  payment_id?: string;
   payment_method?: string;
   numero_tracking?: string;
 }
@@ -51,6 +52,7 @@ const estadoConfig: Record<string, EstadoConfig> = {
   en_envio: { label: "En envío", color: "bg-green-100 text-green-800", icon: Truck as React.ComponentType<React.SVGProps<SVGSVGElement>> },
   entregado: { label: "Entregado", color: "bg-green-100 text-green-800", icon: CheckCircle as React.ComponentType<React.SVGProps<SVGSVGElement>> },
   cancelado: { label: "Cancelado", color: "bg-red-100 text-red-800", icon: XCircle as React.ComponentType<React.SVGProps<SVGSVGElement>> },
+  pendiente_cotizacion: { label: "Pendiente de cotización", color: "bg-orange-100 text-orange-800", icon: Clock as React.ComponentType<React.SVGProps<SVGSVGElement>> },
 };
 
 export default function EnviosPage() {
@@ -212,44 +214,78 @@ export default function EnviosPage() {
                         {pedido.numero_tracking && (
                           <div>Tracking: <span className="font-mono text-xs bg-gray-100 px-2 py-1 rounded">{pedido.numero_tracking}</span></div>
                         )}
+                        {pedido.estado === "pendiente_pago" && pedido.payment_id?.startsWith("http") && (
+                          <div className="pt-2">
+                            <a 
+                              href={pedido.payment_id} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center justify-center w-full bg-[#00a19a] hover:bg-[#007973] text-white text-xs font-bold py-2.5 px-4 rounded-xl transition-all shadow-sm shadow-teal-100"
+                            >
+                              💳 Pagar pedido ahora
+                            </a>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
 
-                  {/* Información de envío */}
-                  {pedido.direccion_envio && (
-                    <div className="mt-4 pt-4 border-t">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* Datos de contacto */}
-                        {datosContacto.nombre && (
-                          <div>
-                            <h4 className="font-semibold mb-2">Datos de contacto</h4>
-                            <div className="text-sm text-gray-600 space-y-1">
-                              {datosContacto.nombre && <div><strong>Nombre:</strong> {datosContacto.nombre}</div>}
-                              {datosContacto.email && <div><strong>Email:</strong> {datosContacto.email}</div>}
-                              {datosContacto.telefono && <div><strong>Teléfono:</strong> {datosContacto.telefono}</div>}
-                            </div>
-                          </div>
-                        )}
-                        
-                        {/* Dirección de envío */}
+                  {/* Información de envío y Cotización */}
+                  <div className="mt-4 pt-4 border-t">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Datos de contacto */}
+                      {datosContacto.nombre && (
                         <div>
-                          <h4 className="font-semibold mb-2">Dirección de envío</h4>
-                          <div className="text-sm text-gray-600">
-                            <div>{pedido.direccion_envio}</div>
-                            <div>{pedido.ciudad_envio}, {pedido.departamento_envio}</div>
-                            {pedido.codigo_postal_envio && <div>CP: {pedido.codigo_postal_envio}</div>}
-                            {pedido.telefono_envio && <div>Tel: {pedido.telefono_envio}</div>}
-                            {pedido.notas_envio && (
-                              <div className="mt-2 text-xs italic">
-                                <strong>Notas:</strong> {pedido.notas_envio}
-                              </div>
-                            )}
+                          <h4 className="font-semibold mb-2">Datos de contacto</h4>
+                          <div className="text-sm text-gray-600 space-y-1">
+                            {datosContacto.nombre && <div><strong>Nombre:</strong> {datosContacto.nombre}</div>}
+                            {datosContacto.email && <div><strong>Email:</strong> {datosContacto.email}</div>}
+                            {datosContacto.telefono && <div><strong>Teléfono:</strong> {datosContacto.telefono}</div>}
                           </div>
                         </div>
+                      )}
+                      
+                      {/* Detalles de Cotización / Dirección */}
+                      <div>
+                        {pedido.notas_envio?.includes("[Cotización]") ? (
+                          <div className="bg-teal-50/50 p-4 rounded-xl border border-teal-100">
+                            <h4 className="font-bold text-teal-900 mb-3 flex items-center gap-2">
+                              <Package className="w-4 h-4" />
+                              Detalles de tu Cotización
+                            </h4>
+                            <div className="space-y-3">
+                              {pedido.notas_envio.split("\n").map((line, i) => {
+                                if (line.trim() === "[Cotización]") return null;
+                                const [label, ...val] = line.split(":");
+                                if (!val.length) return <p key={i} className="text-sm text-teal-800 leading-relaxed">{line}</p>;
+                                return (
+                                  <div key={i} className="flex flex-col sm:flex-row sm:gap-2">
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-teal-600/70 sm:w-24 shrink-0">{label?.trim() ?? ""}</span>
+                                    <span className="text-sm font-bold text-teal-900 leading-snug">{val.join(":").trim()}</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <h4 className="font-semibold mb-2">Dirección de envío</h4>
+                            <div className="text-sm text-gray-600">
+                              <div>{pedido.direccion_envio}</div>
+                              <div>{pedido.ciudad_envio}, {pedido.departamento_envio}</div>
+                              {pedido.codigo_postal_envio && <div>CP: {pedido.codigo_postal_envio}</div>}
+                              {pedido.telefono_envio && <div>Tel: {pedido.telefono_envio}</div>}
+                              {pedido.notas_envio && (
+                                <div className="mt-2 text-xs italic">
+                                  <strong>Notas:</strong> {pedido.notas_envio}
+                                </div>
+                              )}
+                            </div>
+                          </>
+                        )}
                       </div>
                     </div>
-                  )}
+                  </div>
 
                   {/* Botón de tracking */}
                   <div className="mt-4 pt-4 border-t">

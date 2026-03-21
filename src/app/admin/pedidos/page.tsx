@@ -6,17 +6,14 @@ import { Button } from "~/components/ui/button";
 import { createClient } from "@supabase/supabase-js";
 import { DetallePedidoModal } from "../../../components/DetallePedidoModal";
 import {
-  Package,
-  Search,
-  Filter,
-  TrendingUp,
-  Clock,
-  CheckCircle2,
-  Download,
-  Calendar,
-  Users,
-  ArrowUpRight
-} from "lucide-react";
+  Download, Search, Filter,
+  Clock, Package,
+  FileText, Settings2, Mail, TrendingUp, Users, ArrowUpRight, Calendar, CheckCircle2
+} from 'lucide-react';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter
+} from "~/components/ui/dialog";
+import { Input } from "~/components/ui/input";
 import { motion, AnimatePresence } from "framer-motion";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "TU_SUPABASE_URL";
@@ -113,6 +110,10 @@ export default function AdminPedidosPage() {
   const [procesandoPago, setProcesandoPago] = useState<number | null>(null);
   const [filtroEstado, setFiltroEstado] = useState<string>("todos");
 
+  const [generandoReporte, setGenerandoReporte] = useState(false);
+  const [managerEmail, setManagerEmail] = useState("");
+  const [openConfig, setOpenConfig] = useState(false);
+
   const fetchPedidos = async () => {
     const { data, error } = await supabase
       .from("pedidos")
@@ -128,6 +129,14 @@ export default function AdminPedidosPage() {
 
   useEffect(() => {
     void fetchPedidos();
+    // Cargar config actual
+    fetch("/api/admin/configuraciones")
+      .then(r => r.json())
+      .then((d: unknown) => {
+        const data = d as { valor?: string };
+        setManagerEmail(data.valor ?? "");
+      })
+      .catch(console.error);
   }, []);
 
   const simularPagoAprobado = async (pedidoId: number) => {
@@ -155,6 +164,48 @@ export default function AdminPedidosPage() {
       console.error('Error:', error);
     } finally {
       setProcesandoPago(null);
+    }
+  };
+
+  const handleUpdateEmail = async () => {
+    try {
+      const resp = await fetch("/api/admin/configuraciones", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ valor: managerEmail })
+      });
+      if (resp.ok) {
+        alert("✅ Correo del gerente actualizado.");
+        setOpenConfig(false);
+      }
+    } catch (error) {
+      console.error(error);
+      alert("Error al guardar.");
+    }
+  };
+
+  const handleGenerarReporte = async () => {
+    if (!managerEmail) {
+      setOpenConfig(true);
+      return;
+    }
+    setGenerandoReporte(true);
+    try {
+      const resp = await fetch("/api/admin/reporte-gerencial", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ managerEmail })
+      });
+      if (resp.ok) {
+        alert(`📊 Reporte enviado a: ${managerEmail}`);
+      } else {
+        alert("Error al generar el reporte.");
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Error de conexión.");
+    } finally {
+      setGenerandoReporte(false);
     }
   };
 
@@ -196,10 +247,51 @@ export default function AdminPedidosPage() {
                 className="w-full h-14 pl-12 pr-4 bg-white border border-slate-200 rounded-2xl focus:ring-2 focus:ring-[#00a19a] outline-none shadow-sm transition-all text-sm font-bold"
               />
             </div>
-            <Button className="h-14 px-8 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 shadow-xl">
+            <Button
+              className="h-14 px-8 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 shadow-xl"
+            >
               <Download className="w-5 h-5 mr-3" />
               Exportar
             </Button>
+            <div className="flex items-center">
+              <Button
+                onClick={handleGenerarReporte}
+                disabled={generandoReporte}
+                className="h-10 px-4 rounded-l-md bg-purple-600 hover:bg-purple-700 text-white font-bold flex items-center gap-2 border-r border-purple-500"
+              >
+                {generandoReporte ? (
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <FileText className="w-4 h-4" />
+                )}
+                <span className="hidden sm:inline">Generar Reporte Gerencial</span>
+                <span className="sm:hidden">Reporte</span>
+              </Button>
+              <Dialog open={openConfig} onOpenChange={setOpenConfig}>
+                <DialogTrigger asChild>
+                  <Button className="h-10 px-3 rounded-r-md bg-purple-600 hover:bg-purple-700 text-white border-l border-purple-500">
+                    <Settings2 className="w-4 h-4" />
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                      <Mail className="w-5 h-5" /> Configurar Correo Gerencial
+                    </DialogTitle>
+                  </DialogHeader>
+                  <div className="py-4 space-y-4">
+                    <Input
+                      placeholder="correo@gerente.com"
+                      value={managerEmail}
+                      onChange={(e) => setManagerEmail(e.target.value)}
+                    />
+                  </div>
+                  <DialogFooter>
+                    <Button onClick={handleUpdateEmail} className="bg-[#00a19a]">Guardar</Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
           </div>
         </div>
 
@@ -245,7 +337,7 @@ export default function AdminPedidosPage() {
                 <span className="text-sm font-black text-slate-400 uppercase tracking-widest">Filtrar por:</span>
               </div>
               <div className="flex gap-2">
-                {["todos", "pendiente_pago", "pagado", "pago_cancelado"].map((estado) => (
+                {["todos", "pendiente_cotizacion", "pendiente_pago", "pagado", "pago_cancelado"].map((estado) => (
                   <button
                     key={estado}
                     onClick={() => setFiltroEstado(estado)}
@@ -290,6 +382,7 @@ export default function AdminPedidosPage() {
                     const estadoColors: Record<string, string> = {
                       pagado: "bg-emerald-50 text-emerald-700 border-emerald-100",
                       pendiente_pago: "bg-amber-50 text-amber-700 border-amber-100",
+                      pendiente_cotizacion: "bg-orange-50 text-orange-700 border-orange-100",
                       pago_cancelado: "bg-rose-50 text-rose-700 border-rose-100",
                       pago_rechazado: "bg-rose-50 text-rose-700 border-rose-100",
                     };

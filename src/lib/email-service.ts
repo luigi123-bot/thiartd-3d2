@@ -599,3 +599,348 @@ export async function sendAbandonedCartReminder(params: SendAbandonedCartReminde
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
 }
+
+interface SendQuotationEmailParams {
+  to: string;
+  pedidoId: number;
+  nombreCliente: string;
+  items: string; // Resumen de lo que se cotiza
+  total: number;
+  pagoUrl: string;
+}
+
+export async function sendQuotationEmail(params: SendQuotationEmailParams): Promise<{ success: true; data: SentMessageInfo } | { success: false; error: string }> {
+  const { to, pedidoId, nombreCliente, items, total, pagoUrl } = params;
+
+  try {
+    const transporter = createTransporter();
+
+    const html = `
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tu Cotización Thiart 3D</title>
+</head>
+<body style="margin:0; padding:0; background-color:#f8fafc; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f8fafc; padding: 40px 16px;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px; width:100%;">
+
+          <!-- HEADER -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); border-radius: 20px 20px 0 0; padding: 40px 48px; text-align: center;">
+              <div style="font-size: 28px; font-weight: 900; color: #ffffff; letter-spacing: -1px; margin-bottom: 4px;">
+                Thiart<span style="color: #14b8a6;">3D</span>
+              </div>
+              <div style="font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 3px; font-weight: 700;">
+                Personalización Premium
+              </div>
+              <div style="margin-top: 28px; background: rgba(20, 184, 166, 0.1); border: 1px solid rgba(20, 184, 166, 0.3); border-radius: 50px; display: inline-block; padding: 10px 24px;">
+                <span style="color: #14b8a6; font-size: 13px; font-weight: 800; letter-spacing: 1px;">📋 COTIZACIÓN LISTA</span>
+              </div>
+            </td>
+          </tr>
+
+          <!-- BODY -->
+          <tr>
+            <td style="background: #ffffff; padding: 40px 48px;">
+              <p style="font-size: 22px; font-weight: 900; color: #0f172a; margin: 0 0 8px 0; letter-spacing: -0.5px;">
+                ¡Hola, ${nombreCliente}! 👋
+              </p>
+              <p style="font-size: 15px; color: #475569; margin: 0 0 32px 0; line-height: 1.6;">
+                Hemos revisado tu solicitud de proyecto personalizado. A continuación encontrarás el detalle de la cotización y el enlace para proceder con el pago.
+              </p>
+
+              <!-- RESUMEN INFO -->
+              <table width="100%" cellpadding="0" cellspacing="0" style="background: #f8fafc; border-radius: 16px; margin-bottom: 32px; overflow: hidden;">
+                <tr>
+                  <td style="padding: 20px 24px; border-bottom: 1px solid #e2e8f0;">
+                    <span style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 2px; color: #94a3b8;">Detalles del Proyecto</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 24px;">
+                    <div style="font-size: 16px; font-weight: 700; color: #1e293b; margin-bottom: 8px;">Proyecto #${pedidoId}</div>
+                    <div style="font-size: 14px; color: #64748b; line-height: 1.6; white-space: pre-wrap;">${items}</div>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- PRECIO TOTAL -->
+              <div style="text-align: center; margin-bottom: 40px; padding: 32px; background: #0f172a; border-radius: 16px;">
+                <p style="font-size: 12px; font-weight: 800; color: #14b8a6; margin: 0 0 8px 0; text-transform: uppercase; letter-spacing: 2px;">Inversión Total</p>
+                <p style="font-size: 36px; font-weight: 900; color: #ffffff; margin: 0;">
+                  $${total.toLocaleString("es-CO")} <span style="font-size: 14px; color: #64748b; font-weight: 600;">COP</span>
+                </p>
+              </div>
+
+              <!-- CTA -->
+              <div style="text-align: center; margin-bottom: 32px;">
+                <p style="font-size: 14px; color: #475569; margin-bottom: 24px;">Para asegurar tu cupo en nuestra agenda de producción, puedes realizar el pago seguro a través de Wompi:</p>
+                <a href="${pagoUrl}" style="background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%); color: #ffffff; padding: 20px 48px; border-radius: 12px; text-decoration: none; font-weight: 800; display: inline-block; font-size: 18px; box-shadow: 0 10px 15px -3px rgba(20, 184, 166, 0.3);">
+                  💳 PAGAR MI PEDIDO
+                </a>
+              </div>
+
+              <p style="font-size: 13px; color: #94a3b8; text-align: center; margin: 0;">
+                Esta cotización tiene una validez de <strong>5 días hábiles</strong>.
+              </p>
+            </td>
+          </tr>
+
+          <!-- FOOTER -->
+          <tr>
+            <td style="background: #f1f5f9; border-radius: 0 0 20px 20px; padding: 24px 48px; text-align: center; border-top: 1px solid #e2e8f0;">
+              <p style="margin: 0; font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: 2px; font-weight: 700;">
+                Thiart3D · Innovación en cada detalle
+              </p>
+              <p style="margin: 8px 0 0 0; font-size: 11px; color: #cbd5e1;">
+                © 2025 Thiart 3D - Todos los derechos reservados
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `;
+
+    const info = (await transporter.sendMail({
+      from: `"Thiart 3D" <${process.env.GMAIL_USER}>`,
+      to,
+      subject: `📋 Tu Cotización para el Pedido #${pedidoId} está lista – Thiart 3D`,
+      html,
+    })) as { messageId: string; response: string };
+    console.log('✅ Correo de cotización enviado:', info.messageId);
+    return { success: true, data: info };
+  } catch (err: unknown) {
+    console.error('❌ Error en sendQuotationEmail:', err);
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+export interface ManagerReportParams {
+  to: string;
+  totalIncome: number;
+  ordersCount: number;
+  pendingCount: number;
+  quotationsCount: number;
+  paidCount: number;
+  cancelledCount: number;
+  recentOrders: { id: number; total: number; estado: string; cliente: string }[];
+  allOrders?: Array<{ id: number; created_at: string; total: number; estado: string; datos_contacto: string }>;
+  allUsers?: Array<{ id: string | number; nombre?: string; email: string; role: string; creado_en?: string }>;
+  allProducts?: Array<{ id: string | number; nombre: string; categoria: string; stock: number; precio: number; descripcion?: string }>;
+  allMessages?: Array<{ id: string | number; nombre_cliente?: string; asunto?: string; created_at: string; leido: boolean }>;
+}
+export async function sendManagerReportEmail(params: ManagerReportParams) {
+  const { 
+    to, 
+    totalIncome, 
+    ordersCount, 
+    pendingCount, 
+    quotationsCount, 
+    paidCount, 
+    cancelledCount,
+    recentOrders,
+    allOrders = [],
+    allUsers = [],
+    allProducts = [],
+    allMessages = []
+  } = params;
+
+  try {
+    const transporter: Transporter = createTransporter();
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 0; }
+    .container { max-width: 600px; margin: 40px auto; background-color: #ffffff; border-radius: 24px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+    .header { background-color: #0f172a; padding: 48px; text-align: center; color: #ffffff; }
+    .content { padding: 48px; }
+    .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 32px; }
+    .stat-card { background-color: #f1f5f9; padding: 24px; border-radius: 16px; text-align: center; }
+    .stat-label { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: #64748b; margin-bottom: 8px; }
+    .stat-value { font-size: 24px; font-weight: 900; color: #0f172a; }
+    .income-card { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #ffffff; padding: 32px; border-radius: 20px; text-align: center; margin-bottom: 32px; }
+    .income-label { font-size: 12px; font-weight: 800; color: #14b8a6; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px; }
+    .income-value { font-size: 42px; font-weight: 900; }
+    .table-container { margin-top: 32px; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; }
+    table { width: 100%; border-collapse: collapse; }
+    th { background-color: #f8fafc; padding: 12px 16px; text-align: left; font-size: 11px; font-weight: 800; text-transform: uppercase; color: #94a3b8; border-bottom: 1px solid #e2e8f0; }
+    td { padding: 14px 16px; font-size: 13px; border-bottom: 1px solid #f1f5f9; color: #334155; }
+    .badge { padding: 4px 8px; border-radius: 6px; font-size: 10px; font-weight: 800; text-transform: uppercase; }
+    .badge-pagado { background-color: #dcfce7; color: #166534; }
+    .badge-pendiente { background-color: #fef9c3; color: #854d0e; }
+    .footer { background-color: #f1f5f9; padding: 24px; text-align: center; font-size: 11px; color: #94a3b8; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1 style="margin: 0; font-size: 28px; font-weight: 900; letter-spacing: -1px;">REPORTE FULL PLATAFORMA</h1>
+      <p style="margin: 8px 0 0 0; opacity: 0.7; font-size: 14px;">Thiart 3D Business Intelligence - Informe de Operaciones</p>
+    </div>
+    
+    <div class="content">
+      <div class="income-card">
+        <div class="income-label">Ingresos Totales (Pagados)</div>
+        <div class="income-value">$${totalIncome.toLocaleString("es-CO")} <span style="font-size: 16px; opacity: 0.6;">COP</span></div>
+      </div>
+      
+      <div style="display: table; width: 100%; border-spacing: 12px; margin: -12px;">
+        <div style="display: table-row;">
+          <div style="display: table-cell; background: #f8fafc; padding: 20px; border-radius: 16px; text-align: center; width: 50%;">
+            <div style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">Total Pedidos</div>
+            <div style="font-size: 24px; font-weight: 900; color: #0f172a;">${ordersCount}</div>
+          </div>
+          <div style="display: table-cell; background: #f8fafc; padding: 20px; border-radius: 16px; text-align: center; width: 50%;">
+            <div style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">Convertidos</div>
+            <div style="font-size: 24px; font-weight: 900; color: #14b8a6;">${paidCount}</div>
+          </div>
+        </div>
+      </div>
+      
+      <div style="display: table; width: 100%; border-spacing: 12px; margin: 4px -12px 32px -12px;">
+        <div style="display: table-row;">
+          <div style="display: table-cell; background: #f8fafc; padding: 20px; border-radius: 16px; text-align: center; width: 33%;">
+            <div style="font-size: 9px; font-weight: 800; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">Pendientes</div>
+            <div style="font-size: 20px; font-weight: 900; color: #854d0e;">${pendingCount}</div>
+          </div>
+          <div style="display: table-cell; background: #f8fafc; padding: 20px; border-radius: 16px; text-align: center; width: 33%;">
+            <div style="font-size: 9px; font-weight: 800; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">Cotizaciones</div>
+            <div style="font-size: 20px; font-weight: 900; color: #0f172a;">${quotationsCount}</div>
+          </div>
+          <div style="display: table-cell; background: #f8fafc; padding: 20px; border-radius: 16px; text-align: center; width: 33%;">
+            <div style="font-size: 9px; font-weight: 800; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">Cancelados</div>
+            <div style="font-size: 20px; font-weight: 900; color: #e11d48;">${cancelledCount}</div>
+          </div>
+        </div>
+      </div>
+      
+      <div style="display: table; width: 100%; border-spacing: 12px; margin: 4px -12px 32px -12px;">
+        <div style="display: table-row;">
+          <div style="display: table-cell; background: #f8fafc; padding: 20px; border-radius: 16px; text-align: center; width: 33%;">
+            <div style="font-size: 9px; font-weight: 800; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">Usuarios Reg.</div>
+            <div style="font-size: 20px; font-weight: 900; color: #0f172a;">${allUsers.length}</div>
+          </div>
+          <div style="display: table-cell; background: #f8fafc; padding: 20px; border-radius: 16px; text-align: center; width: 33%;">
+            <div style="font-size: 9px; font-weight: 800; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">Productos</div>
+            <div style="font-size: 20px; font-weight: 900; color: #0f172a;">${allProducts.length}</div>
+          </div>
+          <div style="display: table-cell; background: #f8fafc; padding: 20px; border-radius: 16px; text-align: center; width: 33%;">
+            <div style="font-size: 9px; font-weight: 800; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">Mensajes</div>
+            <div style="font-size: 20px; font-weight: 900; color: #0f172a;">${allMessages.length}</div>
+          </div>
+        </div>
+      </div>
+      
+      <h3 style="font-size: 14px; font-weight: 900; color: #0f172a; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 16px; border-left: 4px solid #14b8a6; padding-left: 12px;">Última Actividad</h3>
+      
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Cliente</th>
+              <th>Total</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${recentOrders.map(o => `
+              <tr>
+                <td style="font-weight: 700;">#${o.id}</td>
+                <td>${o.cliente}</td>
+                <td style="font-weight: 700;">$${o.total.toLocaleString("es-CO")}</td>
+                <td>
+                  <span class="badge ${o.estado === 'pagado' ? 'badge-pagado' : 'badge-pendiente'}">
+                    ${o.estado.replace('_', ' ')}
+                  </span>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+      
+      <div style="margin-top: 40px; text-align: center;">
+          <p style="font-size: 13px; color: #64748b;">(Se adjunta archivo Excel con la información completa de la base de datos)</p>
+      </div>
+
+      <div class="footer">
+        Este es un reporte automático de auditoría generado por Thiart 3D.<br>
+        © 2026 Thiart 3D S.A.S. - Business Intelligence Unit
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+    `;
+
+    // Generar contenido del Excel (CSV profesional)
+    const bom = "\uFEFF"; // UTF-8 BOM for Excel
+    let csvContent = bom + "REPORTE INTEGRAL THIART 3D\n";
+    csvContent += `Fecha de Generación; ${new Date().toLocaleString("es-CO")}\n\n`;
+    
+    // --- SECCIÓN PEDIDOS ---
+    csvContent += "--- HISTORIAL DE PEDIDOS ---\n";
+    csvContent += "ID; Fecha; Cliente; Total; Estado; Datos Contacto\n";
+    allOrders.forEach((p) => {
+      csvContent += `${p.id}; ${new Date(p.created_at).toLocaleString("es-CO")}; ${p.id}; ${p.total}; ${p.estado}; "${(p.datos_contacto ?? "").replace(/"/g, "'")}"\n`;
+    });
+    csvContent += "\n\n";
+
+    // --- SECCIÓN USUARIOS ---
+    csvContent += "--- BASE DE DATOS DE USUARIOS ---\n";
+    csvContent += "ID; Nombre; Email; Rol; Creado En\n";
+    allUsers.forEach((u) => {
+      csvContent += `${u.id}; ${u.nombre ?? u.email}; ${u.email}; ${u.role}; ${u.creado_en ?? ''}\n`;
+    });
+    csvContent += "\n\n";
+
+    // --- SECCIÓN PRODUCTOS ---
+    csvContent += "--- CONTROL DE INVENTARIO ---\n";
+    csvContent += "ID; Nombre; Categoria; Stock; Precio; Descripcion\n";
+    allProducts.forEach((pr) => {
+      csvContent += `${pr.id}; ${pr.nombre}; ${pr.categoria}; ${pr.stock}; ${pr.precio}; "${(pr.descripcion ?? "").replace(/"/g, "'")}"\n`;
+    });
+    csvContent += "\n\n";
+
+    // --- SECCIÓN MENSAJES ---
+    csvContent += "--- LOG DE MENSAJES ---\n";
+    csvContent += "ID; Cliente; Asunto; Fecha; Leido\n";
+    allMessages.forEach((m) => {
+      csvContent += `${m.id}; ${m.nombre_cliente ?? 'Anónimo'}; ${m.asunto ?? 'Sin Asunto'}; ${new Date(m.created_at).toLocaleString("es-CO")}; ${m.leido ? 'Sí' : 'No'}\n`;
+    });
+  
+    const info = (await transporter.sendMail({
+      from: `"Thiart 3D BI" <${process.env.GMAIL_USER}>`,
+      to,
+      subject: `📊 Reporte Ejecutivo: ${new Date().toLocaleDateString("es-CO")} - Thiart 3D`,
+      html,
+      attachments: [
+        {
+          filename: `Reporte-Ejecutivo-${new Date().toISOString().split('T')[0]}.csv`,
+          content: csvContent,
+          contentType: 'text/csv'
+        }
+      ]
+    })) as { messageId: string };
+
+    console.log('✅ Reporte gerencial enviado:', info.messageId);
+    return { success: true, data: info };
+  } catch (err: unknown) {
+    console.error('❌ Error en sendManagerReportEmail:', err);
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
