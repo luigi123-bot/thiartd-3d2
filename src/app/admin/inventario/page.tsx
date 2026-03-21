@@ -26,7 +26,7 @@ export default function AdminInventarioPage() {
 	const productosPorPagina = 12;
 
 	interface Producto {
-		id: number;
+		id: string | number;
 		nombre: string;
 		descripcion: string;
 		categoria: string;
@@ -34,7 +34,10 @@ export default function AdminInventarioPage() {
 		stock: number;
 		precio: number;
 		destacado: boolean;
-		image_url?: string; // Añadido para evitar error de propiedad inexistente
+		image_url?: string;
+		producto_imagenes?: { image_url: string }[];
+		model_url?: string;
+		video_url?: string;
 	}
 
 	const [productos, setProductos] = useState<Producto[]>([]);
@@ -45,7 +48,7 @@ export default function AdminInventarioPage() {
 	const [deleting, setDeleting] = useState(false);
 	const [modalDetalle, setModalDetalle] = useState<Producto | null>(null);
 	const [ajustarProducto, setAjustarProducto] = useState<Producto | null>(null);
-	const [destacando, setDestacando] = useState<number | null>(null);
+	const [destacando, setDestacando] = useState<string | number | null>(null);
 
 	// Métricas
 	const totalProductos = productos.length;

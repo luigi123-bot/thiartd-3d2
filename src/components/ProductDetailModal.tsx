@@ -1,11 +1,13 @@
+import React, { useRef, useEffect, useState, useMemo } from "react";
+
 import Image from "next/image";
-import { Star, BadgeDollarSign, Pencil, X, Info, Video } from "lucide-react";
-import { useRef, useEffect } from "react";
+import { Star, BadgeDollarSign, Pencil, X, Info, Video, ChevronLeft, ChevronRight } from "lucide-react";
 
 interface ProductDetailModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   producto: {
+    id: string | number;
     nombre: string;
     descripcion: string;
     categoria: string;
@@ -13,6 +15,9 @@ interface ProductDetailModalProps {
     stock: number;
     precio: number;
     destacado?: boolean;
+    image_url?: string;
+    producto_imagenes?: { image_url: string }[];
+    model_url?: string;
     video_url?: string;
   } | null;
   getStockColor: (stock: number) => string;
@@ -32,7 +37,33 @@ export function ProductDetailModal({
   onToggleDestacado,
   onDeleteProduct,
 }: ProductDetailModalProps) {
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const closeBtnRef = useRef<HTMLButtonElement>(null);
+
+  const allImages = useMemo(() => {
+    const imgs: string[] = [];
+    if (producto?.image_url) imgs.push(producto.image_url);
+    if (producto?.producto_imagenes) {
+      producto.producto_imagenes.forEach(img => {
+        if (img.image_url && !imgs.includes(img.image_url)) {
+          imgs.push(img.image_url);
+        }
+      });
+    }
+    return imgs;
+  }, [producto]);
+
+  // Reset index when product changes
+  useEffect(() => {
+    setCurrentImageIndex(0);
+    if (producto) {
+      console.log("[DEBUG Admin Modal] Datos del producto a mostrar:", {
+        id: producto.id,
+        nombre: producto.nombre,
+        imagenes_galeria: producto.producto_imagenes
+      });
+    }
+  }, [producto]);
 
   // Cerrar con Escape
   useEffect(() => {
@@ -71,15 +102,47 @@ export function ProductDetailModal({
           <X className="w-6 h-6 text-gray-500" />
         </button>
         <div className="flex flex-col md:flex-row gap-0 md:gap-8 p-0 md:p-0 min-h-[340px]">
-          {/* Imagen grande, izquierda */}
-          <div className="relative flex-shrink-0 flex items-center justify-center w-full md:w-[340px] bg-gradient-to-bl from-white to-cyan-100 rounded-t-3xl md:rounded-l-3xl md:rounded-tr-none p-8 md:p-10">
-            <Image
-              src="/Logo%20Thiart%20Tiktok.png"
-              alt="Logo producto"
-              width={280}
-              height={280}
-              className="object-cover w-60 h-60 md:w-72 md:h-72 rounded-2xl shadow-xl ring-1 ring-white/10 border border-gray-200 bg-white"
-            />
+          <div className="relative flex-shrink-0 flex flex-col items-center justify-center w-full md:w-[340px] bg-gradient-to-bl from-white to-cyan-50 rounded-t-3xl md:rounded-l-3xl md:rounded-tr-none p-6 md:p-8">
+            <div className="relative group w-64 h-64 md:w-72 md:h-72">
+              <Image
+                src={allImages[currentImageIndex] ?? "/Logo%20Thiart%20Tiktok.png"}
+                alt={producto?.nombre ?? "Producto"}
+                fill
+                className="object-cover rounded-2xl shadow-xl ring-1 ring-white/10 border border-gray-100 bg-white"
+              />
+              
+              {allImages.length > 1 && (
+                <>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); setCurrentImageIndex((prev) => (prev > 0 ? prev - 1 : allImages.length - 1)); }}
+                    className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white p-2 rounded-full shadow-lg transition-all opacity-0 group-hover:opacity-100 border border-teal-50"
+                  >
+                    <ChevronLeft className="w-5 h-5 text-[#00a19a]" />
+                  </button>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); setCurrentImageIndex((prev) => (prev < allImages.length - 1 ? prev + 1 : 0)); }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white p-2 rounded-full shadow-lg transition-all opacity-0 group-hover:opacity-100 border border-teal-50"
+                  >
+                    <ChevronRight className="w-5 h-5 text-[#00a19a]" />
+                  </button>
+                </>
+              )}
+            </div>
+
+            {/* Miniaturas */}
+            {allImages.length > 1 && (
+              <div className="flex gap-2 mt-4 overflow-x-auto pb-2 max-w-full">
+                {allImages.map((img, idx) => (
+                  <button 
+                    key={idx}
+                    onClick={() => setCurrentImageIndex(idx)}
+                    className={`relative w-12 h-12 rounded-lg overflow-hidden border-2 transition-all ${currentImageIndex === idx ? "border-[#00a19a] scale-105" : "border-transparent opacity-60 hover:opacity-100"}`}
+                  >
+                    <Image src={img} alt={`Thumb ${idx}`} fill className="object-cover" />
+                  </button>
+                ))}
+              </div>
+            )}
             {/* Botón editar imagen */}
             {onEditImage && (
               <button

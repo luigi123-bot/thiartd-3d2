@@ -20,6 +20,7 @@ export default function AdminMensajesPage() {
 		mensaje: string;
 		respondido: boolean;
 		creado_en: string;
+		leido: boolean;
 	}
 
 	interface Thread {
@@ -28,6 +29,7 @@ export default function AdminMensajesPage() {
 		ultimoMensaje: string;
 		fecha: string;
 		leido: boolean;
+		unreadCount: number;
 		cliente_id?: string;
 	}
 
@@ -71,14 +73,22 @@ export default function AdminMensajesPage() {
 
 			const grouped = new Map<string, Thread>();
 			(data as Mensaje[]).forEach((m) => {
-				if (m.nombre !== "Admin" && !grouped.has(m.email)) {
+				const isFromClient = m.nombre !== "Admin";
+				
+				if (!grouped.has(m.email)) {
 					grouped.set(m.email, {
 						email: m.email,
 						nombre: m.nombre,
 						ultimoMensaje: m.mensaje,
 						fecha: m.creado_en,
-						leido: true,
+						leido: m.leido,
+						unreadCount: 0,
 					});
+				}
+
+				if (isFromClient && !m.leido) {
+					const thread = grouped.get(m.email)!;
+					thread.unreadCount += 1;
 				}
 			});
 
@@ -129,7 +139,23 @@ export default function AdminMensajesPage() {
 				.select("*")
 				.eq("email", selectedEmail)
 				.order("creado_en", { ascending: true });
-			setMensajes(Array.isArray(data) ? data : []);
+			
+			const msgData = Array.isArray(data) ? (data as Mensaje[]) : [];
+			setMensajes(msgData);
+
+			// Marcar como leídos
+			const unreadIds = msgData.filter(m => !m.leido && m.nombre !== "Admin").map(m => m.id);
+			if (unreadIds.length > 0) {
+				await supabase
+					.from("mensajes")
+					.update({ leido: true })
+					.in("id", unreadIds);
+				
+				// Actualizar el conteo localmente para que desaparezca el badge
+				setThreads(prev => prev.map(t => 
+					t.email === selectedEmail ? { ...t, unreadCount: 0 } : t
+				));
+			}
 		};
 		void fetchMensajes();
 	}, [selectedEmail]);
@@ -228,13 +254,22 @@ export default function AdminMensajesPage() {
 										<p className={`text-sm font-bold truncate ${selectedEmail === t.email ? "text-emerald-900" : "text-gray-900"}`}>
 											{t.nombre}
 										</p>
-										<span className="text-[10px] text-gray-400 font-medium uppercase tracking-wider whitespace-nowrap ml-2">
+										<span className={`text-[10px] font-medium uppercase tracking-wider whitespace-nowrap ml-2 ${t.unreadCount > 0 ? "text-emerald-500 font-black" : "text-gray-400"}`}>
 											{formatDate(t.fecha)}
 										</span>
 									</div>
-									<p className="text-xs text-gray-500 truncate font-medium">
-										{t.ultimoMensaje}
-									</p>
+									<div className="flex items-center justify-between gap-2">
+										<p className={`text-xs truncate flex-1 ${t.unreadCount > 0 ? "text-gray-900 font-bold" : "text-gray-500 font-medium"}`}>
+											{t.ultimoMensaje}
+										</p>
+										{t.unreadCount > 0 && (
+											<div className="min-w-[18px] h-[18px] bg-emerald-500 rounded-full flex items-center justify-center px-1 animate-in zoom-in duration-300">
+												<span className="text-[10px] text-white font-black leading-none">
+													{t.unreadCount}
+												</span>
+											</div>
+										)}
+									</div>
 								</div>
 							</div>
 						))

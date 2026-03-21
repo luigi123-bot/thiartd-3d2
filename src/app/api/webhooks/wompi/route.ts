@@ -212,6 +212,21 @@ async function procesarTransaccionActualizada(
   // Solo enviar email si el pago fue APROBADO
   if (transaction.status === "APPROVED" && pedidoActualizado) {
     await enviarEmailConfirmacionCompleto(pedidoActualizado, transaction);
+    
+    // Limpiar el carrito en la base de datos ya que la compra fue exitosa
+    if (pedidoActualizado.cliente_id) {
+      console.log(`\n🛒 LIMPIANDO CARRITO PARA USUARIO: ${pedidoActualizado.cliente_id}`);
+      const { error: clearError } = await supabase
+        .from("carrito")
+        .delete()
+        .eq("usuario_id", pedidoActualizado.cliente_id);
+      
+      if (clearError) {
+        console.warn("   ⚠️ No se pudo limpiar el carrito en BD:", clearError.message);
+      } else {
+        console.log("   ✅ Carrito eliminado de la base de datos.");
+      }
+    }
   } else {
     console.log(`\n📭 Sin email - Estado "${transaction.status}" no requiere confirmación`);
   }

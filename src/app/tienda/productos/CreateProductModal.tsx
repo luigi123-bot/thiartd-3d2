@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, Suspense } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "~/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "~/components/ui/dialog";
 import { Input } from "~/components/ui/input";
 import { Button } from "~/components/ui/button";
 import { Textarea } from "~/components/ui/textarea";
@@ -8,10 +8,11 @@ import { ProductImageUpload, ProductModel3DUpload, ProductVideoUpload } from "~/
 import { Model3DViewer, Model3DViewerLoading } from "~/components/Model3DViewer";
 import Image from "next/image";
 import { FiX } from "react-icons/fi";
-import { Video, Package, Tag, DollarSign, Image as ImageIcon } from "lucide-react";
+import { Package, Sparkles } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
 const categorias = [
-  "Abstracto",
+  "Abstracto", 
   "Clásico",
   "Moderno",
   "Arquitectura",
@@ -33,10 +34,11 @@ interface Product {
   detalles: string;
   destacado: boolean;
   image_url?: string;
+  imagenes?: string[];
   model_url?: string;
   video_url?: string;
   user_id?: string;
-  usuario_id?: string; // Add this if some products use 'usuario_id'
+  usuario_id?: string; 
 }
 
 export default function CreateProductModal({ open, onOpenChangeAction, onProductCreatedAction, product }: {
@@ -55,6 +57,7 @@ export default function CreateProductModal({ open, onOpenChangeAction, onProduct
     detalles: "",
     destacado: false,
     image_url: "",
+    imagenes: [] as string[],
     model_url: "",
     video_url: "",
     user_id: "",
@@ -81,15 +84,16 @@ export default function CreateProductModal({ open, onOpenChangeAction, onProduct
   useEffect(() => {
     if (product) {
       setForm({
-        nombre: product.nombre || "",
-        precio: product.precio || 0,
-        descripcion: product.descripcion || "",
-        tamano: product.tamano || tamanos[0],
-        categoria: product.categoria || categorias[0],
-        stock: product.stock || 0,
-        detalles: product.detalles || "",
-        destacado: product.destacado || false,
+        nombre: product.nombre ?? "",
+        precio: product.precio ?? 0,
+        descripcion: product.descripcion ?? "",
+        tamano: product.tamano ?? tamanos[0],
+        categoria: product.categoria ?? categorias[0],
+        stock: product.stock ?? 0,
+        detalles: product.detalles ?? "",
+        destacado: product.destacado ?? false,
         image_url: product.image_url ?? "",
+        imagenes: product.imagenes ?? [],
         model_url: product.model_url ?? "",
         video_url: product.video_url ?? "",
         user_id: product.user_id ?? product.usuario_id ?? "",
@@ -111,6 +115,7 @@ export default function CreateProductModal({ open, onOpenChangeAction, onProduct
         detalles: "",
         destacado: false,
         image_url: "",
+        imagenes: [],
         model_url: "",
         video_url: "",
         user_id: "",
@@ -220,10 +225,6 @@ export default function CreateProductModal({ open, onOpenChangeAction, onProduct
   };
 
 
-  const handleRemoveImage = () => {
-    setImageUrl("");
-    setForm({ ...form, image_url: "" });
-  };
 
   const handleRemoveModel = () => {
     setModelUrl("");
@@ -273,240 +274,389 @@ export default function CreateProductModal({ open, onOpenChangeAction, onProduct
 
   return (
     <Dialog open={open} onOpenChange={onOpenChangeAction}>
-      <DialogContent className="p-0 bg-transparent overflow-hidden">
-        <div className="max-w-[1400px] w-[95vw] xl:w-[70vw] 2xl:w-full mx-auto bg-white rounded-lg shadow-lg p-6 border border-gray-100 h-auto max-h-[90vh] overflow-hidden flex flex-col pb-24 relative">
-          <div className="mt-4 flex flex-col flex-1">
-            <DialogHeader className="pb-2">
-              <div className="flex items-start gap-4">
-                <div className="p-3 rounded-lg bg-[#e6fffb] text-[#0d9488]"><Package className="w-5 h-5" /></div>
+      <DialogContent className="p-0 bg-transparent border-none shadow-none sm:max-w-xl max-w-[95vw] w-full gap-0 overflow-visible">
+        <div className="w-full bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] relative border border-slate-200 animate-in fade-in zoom-in duration-300">
+          {/* Header Section Compact */}
+          <div className="px-6 py-5 border-b border-slate-100 bg-white sticky top-0 z-50 shrink-0">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-3 group">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#00a19a] to-teal-500 text-white flex items-center justify-center shadow-lg shadow-teal-500/20 group-hover:scale-105 transition-all">
+                  <Package className="w-4 h-4" />
+                </div>
                 <div>
-                  <DialogTitle className="text-lg font-semibold text-[#0d9488]">{product ? 'Editar producto' : 'Añadir nuevo producto'}</DialogTitle>
-                  <p className="text-sm text-gray-500 mt-1">Paso {step + 1} de {totalSteps}</p>
-                </div>
-              </div>
-
-              <div className="mt-4">
-                {(() => {
-
-                  const steps: Array<{ label: string; icon: React.ComponentType<{ className?: string }> }> = [
-                    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-                    { label: 'Información', icon: Package },
-                    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-                    { label: 'Clasificación', icon: Tag },
-                    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-                    { label: 'Precio', icon: DollarSign },
-                    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-                    { label: 'Multimedia', icon: ImageIcon },
-                  ];
-                  return (
-                    <div className="flex items-center justify-between gap-4">
-                      {steps.map(({ label, icon: Icon }, i) => (
-                        <div key={label} className="flex-1 flex flex-col items-center text-center">
-                          <div className={`p-3 rounded-full ${step === i ? 'bg-[#0d9488] text-white' : 'bg-gray-100 text-gray-500'}`}><Icon className="w-4 h-4" /></div>
-                          <div className="text-xs mt-2 text-gray-600">{label}</div>
-                        </div>
-                      ))}
-                    </div>
-                  );
-                })()}
-              </div>
-            </DialogHeader>
-
-            <div className="flex justify-center gap-3 mt-3">
-              {Array.from({ length: totalSteps }).map((_, i) => (
-                <div key={i} className={`w-8 h-8 rounded-full flex items-center justify-center text-sm ${step === i ? 'bg-[#0d9488] text-white' : 'bg-gray-100 text-gray-600'}`}>{i + 1}</div>
-              ))}
-            </div>
-
-            <div className="w-full overflow-hidden">
-              <div className="relative">
-                <div className="flex transition-transform duration-300 ease-in-out" style={{ width: `${totalSteps * 100}%`, transform: `translateX(-${(step * 100) / totalSteps}%)` }}>
-                  {/* Step panels */}
-                  {/* Panel 1 - Información */}
-                  <section style={{ width: `${100 / totalSteps}%` }} className="flex-shrink-0 pr-4">
-                    <div className="max-w-2xl mx-auto">
-                      <label className="input-label">Nombre</label>
-                      <Input name="nombre" placeholder="Nombre del producto" value={form.nombre} onChange={handleChange} required className="mt-1" />
-                      {errors.nombre && <p className="text-xs text-red-600 mt-1">{errors.nombre}</p>}
-                      <div className="form-section mt-4">
-                        <label className="input-label">Descripción</label>
-                        <Textarea name="descripcion" placeholder="Descripción del producto" value={form.descripcion} onChange={handleChange} required className="mt-2 h-24" />
-                        {errors.descripcion && <p className="text-xs text-red-600 mt-1">{errors.descripcion}</p>}
-                      </div>
-                    </div>
-                  </section>
-
-                  {/* Panel 2 - Clasificación */}
-                  <section style={{ width: `${100 / totalSteps}%` }} className="flex-shrink-0 px-4">
-                    <div className="max-w-2xl mx-auto">
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div>
-                          <label className="input-label">Tamaño</label>
-                          <select name="tamano" value={form.tamano} onChange={handleChange} className="mt-1 w-full border rounded px-3 py-2 focus:border-[#0d9488] focus:ring-1 focus:ring-[#0d9488]">
-                            {tamanos.map((t) => (<option key={t} value={t}>{t}</option>))}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="input-label">Creador</label>
-                          <select name="user_id" value={form.user_id || ''} onChange={handleChange} className="mt-1 w-full border rounded px-3 py-2 focus:border-[#0d9488] focus:ring-1 focus:ring-[#0d9488]" required>
-                            <option value="">Selecciona creador</option>
-                            {creators.map((c) => (<option key={c.id} value={c.id}>{c.nombre ?? c.email}</option>))}
-                          </select>
-                          {errors.user_id && <p className="text-xs text-red-600 mt-1">{errors.user_id}</p>}
-                        </div>
-                        <div>
-                          <label className="input-label">Categoría</label>
-                          <select name="categoria" value={form.categoria} onChange={handleChange} className="mt-1 w-full border rounded px-3 py-2 focus:border-[#0d9488] focus:ring-1 focus:ring-[#0d9488]">
-                            {categorias.map((c) => (<option key={c} value={c}>{c}</option>))}
-                          </select>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                        <div>
-                          <label className="input-label">Stock</label>
-                          <Input name="stock" type="number" placeholder="0" value={form.stock} onChange={handleChange} min={0} required className="mt-1" />
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <label className="input-label">Producto destacado</label>
-                            <div className="input-hint">Marcar como destacado en la tienda</div>
-                          </div>
-                          <input id="destacado" type="checkbox" checked={form.destacado} onChange={(e) => setForm({ ...form, destacado: e.target.checked })} className="h-5 w-10 rounded-full bg-gray-200 accent-[#0d9488]" />
-                        </div>
-                      </div>
-                    </div>
-                  </section>
-
-                  {/* Panel 3 - Precio */}
-                  <section style={{ width: `${100 / totalSteps}%` }} className="flex-shrink-0 px-4">
-                    <div className="max-w-2xl mx-auto">
-                      <label className="input-label">Precio (€)</label>
-                      <Input name="precio" type="number" placeholder="0.00" value={form.precio} onChange={handleChange} min={0} required className="mt-1" />
-                      {errors.precio && <p className="text-xs text-red-600 mt-1">{errors.precio}</p>}
-                      <div className="text-sm text-gray-500 mt-3">Configura el precio y monedas si aplica.</div>
-                    </div>
-                  </section>
-
-                  {/* Panel 4 - Multimedia */}
-                  <section style={{ width: `${100 / totalSteps}%` }} className="flex-shrink-0 pl-4">
-                    <div className="max-w-2xl mx-auto">
-                      <div className="bg-white border rounded-lg p-4 shadow-sm">
-                        <h4 className="text-sm font-semibold text-gray-800">Imagen del producto</h4>
-                        <p className="text-xs text-gray-500">Tamaño máximo: 5MB. Tipos permitidos: jpeg, png, webp</p>
-                        {imageUrl ? (
-                          <div className="relative mt-3 flex items-start gap-4">
-                            <div className="w-36 h-24 rounded-md overflow-hidden border">
-                              <Image src={imageUrl} alt="Imagen" width={240} height={160} className="w-full h-full object-cover" />
-                            </div>
-                            <div className="flex-1 flex flex-col justify-center gap-2">
-                              <div className="text-sm font-medium text-gray-800">Imagen subida</div>
-                              <div className="text-xs text-gray-500">Tamaño máximo: 5MB. Tipos: jpeg, png, webp</div>
-                              <div className="flex items-center gap-3">
-                                <a href={imageUrl} target="_blank" rel="noreferrer" className="text-sm text-[#0d9488] hover:underline">Ver tamaño completo</a>
-                                <button type="button" onClick={handleRemoveImage} className="text-sm text-red-600">Eliminar</button>
-                              </div>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="mt-3"><ProductImageUpload productId={product?.id?.toString() ?? 'new'} onUploadComplete={(url) => { setImageUrl(url); setForm({ ...form, image_url: url }); }} /></div>
-                        )}
-                      </div>
-
-                      <div className="bg-white border rounded-lg p-4 shadow-sm mt-4">
-                        <h4 className="text-sm font-semibold text-gray-800">Modelo 3D (opcional)</h4>
-                        <p className="text-xs text-gray-500">Sube GLB/GLTF/STL para visor 3D</p>
-                        {modelUrl ? (
-                          <div className="mt-3 flex items-start gap-4">
-                            <div className="w-36 h-24 rounded-md overflow-hidden border bg-gray-50 flex items-center justify-center">
-                              <Suspense fallback={<div className="p-4">Cargando...</div>}>
-                                <div style={{ width: '100%', height: '100%' }}>
-                                  <Model3DViewer modelUrl={modelUrl} height="140px" />
-                                </div>
-                              </Suspense>
-                            </div>
-                            <div className="flex-1 flex flex-col justify-center gap-2">
-                              <div className="text-sm font-medium text-gray-800">Modelo 3D subido</div>
-                              <div className="text-xs text-gray-500">GLB / GLTF / STL</div>
-                              <div className="flex items-center gap-3 mt-2">
-                                <Button type="button" variant="ghost" onClick={() => setShowModelDialog(true)}>Ver modelo</Button>
-                                <Button type="button" variant="outline" onClick={handleRemoveModel} className="text-red-600">Eliminar modelo 3D</Button>
-                              </div>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="mt-3"><ProductModel3DUpload productId={product?.id?.toString() ?? 'new'} onUploadComplete={(url) => { setModelUrl(url); setForm({ ...form, model_url: url }); }} /></div>
-                        )}
-                      </div>
-
-                      <div className="bg-white border rounded-lg p-4 shadow-sm mt-4">
-                        <h4 className="text-sm font-semibold text-gray-800 flex items-center gap-2"><Video className="w-4 h-4 text-[#0d9488]" />Video (opcional)</h4>
-                        <p className="text-xs text-gray-500">MP4, WebM, OGG, MOV (máx. 100MB)</p>
-                        {(videoPreview ?? videoUrl) ? (
-                          <div className="mt-3 relative rounded-md overflow-hidden border">
-                            <video src={videoPreview ?? videoUrl} controls className="w-full h-28 object-cover" />
-                            <button type="button" onClick={handleRemoveVideo} className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1"><FiX className="w-4 h-4" /></button>
-                          </div>
-                        ) : (
-                          <div className="mt-3">
-                            <ProductVideoUpload
-                              productId={product?.id?.toString() ?? 'new'}
-                              onUploadComplete={(url) => {
-                                setVideoUrl(url);
-                                setVideoPreview(url);
-                                setForm({ ...form, video_url: url });
-                              }}
-                            />
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </section>
-
-                  {/* Dialog para ver el modelo 3D en grande */}
-                  {showModelDialog && (
-                    <Dialog open={showModelDialog} onOpenChange={setShowModelDialog}>
-                      <DialogContent className="max-w-3xl w-[90vw]">
-                        <DialogHeader>
-                          <DialogTitle>Vista previa Modelo 3D</DialogTitle>
-                        </DialogHeader>
-                        <div className="mt-2">
-                          <Suspense fallback={<Model3DViewerLoading />}><Model3DViewer modelUrl={modelUrl ?? ''} height="520px" /></Suspense>
-                        </div>
-                      </DialogContent>
-                    </Dialog>
-                  )}
-                </div>
-
-                {/* Footer inside scrollable area so sticky works within the card */}
-                <div className="mt-6">
-                  <div className="absolute bottom-0 left-0 right-0 z-10 bg-white border-t pt-3 pb-4 px-6">
-                    <div className="max-w-3xl mx-auto flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <Button type="button" variant="ghost" onClick={() => setStep(Math.max(0, step - 1))} className="text-gray-600" disabled={step === 0}>Atrás</Button>
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        {step !== totalSteps - 1 ? (
-                          <Button type="button" onClick={handleNext} className="bg-[#0d9488] hover:bg-[#0b7f78] text-white py-3 px-6 rounded-lg">Siguiente</Button>
-                        ) : (
-                          <Button
-                            type="button"
-                            onClick={() => void handleSubmit()}
-                            className="bg-[#0d9488] hover:bg-[#0b7f78] text-white py-3 px-6 rounded-lg"
-                            disabled={loading}
-                          >
-                            {loading ? ('Procesando...') : (product ? 'Actualizar producto' : 'Guardar producto')}
-                          </Button>
-                        )}
-                      </div>
-                    </div>
+                <DialogTitle>
+                  <h2 className="text-2xl font-black text-slate-900 leading-none uppercase tracking-tighter">
+                    {product ? "Editar Obra" : "Publicar Obra"}
+                  </h2>
+                </DialogTitle>
+                <DialogDescription className="sr-only">
+                  Formulario para {product ? "editar los detalles de una obra existente" : "publicar una nueva obra artística en la tienda"}.
+                </DialogDescription>
+                  <div className="flex items-center gap-2 mt-1.5 opacity-60">
+                    <span className="text-[10px] bg-[#00a19a] text-white px-2 py-0.5 rounded-full font-bold uppercase tracking-widest">
+                      Paso {step + 1} de {totalSteps}
+                    </span>
+                    <span className="text-slate-300">/</span>
+                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">
+                      {step === 0 ? "Información Básica" : 
+                       step === 1 ? "Clasificación" : 
+                       step === 2 ? "Valores" : 
+                       "Multimedia"
+                      }
+                    </span>
                   </div>
                 </div>
+              </div>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="w-10 h-10 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-900 transition-all border border-slate-100"
+                onClick={() => onOpenChangeAction(false)}
+              >
+                <FiX className="w-5 h-5" />
+              </Button>
+            </div>
+
+            {/* Premium Progress Bar */}
+            <div className="flex gap-3 px-1">
+              {Array.from({ length: totalSteps }).map((_, i) => (
+                <div key={i} className="flex-1 relative h-1.5 group">
+                  <div className={`absolute inset-0 rounded-full transition-all duration-700 ${
+                      i <= step ? "bg-[#00a19a] shadow-[0_0_15px_rgba(0,161,154,0.4)]" : "bg-slate-100"
+                    }`} 
+                  />
+                  {i === step && (
+                    <motion.div 
+                      layoutId="step-indicator"
+                      className="absolute -top-1 -bottom-1 left-0 right-0 bg-teal-400/20 rounded-full border border-[#00a19a]/20"
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-6 sm:px-10 py-8 bg-slate-50/50 custom-scrollbar">
+            <div className="w-full">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={step}
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.3, ease: "circOut" }}
+                >
+                  {/* Step 1: Información Básica */}
+                  {step === 0 && (
+                    <div className="space-y-6 animate-in slide-in-from-right-2 duration-300">
+                       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+                          <div className="space-y-2.5">
+                            <div className="flex justify-between items-end">
+                              <label className="text-xs font-black text-slate-700 uppercase tracking-[0.2em] ml-1">Título de la Obra</label>
+                              {errors.nombre && <span className="text-[10px] bg-red-50 text-red-500 px-2 py-0.5 rounded-full font-bold">{errors.nombre}</span>}
+                            </div>
+                            <Input 
+                              name="nombre" 
+                              placeholder="Ej: Elegancia en Resina - Edición 2025" 
+                              value={form.nombre} 
+                              onChange={handleChange} 
+                              className="h-11 px-5 rounded-2xl border-slate-200 bg-white text-base font-bold placeholder:text-slate-500 focus:border-[#00a19a] focus:ring-[#00a19a]/10 transition-all shadow-sm" 
+                            />
+                          </div>
+
+                          <div className="space-y-2.5">
+                            <div className="flex justify-between items-end">
+                              <label className="text-xs font-black text-slate-700 uppercase tracking-[0.2em] ml-1">Descripción Artística</label>
+                              {errors.descripcion && <span className="text-[10px] bg-red-50 text-red-500 px-2 py-0.5 rounded-full font-bold">{errors.descripcion}</span>}
+                            </div>
+                            <Textarea 
+                              name="descripcion" 
+                              placeholder="Describe la esencia y el propósito de esta creación..." 
+                              value={form.descripcion} 
+                              onChange={handleChange} 
+                              className="min-h-[160px] px-6 py-4 rounded-xl border-slate-200 bg-white text-sm font-medium leading-relaxed placeholder:text-slate-300 focus:border-[#00a19a] focus:ring-[#00a19a]/10 transition-all" 
+                            />
+                          </div>
+                       </div>
+                    </div>
+                  )}
+
+                  {/* Step 2: Clasificación */}
+                  {step === 1 && (
+                    <div className="space-y-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2.5 bg-slate-50/50 p-6 rounded-2xl border border-slate-100">
+                          <label className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] ml-1">Escala Disponible</label>
+                          <div className="relative">
+                            <select 
+                              name="tamano" 
+                              value={form.tamano} 
+                              onChange={handleChange}
+                              className="w-full h-11 rounded-2xl border border-slate-200 px-5 bg-white font-bold text-slate-900 appearance-none focus:border-[#00a19a] focus:ring-4 focus:ring-[#00a19a]/5 transition-all outline-none"
+                            >
+                              {tamanos.map(t => <option key={t} value={t}>{t}</option>)}
+                            </select>
+                            <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-300">
+                               <Package className="w-4 h-4" />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2.5 bg-slate-50/50 p-6 rounded-2xl border border-slate-100">
+                          <label className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] ml-1">Estilo de la Obra</label>
+                          <div className="relative">
+                            <select 
+                              name="categoria" 
+                              value={form.categoria} 
+                              onChange={handleChange}
+                              className="w-full h-11 rounded-2xl border border-slate-200 px-5 bg-white font-bold text-slate-900 appearance-none focus:border-[#00a19a] focus:ring-4 focus:ring-[#00a19a]/5 transition-all outline-none"
+                            >
+                              {categorias.map(c => <option key={c} value={c}>{c}</option>)}
+                            </select>
+                            <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-300">
+                               <Sparkles className="w-4 h-4" />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2.5 bg-slate-50/50 p-6 rounded-2xl border border-slate-100">
+                        <div className="flex justify-between items-end mb-1">
+                          <label className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] ml-1">Asignar a Artista</label>
+                          {errors.user_id && <span className="text-[10px] bg-red-50 text-red-500 px-2 py-0.5 rounded-full font-bold">{errors.user_id}</span>}
+                        </div>
+                        <select 
+                          name="user_id" 
+                          value={form.user_id} 
+                          onChange={handleChange}
+                          className="w-full h-11 rounded-2xl border border-slate-200 px-5 bg-white font-bold text-slate-900 appearance-none focus:border-[#00a19a] focus:ring-4 focus:ring-[#00a19a]/5 transition-all outline-none"
+                        >
+                          <option value="">Selecciona al creador responsable</option>
+                          {creators.map(c => <option key={c.id} value={c.id}>{c.nombre ?? c.email}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Step 3: Precios y Stock */}
+                  {step === 2 && (
+                    <div className="space-y-6">
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="space-y-2.5 bg-slate-50/50 p-6 rounded-2xl border border-slate-100">
+                            <div className="flex justify-between items-end mb-1">
+                              <label className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] ml-1">Valor de Venta (COP)</label>
+                              {errors.precio && <span className="text-[10px] bg-red-50 text-red-500 px-2 py-0.5 rounded-full font-bold">{errors.precio}</span>}
+                            </div>
+                            <div className="relative">
+                              <div className="absolute left-6 top-1/2 -translate-y-1/2 font-black text-[#00a19a] text-lg">$</div>
+                              <Input 
+                                name="precio" 
+                                type="number" 
+                                value={form.precio} 
+                                onChange={handleChange} 
+                                className="h-11 pl-12 pr-5 rounded-2xl border-slate-200 bg-white font-black text-xl text-slate-900 focus:border-[#00a19a] focus:ring-[#00a19a]/10 shadow-sm transition-all" 
+                              />
+                            </div>
+                          </div>
+
+                          <div className="space-y-2.5 bg-slate-50/50 p-6 rounded-2xl border border-slate-100">
+                            <label className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] ml-1">Reserva</label>
+                            <Input 
+                              name="stock" 
+                              type="number" 
+                              value={form.stock} 
+                              onChange={handleChange} 
+                              className="h-11 px-5 rounded-2xl border-slate-200 bg-white font-black text-xl text-slate-900 focus:border-[#00a19a] focus:ring-[#00a19a]/10 shadow-sm transition-all text-center" 
+                            />
+                          </div>
+                       </div>
+
+                       <div className="bg-slate-900 p-6 rounded-2xl shadow-xl flex items-center justify-between group">
+                          <div className="flex items-center gap-4">
+                            <div className="w-11 h-11 rounded-xl bg-teal-500/20 text-[#00a19a] flex items-center justify-center border border-teal-500/30">
+                              <Sparkles className="w-5 h-5" />
+                            </div>
+                            <div>
+                              <p className="font-bold text-white text-base tracking-tight leading-none">Ocultar de Portada</p>
+                              <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-1.5">Destacar este producto</p>
+                            </div>
+                          </div>
+                          <button 
+                             type="button"
+                             onClick={() => setForm({...form, destacado: !form.destacado})}
+                             className={`w-14 h-8 rounded-full transition-all duration-500 relative flex items-center px-1 ${form.destacado ? "bg-[#00a19a]" : "bg-slate-700"}`}
+                          >
+                             <div className={`w-6 h-6 bg-white rounded-full shadow-lg transition-transform duration-500 ${form.destacado ? "translate-x-6" : "translate-x-0"}`} />
+                          </button>
+                       </div>
+                    </div>
+                  )}
+
+                  {/* Step 4: Multimedia */}
+                  {step === 3 && (
+                    <div className="space-y-10 pb-4">
+                       <div className="space-y-4">
+                          <label className="text-xs font-black text-slate-700 uppercase tracking-[0.2em] ml-2">Galería de Imágenes (Sube hasta 4)</label>
+                          <div className="grid grid-cols-2 gap-4">
+                             {[0, 1, 2, 3].map((idx) => {
+                               const currentUrl = idx === 0 ? imageUrl : (form.imagenes?.[idx - 1] ?? "");
+                               return (
+                                 <div key={idx} className="relative aspect-square">
+                                   {currentUrl ? (
+                                     <div className="relative group rounded-2xl overflow-hidden h-full border-4 border-white shadow-lg">
+                                        <Image src={currentUrl} alt={`Preview ${idx}`} fill className="object-cover" />
+                                        <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center p-2">
+                                          <Button 
+                                            variant="destructive" 
+                                            size="sm"
+                                            className="rounded-xl h-8 text-[10px] font-bold"
+                                            onClick={() => {
+                                              if (idx === 0) {
+                                                setImageUrl("");
+                                                setForm({ ...form, image_url: "" });
+                                              } else {
+                                                const newImgs = [...(form.imagenes ?? [])];
+                                                newImgs[idx - 1] = "";
+                                                setForm({...form, imagenes: newImgs});
+                                              }
+                                            }}
+                                          >
+                                            Quitar
+                                          </Button>
+                                        </div>
+                                     </div>
+                                   ) : (
+                                     <div className="h-full transform transition-all hover:scale-[1.02]">
+                                       <ProductImageUpload 
+                                         productId={product?.id?.toString() ?? "new"} 
+                                         onUploadComplete={(url) => {
+                                           if (idx === 0) {
+                                             console.log("[MULTI-IMAGE] Cargando imagen PRINCIPAL:", url);
+                                             setImageUrl(url);
+                                             setForm({ ...form, image_url: url });
+                                           } else {
+                                             const newImgs = [...(form.imagenes ?? [])];
+                                             newImgs[idx - 1] = url;
+                                             console.log(`[MULTI-IMAGE] Cargando imagen SECUNDARIA ${idx}:`, url);
+                                             console.log("[MULTI-IMAGE] Total imágenes en galería:", newImgs.filter(u => u).length + (imageUrl ? 1 : 0));
+                                             setForm({ ...form, imagenes: newImgs });
+                                           }
+                                         }} 
+                                       />
+                                     </div>
+                                   )}
+                                 </div>
+                               );
+                             })}
+                          </div>
+                       </div>
+
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                          <div className="space-y-4">
+                            <label className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] ml-2">Experiencia 3D (GLB)</label>
+                            {modelUrl ? (
+                              <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-xl flex items-center justify-between">
+                                 <div className="flex items-center gap-4">
+                                   <div className="w-12 h-12 bg-teal-50 rounded-xl flex items-center justify-center text-[#00a19a]">
+                                     <Sparkles className="w-5 h-5 animate-pulse" />
+                                   </div>
+                                   <div>
+                                     <p className="font-black text-slate-900 text-sm tracking-tight">Modelo Listo</p>
+                                     <button type="button" onClick={() => setShowModelDialog(true)} className="text-[10px] text-[#00a19a] font-bold uppercase tracking-widest hover:underline">Ver Interactivos</button>
+                                   </div>
+                                 </div>
+                                 <Button variant="ghost" size="icon" onClick={handleRemoveModel} className="text-red-400 hover:text-red-500 hover:bg-red-50 rounded-full"><FiX /></Button>
+                              </div>
+                            ) : (
+                              <ProductModel3DUpload productId={product?.id?.toString() ?? "new"} onUploadComplete={(url) => {setModelUrl(url); setForm({...form, model_url: url})}} />
+                            )}
+                          </div>
+
+                          <div className="space-y-4">
+                            <label className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] ml-2">Video Presentación (MP4)</label>
+                            {(videoPreview ?? videoUrl) ? (
+                              <div className="relative group rounded-2xl overflow-hidden h-28 border-2 border-slate-100 shadow-lg">
+                                 <video src={videoPreview ?? videoUrl} className="w-full h-full object-cover" />
+                                 <button 
+                                   type="button" 
+                                   onClick={handleRemoveVideo} 
+                                   className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-red-500 text-white w-10 h-10 flex items-center justify-center rounded-full opacity-0 group-hover:opacity-100 transition-all shadow-xl hover:scale-110"
+                                 >
+                                   <FiX className="w-5 h-5" />
+                                 </button>
+                              </div>
+                            ) : (
+                              <ProductVideoUpload productId={product?.id?.toString() ?? "new"} onUploadComplete={(url) => {setVideoUrl(url); setVideoPreview(url); setForm({...form, video_url: url})}} />
+                            )}
+                          </div>
+                       </div>
+                    </div>
+                  )}
+                </motion.div>
+              </AnimatePresence>
+            </div>
+          </div>
+
+          {/* Sticky Controls Panel Compact */}
+          <div className="px-6 py-4 border-t border-slate-200 bg-white sticky bottom-0 z-50 shrink-0">
+            <div className="max-w-3xl mx-auto flex items-center justify-between gap-4">
+              <Button 
+                variant="ghost" 
+                onClick={() => setStep(Math.max(0, step - 1))} 
+                disabled={step === 0}
+                className="h-13 px-6 rounded-xl font-bold text-slate-600 hover:text-slate-900 transition-all border border-transparent hover:border-slate-100"
+              >
+                Regresar
+              </Button>
+              
+              <div className="flex items-center gap-3">
+                <p className="hidden md:block text-[9px] font-black text-slate-300 uppercase tracking-[0.3em]">
+                  {step + 1} / {totalSteps}
+                </p>
+                {step < totalSteps - 1 ? (
+                  <Button 
+                    onClick={handleNext} 
+                    className="h-13 px-10 rounded-xl bg-[#00a19a] hover:bg-[#007973] text-white font-black shadow-xl transition-all active:scale-95"
+                  >
+                    Siguiente
+                  </Button>
+                ) : (
+                  <Button 
+                    onClick={() => void handleSubmit()} 
+                    disabled={loading}
+                    className="h-13 px-10 rounded-xl bg-black hover:bg-slate-900 text-white font-black shadow-xl transition-all active:scale-95 flex items-center gap-2"
+                  >
+                    {loading ? (
+                      <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4" />
+                        Publicar
+                      </>
+                    )}
+                  </Button>
+                )}
               </div>
             </div>
           </div>
         </div>
+
+        {/* Dialog para Modelo 3D */}
+        {showModelDialog && (
+          <Dialog open={showModelDialog} onOpenChange={setShowModelDialog}>
+            <DialogContent className="max-w-4xl p-0 overflow-hidden rounded-[2.5rem] bg-white border-none shadow-2xl">
+              <div className="p-8 pb-4 border-b border-slate-50 flex items-center justify-between">
+                <h3 className="text-xl font-black text-slate-900">Vista Previa 3D</h3>
+                <Button variant="ghost" size="icon" onClick={() => setShowModelDialog(false)}><FiX /></Button>
+              </div>
+              <div className="aspect-square sm:aspect-video w-full bg-slate-50">
+                <Suspense fallback={<Model3DViewerLoading />}>
+                  <Model3DViewer modelUrl={modelUrl || ""} height="100%" />
+                </Suspense>
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
       </DialogContent>
     </Dialog>
   );

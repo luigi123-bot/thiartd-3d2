@@ -23,10 +23,11 @@ export default function ChatWidget({
     mensaje: string;
     respondido: boolean;
     creado_en: string;
+    leido: boolean;
   };
   const [mensajes, setMensajes] = useState<Mensaje[]>([]);
   const [msg, setMsg] = useState("");
-  const [hasNew, setHasNew] = useState(false);
+  const [hasNew, setHasNew] = useState(0); // Ahora será un número
   const chatRef = useRef<HTMLDivElement>(null);
   // Ref to always have current 'open' value inside Realtime callback without re-subscribing
   const openRef = useRef(open);
@@ -71,7 +72,7 @@ export default function ChatWidget({
             
             // Notificar si está cerrado y lo envía el admin
             if (newMessage.nombre === "Admin" && !openRef.current) {
-               setHasNew(true);
+               setHasNew(prev => prev + 1);
             }
           }
         }
@@ -86,11 +87,18 @@ export default function ChatWidget({
   }, [clienteEmail]); // Depender de clienteEmail asegura que se inicie cuando haya correo
 
   useEffect(() => {
-    if (open) setHasNew(false);
+    if (open) {
+      setHasNew(0);
+      // Marcar como leídos los del admin
+      const unreadAdminMsgs = mensajes.filter(m => !m.leido && m.nombre === "Admin").map(m => m.id);
+      if (unreadAdminMsgs.length > 0) {
+        void supabase.from("mensajes").update({ leido: true }).in("id", unreadAdminMsgs);
+      }
+    }
     setTimeout(() => {
       if (chatRef.current) chatRef.current.scrollTo({ top: chatRef.current.scrollHeight, behavior: 'smooth' });
     }, 100);
-  }, [open, mensajes.length]);
+  }, [open, mensajes]);
 
   const enviarMensaje = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,7 +108,7 @@ export default function ChatWidget({
     
     const { data: inserted, error } = await supabase
       .from("mensajes")
-      .insert([{ nombre: clienteNombre, email: clienteEmail, mensaje: currentText, respondido: false }])
+      .insert([{ nombre: clienteNombre, email: clienteEmail, mensaje: currentText, respondido: false, leido: false }])
       .select().single<Mensaje>();
       
     if (!error && inserted) {
@@ -218,8 +226,10 @@ export default function ChatWidget({
       >
         <div className="absolute inset-0 bg-gradient-to-tr from-emerald-500/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
         {open ? <FiX className="text-2xl" /> : <FiMessageCircle className="text-2xl" />}
-        {hasNew && (
-          <span className="absolute top-3 right-3 w-4 h-4 bg-emerald-500 border-2 border-black rounded-full animate-bounce"></span>
+        {hasNew > 0 && (
+          <span className="absolute top-2 right-2 min-w-[20px] h-[20px] bg-emerald-500 border-2 border-black rounded-full flex items-center justify-center animate-bounce shadow-lg">
+            <span className="text-[10px] text-white font-black leading-none">{hasNew}</span>
+          </span>
         )}
       </motion.button>
 

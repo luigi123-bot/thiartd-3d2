@@ -7,7 +7,7 @@ import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader } from "~/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { Dialog, DialogContent, DialogTitle } from "~/components/ui/dialog";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { X, Eye, EyeOff } from "lucide-react";
 import Image from "next/image";
 
@@ -29,7 +29,20 @@ export default function SupabaseAuth({ onAuth, open = false, onOpenChange }: {
   onOpenChange?: (open: boolean) => void;
 }) {
   const [tab, setTab] = useState<"login" | "register" | "reset" | "verify-code" | "new-password">("login");
-  const [form, setForm] = useState({ nombre: "", email: "", password: "", confirmPassword: "", code: "", newPassword: "" });
+  const [form, setForm] = useState({ 
+    nombre: "", 
+    email: "", 
+    password: "", 
+    confirmPassword: "", 
+    code: "", 
+    newPassword: "",
+    telefono: "",
+    direccion: "",
+    ciudad: "",
+    departamento: "",
+    codigo_postal: ""
+  });
+  const [registerStep, setRegisterStep] = useState<1 | 2>(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>("");
   const [success, setSuccess] = useState<string>("");
@@ -128,13 +141,48 @@ export default function SupabaseAuth({ onAuth, open = false, onOpenChange }: {
 
     await supabase.from("usuarios").upsert({
       id: userId,
+      auth_id: userId,
       nombre: form.nombre,
       email: form.email,
+      telefono: form.telefono,
+      direccion: form.direccion,
+      ciudad: form.ciudad,
+      departamento: form.departamento,
+      codigo_postal: form.codigo_postal,
       creado_en: new Date().toISOString(),
       role: "cliente"
     });
 
+    // Enviar correo de bienvenida personalizado
+    try {
+      await fetch("/api/auth/welcome", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: form.email, nombre: form.nombre })
+      });
+    } catch (err) {
+      console.warn("No se pudo enviar el correo de bienvenida:", err);
+    }
+
     setLoading(false);
+    setRegisterStep(1); // Reset step for next time
+  };
+
+  const nextRegisterStep = () => {
+    if (form.nombre && form.email && form.password && form.confirmPassword) {
+      if (form.password !== form.confirmPassword) {
+        setError("Las contraseñas no coinciden");
+        return;
+      }
+      if (form.password.length < 6) {
+        setError("La contraseña debe tener al menos 6 caracteres");
+        return;
+      }
+      setError("");
+      setRegisterStep(2);
+    } else {
+      setError("Por favor completa todos los campos de cuenta");
+    }
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -312,7 +360,19 @@ export default function SupabaseAuth({ onAuth, open = false, onOpenChange }: {
       
       setTimeout(() => {
         setTab("login");
-        setForm({ nombre: "", email: form.email, password: "", code: "", newPassword: "", confirmPassword: "" });
+        setForm({ 
+          nombre: "", 
+          email: form.email, 
+          password: "", 
+          code: "", 
+          newPassword: "", 
+          confirmPassword: "",
+          telefono: "",
+          direccion: "",
+          ciudad: "",
+          departamento: "",
+          codigo_postal: ""
+        });
         setSuccess("");
       }, 2000);
 
@@ -362,7 +422,8 @@ export default function SupabaseAuth({ onAuth, open = false, onOpenChange }: {
 
             {/* Título */}
             <DialogTitle className="text-2xl font-semibold text-center text-gray-800">
-              {tab === "login" || tab === "register" ? "Bienvenido a Thiart 3D" : 
+              {tab === "login" ? "Bienvenido a Thiart 3D" : 
+               tab === "register" ? "Crear Nueva Cuenta (Envío Gratis)" : 
                tab === "reset" ? "Recuperar contraseña" :
                tab === "verify-code" ? "Verificar código" :
                "Nueva contraseña"}
@@ -378,6 +439,7 @@ export default function SupabaseAuth({ onAuth, open = false, onOpenChange }: {
                   setTab(value as "login" | "register");
                   setError("");
                   setSuccess("");
+                  setRegisterStep(1);
                 }}
                 className="mb-6"
               >
@@ -400,45 +462,44 @@ export default function SupabaseAuth({ onAuth, open = false, onOpenChange }: {
                 <TabsContent value="login" className="mt-6">
                   <form className="flex flex-col gap-4" onSubmit={handleLogin}>
                     <div className="space-y-2">
-                      <label htmlFor="login-email" className="text-sm font-medium text-gray-700">
-                        Correo electrónico
-                      </label>
-                      <Input 
-                        id="login-email"
-                        name="email" 
-                        placeholder="tu@email.com" 
-                        type="email" 
-                        value={form.email} 
-                        onChange={handleChange} 
-                        required 
-                        className="h-11 border-gray-300 focus:ring-[#009688] focus:border-[#009688]"
-                      />
+                       <label htmlFor="login-email" className="text-sm font-semibold text-gray-700 ml-1">
+                          Correo electrónico
+                       </label>
+                       <Input 
+                          id="login-email"
+                          name="email" 
+                          placeholder="nombre@ejemplo.com" 
+                          type="email" 
+                          value={form.email} 
+                          onChange={handleChange} 
+                          required 
+                          className="h-12 border-gray-200 rounded-xl bg-gray-50/50 focus:ring-black focus:border-black transition-all"
+                       />
                     </div>
 
                     <div className="space-y-2">
-                      <label htmlFor="login-password" className="text-sm font-medium text-gray-700">
-                        Contraseña
-                      </label>
-                      <div className="relative">
-                        <Input 
-                          id="login-password"
-                          name="password" 
-                          placeholder="••••••••" 
-                          type={showPasswords.password ? "text" : "password"} 
-                          value={form.password} 
-                          onChange={handleChange} 
-                          required 
-                          className="h-11 pr-10 border-gray-300 focus:ring-[#009688] focus:border-[#009688]"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => togglePass("password")}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-                          aria-label={showPasswords.password ? "Ocultar contraseña" : "Mostrar contraseña"}
-                        >
-                          {showPasswords.password ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        </button>
-                      </div>
+                       <label htmlFor="login-password" className="text-sm font-semibold text-gray-700 ml-1">
+                          Contraseña
+                       </label>
+                       <div className="relative">
+                          <Input 
+                            id="login-password"
+                            name="password" 
+                            placeholder="••••••••" 
+                            type={showPasswords.password ? "text" : "password"} 
+                            value={form.password} 
+                            onChange={handleChange} 
+                            required 
+                            className="h-12 pr-10 border-gray-200 rounded-xl bg-gray-50/50 focus:ring-black focus:border-black transition-all"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => togglePass("password")}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black transition-colors"
+                          >
+                            {showPasswords.password ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                       </div>
                     </div>
                     
                     <div className="flex justify-end">
@@ -457,10 +518,10 @@ export default function SupabaseAuth({ onAuth, open = false, onOpenChange }: {
 
                     <Button 
                       type="submit" 
-                      className="w-full h-11 bg-black text-white hover:bg-[#00796b] transition-all mt-2" 
+                      className="w-full h-12 bg-black text-white hover:bg-gray-800 rounded-xl mt-4 font-bold text-base shadow-lg transition-all active:scale-[0.98]" 
                       disabled={loading}
                     >
-                      {loading ? "Ingresando..." : "Iniciar sesión"}
+                      {loading ? "Ingresando..." : "Acceder a mi cuenta"}
                     </Button>
 
                     {error && (
@@ -475,108 +536,106 @@ export default function SupabaseAuth({ onAuth, open = false, onOpenChange }: {
                   </form>
                 </TabsContent>
 
-                {/* Contenido Tab Registro */}
+                {/* Contenido Tab Registro con Multi-paso */}
                 <TabsContent value="register" className="mt-6">
                   <form className="flex flex-col gap-4" onSubmit={handleRegister}>
-                    <div className="space-y-2">
-                      <label htmlFor="register-nombre" className="text-sm font-medium text-gray-700">
-                        Nombre completo
-                      </label>
-                      <Input 
-                        id="register-nombre"
-                        name="nombre" 
-                        placeholder="Juan Pérez" 
-                        value={form.nombre} 
-                        onChange={handleChange} 
-                        required 
-                        className="h-11 border-gray-300 focus:ring-[#009688] focus:border-[#009688]"
-                      />
+                    {/* Indicador de pasos */}
+                    <div className="flex items-center justify-between mb-4 px-2">
+                       <div className="flex items-center gap-2">
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${registerStep === 1 ? 'bg-black text-white' : 'bg-[#009688] text-white'}`}>1</div>
+                          <span className="text-xs font-bold text-gray-500">Cuenta</span>
+                       </div>
+                       <div className="flex-1 h-[2px] bg-gray-100 mx-4">
+                          <motion.div 
+                            className="h-full bg-[#009688]" 
+                            initial={{ width: "0%" }}
+                            animate={{ width: registerStep === 2 ? "100%" : "0%" }}
+                          />
+                       </div>
+                       <div className="flex items-center gap-2">
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${registerStep === 2 ? 'bg-black text-white' : 'bg-gray-100 text-gray-400'}`}>2</div>
+                          <span className="text-xs font-bold text-gray-500">Envío</span>
+                       </div>
                     </div>
 
-                    <div className="space-y-2">
-                      <label htmlFor="register-email" className="text-sm font-medium text-gray-700">
-                        Correo electrónico
-                      </label>
-                      <Input 
-                        id="register-email"
-                        name="email" 
-                        placeholder="tu@email.com" 
-                        type="email" 
-                        value={form.email} 
-                        onChange={handleChange} 
-                        required 
-                        className="h-11 border-gray-300 focus:ring-[#009688] focus:border-[#009688]"
-                      />
+                    <div className="relative overflow-hidden min-h-[320px]">
+                      <AnimatePresence mode="wait">
+                        {registerStep === 1 ? (
+                          <motion.div
+                            key="step1"
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: -20 }}
+                            className="space-y-4"
+                          >
+                            <div className="space-y-2">
+                              <label htmlFor="register-nombre" className="text-sm font-semibold text-gray-700">Nombre completo</label>
+                              <Input id="register-nombre" name="nombre" placeholder="Tu Nombre Completo" value={form.nombre} onChange={handleChange} required className="h-12 border-gray-200 rounded-xl bg-gray-50/50" />
+                            </div>
+                            <div className="space-y-2">
+                              <label htmlFor="register-email" className="text-sm font-semibold text-gray-700">Correo electrónico</label>
+                              <Input id="register-email" name="email" placeholder="tu@email.com" type="email" value={form.email} onChange={handleChange} required className="h-12 border-gray-200 rounded-xl bg-gray-50/50" />
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                              <div className="space-y-2">
+                                <label className="text-sm font-semibold text-gray-700">Contraseña</label>
+                                <div className="relative">
+                                  <Input name="password" type={showPasswords.password ? "text" : "password"} value={form.password} onChange={handleChange} required minLength={6} className="h-12 pr-10 border-gray-200 rounded-xl bg-gray-50/50" />
+                                  <button type="button" onClick={() => togglePass("password")} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"><Eye className="w-4 h-4" /></button>
+                                </div>
+                              </div>
+                              <div className="space-y-2">
+                                <label className="text-sm font-semibold text-gray-700">Confirmar</label>
+                                <div className="relative">
+                                  <Input name="confirmPassword" type={showPasswords.confirmPassword ? "text" : "password"} value={form.confirmPassword} onChange={handleChange} required minLength={6} className="h-12 pr-10 border-gray-200 rounded-xl bg-gray-50/50" />
+                                  <button type="button" onClick={() => togglePass("confirmPassword")} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"><Eye className="w-4 h-4" /></button>
+                                </div>
+                              </div>
+                            </div>
+                            <Button type="button" onClick={nextRegisterStep} className="w-full h-12 bg-black hover:bg-gray-800 text-white rounded-xl font-bold mt-4 shadow-lg shadow-black/10">Continuar →</Button>
+                          </motion.div>
+                        ) : (
+                          <motion.div
+                            key="step2"
+                            initial={{ opacity: 0, x: 20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: 20 }}
+                            className="space-y-4"
+                          >
+                            <div className="space-y-2">
+                              <label className="text-sm font-semibold text-gray-700">Teléfono (WhatsApp)</label>
+                              <Input name="telefono" placeholder="300 123 4567" value={form.telefono} onChange={handleChange} className="h-12 border-gray-200 rounded-xl bg-gray-50/50" />
+                            </div>
+                            <div className="space-y-2">
+                              <label className="text-sm font-semibold text-gray-700">Dirección Residencial</label>
+                              <Input name="direccion" placeholder="Calle 123 #45-67" value={form.direccion} onChange={handleChange} className="h-12 border-gray-200 rounded-xl bg-gray-50/50" />
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                              <div className="space-y-2">
+                                <label className="text-sm font-semibold text-gray-700">Ciudad</label>
+                                <Input name="ciudad" placeholder="Medellín" value={form.ciudad} onChange={handleChange} className="h-12 border-gray-200 rounded-xl bg-gray-50/50" />
+                              </div>
+                              <div className="space-y-2">
+                                <label className="text-sm font-semibold text-gray-700">Departamento</label>
+                                <Input name="departamento" placeholder="Antioquia" value={form.departamento} onChange={handleChange} className="h-12 border-gray-200 rounded-xl bg-gray-50/50" />
+                              </div>
+                            </div>
+                            <div className="flex gap-3 mt-4">
+                              <Button type="button" variant="outline" onClick={() => setRegisterStep(1)} className="flex-1 h-12 border-gray-200 rounded-xl font-bold">← Atrás</Button>
+                              <Button type="submit" className="flex-[2] h-12 bg-[#009688] hover:bg-[#00796b] text-white rounded-xl font-bold shadow-lg shadow-[#009688]/20" disabled={loading}>
+                                {loading ? "Procesando..." : "Completar Registro 🎉"}
+                              </Button>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </div>
-
-                    <div className="space-y-2">
-                      <label htmlFor="register-password" className="text-sm font-medium text-gray-700">
-                        Contraseña
-                      </label>
-                      <div className="relative">
-                        <Input 
-                          id="register-password"
-                          name="password" 
-                          placeholder="••••••••" 
-                          type={showPasswords.password ? "text" : "password"} 
-                          value={form.password} 
-                          onChange={handleChange} 
-                          required 
-                          minLength={6}
-                          className="h-11 pr-10 border-gray-300 focus:ring-[#009688] focus:border-[#009688]"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => togglePass("password")}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-                          aria-label={showPasswords.password ? "Ocultar contraseña" : "Mostrar contraseña"}
-                        >
-                          {showPasswords.password ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        </button>
-                      </div>
-                      <p className="text-xs text-gray-500">Mínimo 6 caracteres</p>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label htmlFor="register-confirm-password" className="text-sm font-medium text-gray-700">
-                        Confirmar contraseña
-                      </label>
-                      <div className="relative">
-                        <Input 
-                          id="register-confirm-password"
-                          name="confirmPassword" 
-                          placeholder="••••••••" 
-                          type={showPasswords.confirmPassword ? "text" : "password"} 
-                          value={form.confirmPassword} 
-                          onChange={handleChange} 
-                          required 
-                          minLength={6}
-                          className="h-11 pr-10 border-gray-300 focus:ring-[#009688] focus:border-[#009688]"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => togglePass("confirmPassword")}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-                          aria-label={showPasswords.confirmPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
-                        >
-                          {showPasswords.confirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        </button>
-                      </div>
-                    </div>
-
-                    <Button 
-                      type="submit" 
-                      className="w-full h-11 bg-black text-white hover:bg-[#00796b] transition-all mt-2" 
-                      disabled={loading}
-                    >
-                      {loading ? "Registrando..." : "Registrarse"}
-                    </Button>
 
                     {error && (
                       <motion.div 
                         initial={{ opacity: 0, y: -10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm"
+                        className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-xs font-semibold mt-4"
                       >
                         {error}
                       </motion.div>

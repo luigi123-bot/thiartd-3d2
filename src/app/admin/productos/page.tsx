@@ -4,7 +4,7 @@ import Image from "next/image";
 import { Button } from "~/components/ui/button";
 import CreateProductModal from "~/app/tienda/productos/CreateProductModal";
 import { Card } from "~/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "~/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "~/components/ui/dialog";
 import Loader from "~/components/providers/UiProvider";
 import { useUser } from "@clerk/nextjs";
 import { Package, Star, AlertTriangle, Layers, ChevronDown, Search, Filter, BadgeDollarSign } from "lucide-react";
@@ -19,7 +19,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 const CATEGORIAS = ["Todas", "Moderno", "Pequeño", "Sin Stock", "Destacados"];
 
 interface Producto {
-  id: number;
+  id: string;
   nombre: string;
   descripcion: string;
   categoria: string;
@@ -28,6 +28,7 @@ interface Producto {
   precio: number;
   destacado: boolean;
   image_url?: string;
+  producto_imagenes?: { image_url: string }[];
 }
 
 export default function AdminProductosPage() {
@@ -90,9 +91,15 @@ export default function AdminProductosPage() {
     setLoading(true);
     const { data } = await supabase
       .from("productos")
-      .select("*")
+      .select("*, producto_imagenes(*)")
       .order("id", { ascending: false });
-    setProductos(Array.isArray(data) ? data : []);
+    const productosData = (Array.isArray(data) ? data : []) as Producto[];
+    console.log("[DEBUG Admin] Productos cargados con galería:", productosData.map((p: Producto) => ({ 
+      id: p.id, 
+      nombre: p.nombre, 
+      count_imagenes: p.producto_imagenes?.length ?? 0 
+    })));
+    setProductos(productosData);
     setLoading(false);
   };
 
@@ -129,8 +136,8 @@ export default function AdminProductosPage() {
     // Podrías mostrar un mensaje de error si error !== null
   };
 
-  // Ordena los productos: los más nuevos primero
-  const productosOrdenados = [...productos].sort((a, b) => b.id - a.id);
+  // Ordena por ID o podrías agregar un campo created_at
+  const productosOrdenados = [...productos].sort((a, b) => b.id.localeCompare(a.id));
 
   // Filtros y orden
   let productosFiltrados = productosOrdenados.filter((p) => {
@@ -399,8 +406,9 @@ export default function AdminProductosPage() {
             editProduct
               ? {
                   ...editProduct,
-                  detalles: "",
-                  destacado: false,
+                  detalles: editProduct.descripcion ?? "", // O maneja detalles por separado
+                  destacado: editProduct.destacado ?? false,
+                  imagenes: editProduct.producto_imagenes?.map(img => img.image_url) ?? []
                 }
               : undefined
           }
@@ -410,8 +418,11 @@ export default function AdminProductosPage() {
           <DialogContent>
             <DialogHeader>
               <DialogTitle>¿Eliminar producto?</DialogTitle>
+              <DialogDescription className="sr-only">
+                Esta acción eliminará permanentemente el producto de la base de datos.
+              </DialogDescription>
             </DialogHeader>
-            <div>¿Estás seguro de que deseas eliminar <b>{deleteProduct?.nombre}</b>?</div>
+            <div className="py-4 text-sm text-slate-600">¿Estás seguro de que deseas eliminar a <b>{deleteProduct?.nombre}</b>? Esta acción no se puede deshacer.</div>
             <DialogFooter>
               <Button variant="secondary" onClick={() => setDeleteProduct(null)} disabled={deleting}>Cancelar</Button>
               <Button variant="destructive" onClick={handleDelete} disabled={deleting}>{deleting ? "Eliminando..." : "Eliminar"}</Button>

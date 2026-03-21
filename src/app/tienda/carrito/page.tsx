@@ -4,7 +4,8 @@ import { Button } from "~/components/ui/button";
 import { Card } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
 import Link from "next/link";
-import { Trash2, Plus, Minus, ShoppingBag, CreditCard } from "lucide-react";
+import { Trash2, Plus, Minus, ShoppingBag, CreditCard, Package } from "lucide-react";
+import NextImage from "next/image";
 import { useToast } from "~/components/ui/use-toast";
 import { createClient } from "@supabase/supabase-js";
 
@@ -91,25 +92,32 @@ export default function CarritoPage() {
         }
 
         // Buscar datos adicionales en la tabla usuarios para pre-llenar
-        const { data: usuarioDb } = await supabase
-          .from("usuarios")
-          .select("telefono, direccion, ciudad, departamento, codigo_postal")
-          .eq("auth_id", data.user.id)
-          .single<UsuarioContactoDB>();
+        // Usamos try-catch y maybeSingle para no romper la página si las columnas no existen aún
+        try {
+          const { data: usuarioDb, error: userError } = await supabase
+            .from("usuarios")
+            .select("telefono, direccion, ciudad, departamento, codigo_postal")
+            .eq("auth_id", data.user.id)
+            .maybeSingle<UsuarioContactoDB>();
 
-        if (usuarioDb) {
-          setDatosContacto(prev => ({
-            ...prev,
-            telefono: usuarioDb.telefono ?? ""
-          }));
-          setDatosEnvio(prev => ({
-            ...prev,
-            telefono: usuarioDb.telefono ?? "",
-            direccion: usuarioDb.direccion ?? "",
-            ciudad: usuarioDb.ciudad ?? "",
-            departamento: usuarioDb.departamento ?? "",
-            codigoPostal: usuarioDb.codigo_postal ?? ""
-          }));
+          if (userError) {
+            console.warn("⚠️ No se pudieron cargar los datos de perfil (columna no encontrada):", userError.message);
+          } else if (usuarioDb) {
+            setDatosContacto(prev => ({
+              ...prev,
+              telefono: usuarioDb.telefono ?? prev.telefono
+            }));
+            setDatosEnvio(prev => ({
+              ...prev,
+              telefono: usuarioDb.telefono ?? prev.telefono,
+              direccion: usuarioDb.direccion ?? prev.direccion,
+              ciudad: usuarioDb.ciudad ?? prev.ciudad,
+              departamento: usuarioDb.departamento ?? prev.departamento,
+              codigoPostal: usuarioDb.codigo_postal ?? prev.codigoPostal
+            }));
+          }
+        } catch (e) {
+          console.warn("Error silencioso al cargar datos de perfil:", e);
         }
       } else {
         console.log("⚠️ No hay usuario autenticado");
@@ -319,8 +327,19 @@ export default function CarritoPage() {
                 {carrito.map((item) => (
                   <div key={item.id} className="flex flex-col xs:flex-row items-start xs:items-center gap-3 sm:gap-4 border-b pb-4 sm:pb-6 last:border-b-0 last:pb-0">
                     {/* Imagen del producto */}
-                    <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gray-200 rounded-lg flex items-center justify-center flex-shrink-0">
-                      <span className="text-xl sm:text-2xl">📦</span>
+                    <div className="w-16 h-16 sm:w-20 sm:h-20 bg-white rounded-xl overflow-hidden border border-slate-100 flex-shrink-0 relative shadow-sm">
+                      {item.imagen ? (
+                        <NextImage
+                          src={item.imagen}
+                          alt={item.nombre}
+                          fill
+                          className="object-contain p-1.5 transition-transform hover:scale-110"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-slate-50 flex items-center justify-center text-slate-300">
+                          <Package className="w-8 h-8" />
+                        </div>
+                      )}
                     </div>
                     {/* ...resto de la lista de productos... */}
                     {/* Información del producto */}

@@ -3,40 +3,52 @@ import { pgTable, serial, varchar, text, numeric, integer, boolean, uuid, timest
 // If you get an error, ensure your drizzle-orm version is >=0.30.0. Otherwise, use:
 // import { table, serial, varchar, text, numeric, integer, boolean, uuid, timestamp } from "drizzle-orm/pg-core";
 
-export const usuario = pgTable("public.usuario", {
+export const usuario = pgTable("public.usuarios", {
   id: uuid("id").primaryKey().defaultRandom(),
   nombre: varchar("nombre", { length: 100 }),
   email: varchar("email", { length: 100 }),
   password: varchar("password", { length: 255 }).notNull(),
-  role: varchar("role", { length: 20 }).default("user"), // <-- Cambiado a 'role'
+  role: varchar("role", { length: 20 }).default("user"),
+  auth_id: varchar("auth_id", { length: 255 }),  // ID de Supabase Auth
 });
 
 export const products = pgTable("public.productos", {
-  id: serial("id").primaryKey(),
-  name: varchar("name", { length: 100 }).notNull(),         // OBLIGATORIO
-  description: text("description"),                         // Opcional
-  price: numeric("price", { precision: 10, scale: 2 }),     // Opcional (puede ser obligatorio en tu lógica)
-  size: varchar("size", { length: 50 }),                    // Opcional
-  stock: integer("stock").default(0),                       // Opcional (default 0)
-  category: varchar("category", { length: 50 }),            // Opcional
-  featured: boolean("featured").default(false),             // Opcional (default false)
-  details: text("details"),                                 // Opcional
-  image_url: text("image_url"),                             // Opcional (deprecated - usar producto_imagenes)
-  model_url: text("model_url"),                             // Opcional - URL del modelo 3D (GLB/GLTF)
-  video_url: text("video_url"),                             // Opcional - URL del video del producto
-  user_id: uuid("user_id").references(() => usuario.id).notNull(), // OBLIGATORIO
+  id: uuid("id").primaryKey().defaultRandom(),
+  nombre: varchar("nombre", { length: 100 }).notNull(),
+  descripcion: text("descripcion"),
+  precio: numeric("precio", { precision: 10, scale: 2 }),
+  tamano: varchar("tamano", { length: 50 }),
+  stock: integer("stock").default(0),
+  categoria: varchar("categoria", { length: 50 }),
+  destacado: boolean("destacado").default(false),
+  detalles: text("detalles"),
+  image_url: text("image_url"),
+  model_url: text("model_url"),
+  video_url: text("video_url"),
+  user_id: uuid("user_id").references(() => usuario.id).notNull(),
 });
 
 // Nueva tabla para múltiples imágenes por producto
 export const productoImagenes = pgTable("public.producto_imagenes", {
   id: serial("id").primaryKey(),
-  producto_id: integer("producto_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
+  producto_id: uuid("producto_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
   image_url: text("image_url").notNull(),
   orden: integer("orden").default(0).notNull(),
   es_portada: boolean("es_portada").default(false),
   alt_text: varchar("alt_text", { length: 255 }),
   created_at: timestamp("created_at", { withTimezone: true }).defaultNow(),
   updated_at: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+
+// Tabla para reseñas de productos
+export const valoraciones = pgTable("public.valoraciones", {
+  id: serial("id").primaryKey(),
+  producto_id: uuid("producto_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
+  usuario_id: uuid("usuario_id").references(() => usuario.id, { onDelete: "cascade" }), // Puede ser opcional si se permiten anónimos con nombre
+  nombre_cliente: varchar("nombre_cliente", { length: 150 }), // Nombre descriptivo para anonimato o fallbacks
+  estrellas: integer("estrellas").notNull().default(5),
+  comentario: text("comentario"),
+  created_at: timestamp("created_at", { withTimezone: true }).defaultNow(),
 });
 
 export const personalizaciones = pgTable("public.personalizaciones", {
@@ -94,6 +106,16 @@ export const historial_envios = pgTable("public.historial_envios", {
   fecha: timestamp("fecha", { withTimezone: true }).defaultNow(),
   notificado_cliente: boolean("notificado_cliente").default(false),
   created_at: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+
+export const carrito = pgTable("public.carrito", {
+  id: serial("id").primaryKey(),
+  usuario_id: uuid("usuario_id").references(() => usuario.id, { onDelete: "cascade" }).notNull().unique(), // Sincronización con Supabase Auth
+  productos: text("productos").notNull(), // JSON string de los items
+  recordatorio_enviado: boolean("recordatorio_enviado").default(false),
+  ultimo_recordatorio_at: timestamp("ultimo_recordatorio_at", { withTimezone: true }),
+  created_at: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updated_at: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
 
 // Nueva tabla para notificaciones
