@@ -242,6 +242,50 @@ export default function TopbarTienda() {
             <Input placeholder="Buscar..." className="rounded-full shadow-sm text-black" autoFocus />
           </div>
         )}
+
+        {/* Menú móvil */}
+        <div 
+          className={`xl:hidden bg-white border-t transition-all duration-300 overflow-hidden ${
+            menuOpen ? "max-h-96 opacity-100" : "max-h-0 opacity-0 pointer-events-none"
+          }`}
+        >
+          <div className="flex flex-col p-4 gap-1">
+            <Link 
+              href="/" 
+              className="px-4 py-3 text-slate-700 font-bold hover:bg-slate-50 rounded-xl"
+              onClick={() => setMenuOpen(false)}
+            >
+              Inicio
+            </Link>
+            <Link 
+              href="/tienda/personalizar" 
+              className="px-4 py-3 text-slate-700 font-bold hover:bg-slate-50 rounded-xl"
+              onClick={() => setMenuOpen(false)}
+            >
+              Personalizar
+            </Link>
+            <Link 
+              href="/tienda/productos" 
+              className="px-4 py-3 text-slate-700 font-bold hover:bg-slate-50 rounded-xl"
+              onClick={() => setMenuOpen(false)}
+            >
+              Productos
+            </Link>
+            <Link 
+              href="/tienda/sobre-nosotros" 
+              className="px-4 py-3 text-slate-700 font-bold hover:bg-slate-50 rounded-xl"
+              onClick={() => setMenuOpen(false)}
+            >
+              Nosotros
+            </Link>
+            {!usuario && (
+              <div className="grid grid-cols-2 gap-3 mt-2 pt-4 border-t">
+                <Button variant="outline" onClick={() => { setAuthModalOpen(true); setMenuOpen(false); }}>Entrar</Button>
+                <Button variant="default" className="bg-[#00a19a]" onClick={() => { setAuthModalOpen(true); setMenuOpen(false); }}>Registro</Button>
+              </div>
+            )}
+          </div>
+        </div>
       </nav>
 
       <SupabaseAuth open={authModalOpen} onOpenChange={setAuthModalOpen} onAuth={() => setAuthModalOpen(false)} />
