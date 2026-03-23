@@ -10,6 +10,7 @@ import { useUser } from "@clerk/nextjs";
 import { supabase } from "~/lib/supabaseClient";
 import { motion } from "framer-motion";
 import { FiStar, FiArrowRight, FiShield } from "react-icons/fi";
+import Link from "next/link";
 
 const TopbarTienda = dynamic(() => import("./tienda/componentes/TopbarTienda"), { ssr: false });
 
@@ -83,12 +84,16 @@ export default function Home() {
                             Descubre figuras personalizadas, repuestos y arte tridimensional con una calidad excepcional y precisión en cada capa.
                         </p>
                         <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
-                            <Button className="h-14 px-8 bg-white text-[#007973] hover:bg-teal-50 rounded-2xl font-black uppercase tracking-widest shadow-2xl shadow-black/20 transition-transform active:scale-95 text-sm">
-                                Ver Catálogo
-                            </Button>
-                            <Button variant="outline" className="h-14 px-8 bg-black/20 hover:bg-black/30 text-white border-white/30 backdrop-blur-md rounded-2xl font-bold uppercase tracking-widest transition-transform active:scale-95 text-sm">
-                                Cotizar Proyecto
-                            </Button>
+                            <Link href="/tienda/productos" passHref>
+                                <Button className="w-full sm:w-auto h-14 px-8 bg-white text-[#007973] hover:bg-teal-50 rounded-2xl font-black uppercase tracking-widest shadow-2xl shadow-black/20 transition-transform active:scale-95 text-sm">
+                                    Ver Catálogo
+                                </Button>
+                            </Link>
+                            <Link href="/tienda/personalizar" passHref>
+                                <Button variant="outline" className="w-full sm:w-auto h-14 px-8 bg-black/20 hover:bg-black/30 text-white border-white/30 backdrop-blur-md rounded-2xl font-bold uppercase tracking-widest transition-transform active:scale-95 text-sm">
+                                    Cotizar Proyecto
+                                </Button>
+                            </Link>
                         </div>
                     </motion.div>
 
