@@ -7,7 +7,7 @@ import { ShoppingCart, X, Filter, Sparkles, Package, Tag, BadgeDollarSign, Heart
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import CreateProductModal from "./CreateProductModal";
+import CreateProductModal from "~/components/CreateProductModal";
 import { type AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
 
 const categorias = [

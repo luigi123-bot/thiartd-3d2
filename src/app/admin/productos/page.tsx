@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import { Button } from "~/components/ui/button";
-import CreateProductModal from "~/app/tienda/productos/CreateProductModal";
+import CreateProductModal from "~/components/CreateProductModal";
 import { Card } from "~/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "~/components/ui/dialog";
 import Loader from "~/components/providers/UiProvider";

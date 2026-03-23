@@ -9,6 +9,7 @@ const config = {
 	images: {
 		domains: [
 			"ui-avatars.com",
+			"lh3.googleusercontent.com",
 		],
 		remotePatterns: [
 			{

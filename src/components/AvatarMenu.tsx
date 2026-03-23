@@ -29,8 +29,9 @@ export default function AvatarMenu({ userName, userEmail }: Props) {
   }, [userEmail]);
 
   const handleLogout = async () => {
-    // await supabase.auth.signOut();
-    router.push("/login");
+    await supabase.auth.signOut();
+    router.push("/");
+    window.location.reload();
   };
 
   return (

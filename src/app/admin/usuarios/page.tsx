@@ -86,6 +86,8 @@ export default function AdminUsuariosPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [syncing, setSyncing] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [roles, setRoles] = useState<{ id: string, label: string }[]>([]);
 
   const deleteUsuario = async (id: string) => {
     if (!confirm("¿Estás seguro de que deseas eliminar este usuario?")) return;
@@ -129,9 +131,53 @@ export default function AdminUsuariosPage() {
     }
   };
 
+  const fetchRoles = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/roles");
+      const data = (await res.json()) as { roles?: { id: string; label: string }[] };
+      if (Array.isArray(data.roles) && data.roles.length > 0) {
+        setRoles(data.roles);
+      } else {
+        setRoles([
+          { id: "cliente", label: "Cliente" },
+          { id: "creador", label: "Creador" },
+          { id: "admin", label: "Admin" },
+        ]);
+      }
+    } catch {
+      setRoles([
+        { id: "cliente", label: "Cliente" },
+        { id: "creador", label: "Creador" },
+        { id: "admin", label: "Admin" },
+      ]);
+    }
+  }, []);
+
   useEffect(() => {
     void fetchUsuarios();
-  }, [fetchUsuarios]);
+    void fetchRoles();
+  }, [fetchUsuarios, fetchRoles]);
+
+  const changeRole = async (userId: string, newRole: string) => {
+    setUpdatingId(userId);
+    try {
+      const res = await fetch("/api/usuarios", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: userId, role: newRole }),
+      });
+      if (res.ok) {
+        setUsuarios(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
+      } else {
+        const data = await res.json() as { error?: string };
+        alert(data.error ?? "Error al actualizar el rol");
+      }
+    } catch {
+      alert("Error de red al actualizar el rol");
+    } finally {
+      setUpdatingId(null);
+    }
+  };
 
   const filteredUsuarios = usuarios.filter(u => 
     u.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ??
@@ -287,13 +333,26 @@ export default function AdminUsuariosPage() {
                         const displayRole = isUUID ? "cliente" : r;
                         
                         const config = configMap[displayRole] ?? configMap.cliente!;
-                        
-                        const Icon = config.icon;
                         return (
-                          <span className={`inline-flex items-center px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${config.color}`}>
-                            <Icon className="w-3.5 h-3.5 mr-2" />
-                            {displayRole}
-                          </span>
+                          <div className="flex flex-col gap-2">
+                             {updatingId === u.id ? (
+                               <div className="flex items-center gap-2">
+                                  <div className="w-4 h-4 border-2 border-[#00a19a] border-t-transparent rounded-full animate-spin" />
+                                  <span className="text-[10px] font-bold text-slate-400">Actualizando...</span>
+                               </div>
+                             ) : (
+                               <select 
+                                 className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all cursor-pointer outline-none ${config.color}`}
+                                 value={rol}
+                                 onChange={(e) => u.id && void changeRole(u.id, e.target.value)}
+                                 disabled={updatingId === u.id}
+                               >
+                                 {roles.map((r) => (
+                                   <option key={r.id} value={r.id.toLowerCase()}>{r.label}</option>
+                                 ))}
+                               </select>
+                             )}
+                          </div>
                         );
                       };
 

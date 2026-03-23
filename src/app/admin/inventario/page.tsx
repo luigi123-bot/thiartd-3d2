@@ -4,7 +4,7 @@ import Image from "next/image";
 import { Button } from "~/components/ui/button";
 import { createClient } from "@supabase/supabase-js";
 import Loader from "~/components/providers/UiProvider";
-import CreateProductModal from "~/app/tienda/productos/CreateProductModal";
+import CreateProductModal from "~/components/CreateProductModal";
 import AjustarInventarioModal from "./AjustarInventarioModal";
 import { FiSettings, FiEdit2, FiEye, FiStar } from "react-icons/fi";
 import { Star, BadgeDollarSign } from "lucide-react";

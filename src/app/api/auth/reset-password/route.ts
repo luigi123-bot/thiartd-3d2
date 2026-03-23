@@ -215,10 +215,8 @@ export async function POST(req: NextRequest) {
       if (userPlural) {
         authUserId = userPlural.auth_id ?? userPlural.id;
         console.log("Usuario encontrado en 'usuarios' (update):", authUserId);
-      }
-
-      // 2. Si no se encontró, intentar en 'usuario'
-      if (!authUserId) {
+      } else {
+        // 2. Si no se encontró en 'usuarios', intentar en 'usuario'
         const { data: userSingular } = await supabase
           .from("usuario")
           .select("id, auth_id")
@@ -255,16 +253,45 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // Actualizar contraseña usando Supabase Admin API
-      const { error: updateError } = await supabase.auth.admin.updateUserById(
+      // 4. Intentar actualizar contraseña
+      let { error: updateError } = await supabase.auth.admin.updateUserById(
         authUserId,
         { password: newPassword }
       );
 
+      // 5. Si falla porque el ID no existe, buscar por email en Auth y reintentar
+      if (updateError && 'status' in updateError && (updateError as { status: number }).status === 404) {
+        console.warn("ID de usuario no encontrado en Auth, intentando búsqueda por email...");
+        try {
+          const { data: authList, error: listError } = await supabase.auth.admin.listUsers({
+            perPage: 1000
+          });
+          
+          if (listError) {
+             console.error("Error al listar usuarios de Auth para recovery:", listError);
+          }
+          
+          const authFound = authList?.users.find(u => u.email?.toLowerCase() === decoded.email.toLowerCase());
+          
+          if (authFound) {
+            console.log("Re-intentando con ID correcto de Auth (fallback):", authFound.id);
+            const secondAttempt = await supabase.auth.admin.updateUserById(
+              authFound.id,
+              { password: newPassword }
+            );
+            updateError = secondAttempt.error;
+          } else {
+             console.error("No se encontró el email en la lista de Auth Admin:", decoded.email);
+          }
+        } catch (err) {
+           console.error("Error crítico en fallback de búsqueda de usuario:", err);
+        }
+      }
+
       if (updateError) {
-        console.error("Error al actualizar contraseña:", updateError);
+        console.error("Error final al actualizar contraseña:", updateError);
         return NextResponse.json(
-          { error: "Error al actualizar la contraseña" },
+          { error: "Error al actualizar la contraseña: " + updateError.message },
           { status: 500 }
         );
       }

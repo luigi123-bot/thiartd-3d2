@@ -181,3 +181,40 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ error: "Error inesperado al eliminar usuario" }, { status: 500 });
   }
 }
+
+export async function PATCH(req: Request) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get("id");
+    const body = await req.json() as { id?: string; role?: string; rol?: string };
+    const userId = id ?? body.id;
+    const newRole = body.role ?? body.rol;
+
+    if (!userId || !newRole) {
+      return NextResponse.json({ error: "ID de usuario y rol son requeridos" }, { status: 400 });
+    }
+
+    if (!supabaseServiceKey) {
+      return NextResponse.json({ error: "No se puede actualizar: SUPABASE_SERVICE_ROLE_KEY no configurada" }, { status: 500 });
+    }
+
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+
+    const { data, error } = await supabaseAdmin
+      .from("usuarios")
+      .update({ role: newRole })
+      .eq("id", userId)
+      .select()
+      .returns<{ id: string; role: string; email: string; nombre: string }[]>()
+      .single();
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, usuario: data as Record<string, unknown> });
+  } catch (err) {
+    console.error("Error en PATCH /api/usuarios:", err);
+    return NextResponse.json({ error: "Error inesperado al actualizar usuario" }, { status: 500 });
+  }
+}

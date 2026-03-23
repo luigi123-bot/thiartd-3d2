@@ -11,15 +11,12 @@ import {
   IoMdPerson,
   IoMdLogOut,
 } from "react-icons/io";
-import { FiSettings, FiBell } from "react-icons/fi";
+import { FiSettings, FiBell, FiStar, FiPackage } from "react-icons/fi";
 import { useRouter } from "next/navigation";
-import { createClient, type RealtimeChannel } from "@supabase/supabase-js";
+import { supabase } from "~/lib/supabaseClient";
 import { useCarrito } from "~/components/providers/CarritoProvider";
 import SupabaseAuth from "~/components/SupabaseAuth";
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
-const supabase = createClient(supabaseUrl, supabaseKey);
+import BecomeCreatorModal from "~/components/BecomeCreatorModal";
 
 interface UserNotification {
     id: string | number;
@@ -33,9 +30,11 @@ export default function TopbarTienda() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [showMobileSearch, setShowMobileSearch] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [becomeCreatorModalOpen, setBecomeCreatorModalOpen] = useState(false);
   const [usuario, setUsuario] = useState<{ id?: string; nombre?: string; email?: string; avatar_url?: string } | null>(null);
   const [role, setRole] = useState<string | null>(null);
   const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
+  const [authDefaultTab, setAuthDefaultTab] = useState<"login" | "register" | "creador">("login");
 
   const [notifications, setNotifications] = useState<UserNotification[]>([]);
   const [unread, setUnread] = useState(0);
@@ -80,49 +79,76 @@ export default function TopbarTienda() {
     }
   };
 
-  useEffect(() => {
-    let channel: RealtimeChannel | null = null;
-    void (async () => {
-      const { data } = await supabase.auth.getUser();
-      if (data?.user) {
-        setUsuario({
-          id: data.user.id,
-          nombre: (data.user.user_metadata?.nombre as string) ?? data.user.email,
-          email: data.user.email,
-          avatar_url: data.user.user_metadata?.avatar_url as string,
-        });
+  const syncUser = useCallback(async () => {
+    const { data } = await supabase.auth.getUser();
+    if (data?.user) {
+      setUsuario({
+        id: data.user.id,
+        nombre: (data.user.user_metadata?.nombre as string) ?? data.user.email,
+        email: data.user.email,
+        avatar_url: data.user.user_metadata?.avatar_url as string,
+      });
 
-        const { data: userDb } = await supabase
-          .from("usuarios")
-          .select("role")
-          .eq("email", data.user.email)
-          .single() as { data: { role: string } | null };
-        if (userDb?.role) setRole(userDb.role);
-        
-        // Cargar notificaciones
-        void fetchUserNotifications(data.user.id);
-        
-        // Listen Real-time
-        channel = supabase.channel(`user-notifs-${data.user.id}`)
-          .on('postgres_changes', { 
-              event: 'INSERT', 
-              schema: 'public', 
-              table: 'notificaciones', 
-              filter: `usuario_id=eq.${data.user.id}` 
-          }, () => {
-            void fetchUserNotifications(data.user.id);
-          })
-          .subscribe();
+      // Búsqueda resiliente por ID o Email
+      const { data: userDb, error: roleError } = await supabase
+        .from("usuarios")
+        .select("role")
+        .or(`id.eq.${data.user.id},email.eq.${data.user.email}`)
+        .maybeSingle() as { data: { role: string } | null; error: { message: string } | null };
+      
+      if (roleError) console.error("[DEBUG Topbar] Error fetching role:", roleError);
+      
+      if (userDb?.role) {
+        const normalizedRole = userDb.role.toLowerCase();
+        console.log("[DEBUG Topbar] Role found:", normalizedRole);
+        setRole(normalizedRole);
       } else {
+        console.warn("[DEBUG Topbar] No user record found in 'usuarios' table for", data.user.email);
+        setRole("cliente");
+      }
+      void fetchUserNotifications(data.user.id);
+    } else {
+      setUsuario(null);
+      setRole(null);
+    }
+  }, [fetchUserNotifications]);
+
+  useEffect(() => {
+    void syncUser();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event: string, _session) => {
+      console.log("[DEBUG Topbar] Auth state change:", _event);
+      if (_event === "SIGNED_IN" || _event === "TOKEN_REFRESHED" || _event === "USER_UPDATED") {
+        void syncUser();
+      } else if (_event === "SIGNED_OUT") {
         setUsuario(null);
         setRole(null);
       }
-    })();
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [syncUser]);
+
+  useEffect(() => {
+    if (!usuario?.id) return;
+
+    const channel = supabase.channel(`user-notifs-${usuario.id}`)
+      .on('postgres_changes', { 
+          event: 'INSERT', 
+          schema: 'public', 
+          table: 'notificaciones', 
+          filter: `usuario_id=eq.${usuario.id}` 
+      }, () => {
+        void fetchUserNotifications(usuario.id!);
+      })
+      .subscribe();
     
     return () => {
-        if (channel) void supabase.removeChannel(channel);
+        void supabase.removeChannel(channel);
     };
-  }, [authModalOpen, fetchUserNotifications]);
+  }, [usuario?.id, fetchUserNotifications]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -135,6 +161,9 @@ export default function TopbarTienda() {
   }, [notifOpen]);
 
   if (!isMounted) return null;
+
+  const isAdmin = role?.toLowerCase() === "admin";
+  const isCreator = role?.toLowerCase() === "creador" || isAdmin;
 
   return (
     <>
@@ -153,6 +182,28 @@ export default function TopbarTienda() {
               <Link href="/tienda/personalizar" className="text-white hover:text-gray-100 font-bold transition-colors">Personalizar</Link>
               <Link href="/tienda/productos" className="text-white hover:text-gray-100 font-bold transition-colors">Productos</Link>
               <Link href="/tienda/sobre-nosotros" className="text-white hover:text-gray-100 font-bold transition-colors">Nosotros</Link>
+              
+              {/* ACCESOS DIRECTOS POR ROL */}
+              {isAdmin && (
+                <Link href="/admin" className="bg-white/20 px-3 py-1.5 rounded-lg text-white hover:bg-white/30 font-black text-xs uppercase tracking-widest border border-white/40 transition-all flex items-center gap-2">
+                  <FiSettings className="w-3 h-3" /> Admin Panel
+                </Link>
+              )}
+              
+              {isCreator ? (
+                <Link href="/creador" className="bg-amber-400 px-3 py-1.5 rounded-lg text-amber-950 hover:bg-amber-300 font-black text-xs uppercase tracking-widest transition-all shadow-lg shadow-amber-900/20 flex items-center gap-2">
+                  <FiStar className="w-3 h-3" /> Panel Creador
+                </Link>
+              ) : (
+                usuario && (
+                  <button 
+                    onClick={() => setBecomeCreatorModalOpen(true)}
+                    className="bg-gradient-to-r from-teal-400 to-emerald-400 px-4 py-2 rounded-xl text-white hover:scale-105 font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-teal-900/10 flex items-center gap-2 border border-white/20"
+                  >
+                    <FiStar className="w-3 h-3 text-yellow-200 animate-pulse" /> Ser Creador 🎨
+                  </button>
+                )
+              )}
             </div>
 
             <div className="flex items-center gap-2 lg:gap-3">
@@ -203,10 +254,10 @@ export default function TopbarTienda() {
               </div>
 
               {!usuario ? (
-                <div className="hidden lg:flex items-center gap-2">
-                   <Button variant="outline" onClick={() => setAuthModalOpen(true)} className="text-white border-white hover:bg-white hover:text-[#00a19a]">Entrar</Button>
-                   <Button variant="default" onClick={() => setAuthModalOpen(true)} className="bg-white text-[#00a19a] hover:bg-gray-100">Registrarse</Button>
-                </div>
+                 <div className="hidden lg:flex items-center gap-2">
+                    <Button variant="outline" onClick={() => { setAuthDefaultTab("login"); setAuthModalOpen(true); }} className="text-white border-white hover:bg-white hover:text-[#00a19a]">Entrar</Button>
+                    <Button variant="default" onClick={() => { setAuthDefaultTab("register"); setAuthModalOpen(true); }} className="bg-white text-[#00a19a] hover:bg-gray-100">Registrarse</Button>
+                 </div>
               ) : (
                 <div className="relative group">
                   <button onClick={() => setAvatarMenuOpen(!avatarMenuOpen)} className="flex items-center gap-2 p-1 rounded-full hover:bg-white/10 transition">
@@ -221,10 +272,33 @@ export default function TopbarTienda() {
                         <div className="text-[10px] text-slate-400 truncate">{usuario.email}</div>
                       </div>
                       <button className="w-full text-left px-4 py-2 hover:bg-slate-50 flex items-center gap-3 text-sm" onClick={() => { setAvatarMenuOpen(false); router.push("/tienda/mi-perfil"); }}><IoMdPerson className="text-[#00a19a]" /> Perfil</button>
-                      <button className="w-full text-left px-4 py-2 hover:bg-slate-50 flex items-center gap-3 text-sm" onClick={() => { setAvatarMenuOpen(false); router.push("/envios"); }}><IoMdPerson className="text-[#00a19a]" /> Pedidos</button>
-                      {role === "admin" && <button className="w-full text-left px-4 py-2 hover:bg-slate-50 flex items-center gap-3 text-sm text-[#00a19a] font-bold" onClick={() => { setAvatarMenuOpen(false); router.push("/admin"); }}><FiSettings /> Admin</button>}
+                      <button className="w-full text-left px-4 py-2 hover:bg-slate-50 flex items-center gap-3 text-sm" onClick={() => { setAvatarMenuOpen(false); router.push("/envios"); }}><FiPackage className="text-[#00a19a]" /> Pedidos</button>
+                      {/* Opción Creador */}
+                      {isCreator ? (
+                        <button 
+                          className="w-full text-left px-4 py-2 hover:bg-slate-50 flex items-center gap-3 text-sm text-[#00a19a] font-bold" 
+                          onClick={() => { 
+                            setAvatarMenuOpen(false); 
+                            router.push("/creador");
+                          }}
+                        >
+                          <FiStar className="text-amber-500" /> Panel Creador
+                        </button>
+                      ) : (
+                        <button 
+                          className="w-full text-left px-4 py-2 hover:bg-amber-50 flex items-center gap-3 text-sm text-amber-700 font-bold" 
+                          onClick={() => { 
+                            setBecomeCreatorModalOpen(true);
+                            setAvatarMenuOpen(false);
+                          }}
+                        >
+                          <FiStar className="text-amber-500" /> Ser Creador 🚀
+                        </button>
+                      )}
+
+                      {isAdmin && <button className="w-full text-left px-4 py-2 hover:bg-slate-50 flex items-center gap-3 text-sm text-[#00a19a] font-bold" onClick={() => { setAvatarMenuOpen(false); router.push("/admin"); }}><FiSettings /> Admin</button>}
                       <hr className="my-1" />
-                      <button className="w-full text-left px-4 py-2 hover:bg-red-50 text-red-600 flex items-center gap-3 text-sm" onClick={async () => { await supabase.auth.signOut(); router.push("/"); }}><IoMdLogOut /> Salir</button>
+                      <button className="w-full text-left px-4 py-2 hover:bg-red-50 text-red-600 flex items-center gap-3 text-sm" onClick={async () => { await supabase.auth.signOut(); router.push("/"); window.location.reload(); }}><IoMdLogOut /> Salir</button>
                     </div>
                   )}
                 </div>
@@ -246,49 +320,71 @@ export default function TopbarTienda() {
         {/* Menú móvil */}
         <div 
           className={`xl:hidden bg-white border-t transition-all duration-300 overflow-hidden ${
-            menuOpen ? "max-h-96 opacity-100" : "max-h-0 opacity-0 pointer-events-none"
+            menuOpen ? "max-h-screen opacity-100" : "max-h-0 opacity-0 pointer-events-none"
           }`}
         >
-          <div className="flex flex-col p-4 gap-1">
-            <Link 
-              href="/" 
-              className="px-4 py-3 text-slate-700 font-bold hover:bg-slate-50 rounded-xl"
-              onClick={() => setMenuOpen(false)}
-            >
-              Inicio
-            </Link>
-            <Link 
-              href="/tienda/personalizar" 
-              className="px-4 py-3 text-slate-700 font-bold hover:bg-slate-50 rounded-xl"
-              onClick={() => setMenuOpen(false)}
-            >
-              Personalizar
-            </Link>
-            <Link 
-              href="/tienda/productos" 
-              className="px-4 py-3 text-slate-700 font-bold hover:bg-slate-50 rounded-xl"
-              onClick={() => setMenuOpen(false)}
-            >
-              Productos
-            </Link>
-            <Link 
-              href="/tienda/sobre-nosotros" 
-              className="px-4 py-3 text-slate-700 font-bold hover:bg-slate-50 rounded-xl"
-              onClick={() => setMenuOpen(false)}
-            >
-              Nosotros
-            </Link>
+          <div className="flex flex-col p-4 gap-1 pb-10">
+            <Link href="/" className="px-4 py-3 text-slate-700 font-bold hover:bg-slate-50 rounded-xl" onClick={() => setMenuOpen(false)}>Inicio</Link>
+            <Link href="/tienda/personalizar" className="px-4 py-3 text-slate-700 font-bold hover:bg-slate-50 rounded-xl" onClick={() => setMenuOpen(false)}>Personalizar</Link>
+            <Link href="/tienda/productos" className="px-4 py-3 text-slate-700 font-bold hover:bg-slate-50 rounded-xl" onClick={() => setMenuOpen(false)}>Productos</Link>
+            <Link href="/tienda/sobre-nosotros" className="px-4 py-3 text-slate-700 font-bold hover:bg-slate-50 rounded-xl" onClick={() => setMenuOpen(false)}>Nosotros</Link>
+            
+            <hr className="my-2 border-slate-100" />
+            
+            {/* MOBILE ACCESS BY ROLE */}
+            {isCreator ? (
+              <Link 
+                href="/creador" 
+                className="mx-2 px-4 py-3 text-[#00a19a] font-black bg-teal-50 rounded-xl flex items-center gap-3"
+                onClick={() => setMenuOpen(false)}
+              >
+                <FiStar /> Panel Creador
+              </Link>
+            ) : (
+              usuario && (
+                <button 
+                  onClick={() => { setBecomeCreatorModalOpen(true); setMenuOpen(false); }}
+                  className="mx-2 px-4 py-3 text-white font-black bg-gradient-to-r from-teal-500 to-emerald-500 rounded-xl flex items-center justify-between group shadow-lg shadow-teal-900/10 transition-all active:scale-[0.98]"
+                >
+                  <span className="flex items-center gap-3">
+                    <FiStar className="text-yellow-200 animate-pulse" /> Ser Creador 🎨
+                  </span>
+                  <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full font-bold">UNIRSE</span>
+                </button>
+              )
+            )}
+            
+            {isAdmin && (
+              <Link 
+                href="/admin" 
+                className="mx-2 px-4 py-3 text-slate-700 font-black bg-slate-100 rounded-xl flex items-center gap-3 mt-2"
+                onClick={() => setMenuOpen(false)}
+              >
+                <FiSettings /> Dashboard Administrativo
+              </Link>
+            )}
+
             {!usuario && (
-              <div className="grid grid-cols-2 gap-3 mt-2 pt-4 border-t">
-                <Button variant="outline" onClick={() => { setAuthModalOpen(true); setMenuOpen(false); }}>Entrar</Button>
-                <Button variant="default" className="bg-[#00a19a]" onClick={() => { setAuthModalOpen(true); setMenuOpen(false); }}>Registro</Button>
+              <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t">
+                <Button variant="outline" onClick={() => { setAuthDefaultTab("login"); setAuthModalOpen(true); setMenuOpen(false); }} className="rounded-xl border-slate-200">Entrar</Button>
+                <Button variant="default" className="bg-[#00a19a] rounded-xl" onClick={() => { setAuthDefaultTab("register"); setAuthModalOpen(true); setMenuOpen(false); }}>Registro</Button>
               </div>
             )}
           </div>
         </div>
       </nav>
 
-      <SupabaseAuth open={authModalOpen} onOpenChange={setAuthModalOpen} onAuth={() => setAuthModalOpen(false)} />
+      <SupabaseAuth 
+        open={authModalOpen} 
+        onOpenChange={setAuthModalOpen} 
+        onAuth={() => setAuthModalOpen(false)} 
+        defaultTab={authDefaultTab}
+      />
+
+      <BecomeCreatorModal 
+        open={becomeCreatorModalOpen} 
+        onOpenChange={setBecomeCreatorModalOpen} 
+      />
     </>
   );
 }

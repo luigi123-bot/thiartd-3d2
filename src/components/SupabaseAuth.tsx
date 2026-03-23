@@ -1,19 +1,17 @@
 'use client';
 
-import { useEffect, useState } from "react";
-import { createClient } from "@supabase/supabase-js";
+import { useEffect, useState, useRef } from "react";
 import { Input } from "~/components/ui/input";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader } from "~/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { Dialog, DialogContent, DialogTitle } from "~/components/ui/dialog";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Eye, EyeOff } from "lucide-react";
+import { X, Eye, EyeOff, Mail, Lock } from "lucide-react";
+import { FaGoogle } from "react-icons/fa";
 import Image from "next/image";
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
-const supabase = createClient(supabaseUrl, supabaseKey);
+import { supabase } from "../lib/supabaseClient";
+import { useRouter } from "next/navigation";
 
 type UsuarioDB = {
   id: string;
@@ -23,12 +21,15 @@ type UsuarioDB = {
   role: string;
 };
 
-export default function SupabaseAuth({ onAuth, open = false, onOpenChange }: { 
+export default function SupabaseAuth({ onAuth, open = false, onOpenChange, defaultTab = "login" }: { 
   onAuth?: (user: UsuarioDB) => void;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  defaultTab?: "login" | "register" | "creador";
 }) {
-  const [tab, setTab] = useState<"login" | "register" | "reset" | "verify-code" | "new-password">("login");
+  const router = useRouter();
+  const [tab, setTab] = useState<"login" | "register" | "reset" | "verify-code" | "new-password">(defaultTab === "creador" ? "login" : defaultTab);
+  const [, setAuthUser] = useState<UsuarioDB | null>(null);
   const [form, setForm] = useState({ 
     nombre: "", 
     email: "", 
@@ -48,6 +49,7 @@ export default function SupabaseAuth({ onAuth, open = false, onOpenChange }: {
   const [success, setSuccess] = useState<string>("");
   const [resetToken, setResetToken] = useState<string>("");
   const [showPasswords, setShowPasswords] = useState({ password: false, confirmPassword: false, newPassword: false });
+  const isFirstLoad = useRef(true);
 
   const togglePass = (field: keyof typeof showPasswords) =>
     setShowPasswords(prev => ({ ...prev, [field]: !prev[field] }));
@@ -59,26 +61,26 @@ export default function SupabaseAuth({ onAuth, open = false, onOpenChange }: {
     const getSession = async () => {
       const { data } = await supabase.auth.getSession();
       if (data.session) {
-        const { user } = data.session;
+        const { user: authUser } = data.session;
         const { data: usuarioData } = await supabase
           .from("usuarios")
           .select("*")
-          .eq("id", user.id)
+          .eq("id", authUser.id)
           .single<UsuarioDB>();
-        if (onAuth && usuarioData) {
-          onAuth(usuarioData);
+        
+        if (usuarioData) {
+          setAuthUser(usuarioData);
+          // NO llamamos a onAuth aquí porque es una sincronización pasiva al montar
         }
-        // Cerrar el modal si hay sesión
-        if (onOpenChange) {
-          onOpenChange(false);
-        }
+      } else {
+        setAuthUser(null);
       }
     };
 
     void getSession();
 
     // Escucha cambios en el estado de sesión
-    const { data: listener } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
         const { data: usuarioData } = await supabase
           .from("usuarios")
@@ -86,22 +88,40 @@ export default function SupabaseAuth({ onAuth, open = false, onOpenChange }: {
           .eq("id", session.user.id)
           .single<UsuarioDB>();
         
-        if (onAuth && usuarioData) {
-          onAuth(usuarioData);
+        if (usuarioData) {
+          setAuthUser(usuarioData);
+          
+          // Solo cerramos el modal y notificamos si es un inicio de sesión REAL (no al montar)
+          // Ignoramos el primer trigger si ya hay sesión
+          if (event === "SIGNED_IN" && !isFirstLoad.current) {
+             if (onAuth) onAuth(usuarioData);
+             if (onOpenChange) onOpenChange(false);
+             
+             // Redirección por rol
+             if (usuarioData.role === "admin") {
+               router.push("/admin");
+             } else if (usuarioData.role === "creador") {
+               router.push("/creador");
+             }
+          }
         }
-        
-        // Cerrar el modal después de login o registro exitoso
-        if (onOpenChange) {
-          onOpenChange(false);
-        }
+      } else {
+        setAuthUser(null);
       }
+      isFirstLoad.current = false;
     });
 
     return () => {
       listener.subscription.unsubscribe();
+      isFirstLoad.current = true;
     };
-  }, [open, onAuth, onOpenChange]);
+  }, [open, onAuth, onOpenChange, router]);
 
+  useEffect(() => {
+     if (open && defaultTab && defaultTab !== "creador") {
+        setTab(defaultTab);
+     }
+  }, [open, defaultTab]);
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
     setError("");
@@ -165,7 +185,16 @@ export default function SupabaseAuth({ onAuth, open = false, onOpenChange }: {
     }
 
     setLoading(false);
-    setRegisterStep(1); // Reset step for next time
+    setRegisterStep(1); 
+    
+    if (onAuth) onAuth({
+      id: userId,
+      nombre: form.nombre,
+      email: form.email,
+      creado_en: new Date().toISOString(),
+      role: "cliente"
+    });
+    if (onOpenChange) onOpenChange(false);
   };
 
   const nextRegisterStep = () => {
@@ -219,13 +248,33 @@ export default function SupabaseAuth({ onAuth, open = false, onOpenChange }: {
       setLoading(false);
       return;
     }
-
     setLoading(false);
-    if (onAuth) onAuth(usuarioData);
     
-    // Cerrar el modal después de login exitoso
-    if (onOpenChange) {
-      onOpenChange(false);
+    // Cerramos el modal inmediatamente tras éxito
+    if (onAuth) onAuth(usuarioData);
+    if (onOpenChange) onOpenChange(false);
+
+    // Redirección si es admin o creador a sus respectivos paneles si no están allí
+    if (usuarioData.role === "admin") {
+       router.push("/admin");
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+      if (error) throw error;
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Error al iniciar sesión con Google";
+      setError(message);
+      setLoading(false);
     }
   };
 
@@ -387,7 +436,7 @@ export default function SupabaseAuth({ onAuth, open = false, onOpenChange }: {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent 
-        className="max-w-sm w-full rounded-2xl shadow-lg p-0 bg-white/90 backdrop-blur-sm border-none"
+        className="max-w-[420px] w-full rounded-2xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.1)] p-0 bg-white border-0"
         showCloseButton={false}
       >
         {/* Botón Cerrar Personalizado */}
@@ -401,36 +450,41 @@ export default function SupabaseAuth({ onAuth, open = false, onOpenChange }: {
         </Button>
 
         <Card className="border-none shadow-none bg-transparent">
-          <CardHeader className="pt-8 pb-4 px-6">
+          <CardHeader className="pt-10 pb-2 px-8">
             {/* Logo con animación */}
             <motion.div 
               className="flex justify-center mb-4"
               whileHover={{ scale: 1.05, rotate: 5 }}
               transition={{ type: "spring", stiffness: 300 }}
             >
-              <div className="relative w-20 h-20 rounded-full bg-gradient-to-br from-[#009688] to-[#00796b] flex items-center justify-center shadow-lg">
+              <div className="w-16 h-16 rounded-2xl bg-[#eff7f6] flex items-center justify-center p-2 shadow-sm border border-teal-100/50">
                 <Image
                   src="/IG Foto de Perfil.png"
                   alt="Thiart 3D Logo"
-                  width={70}
-                  height={70}
-                  className="object-contain rounded-full"
+                  width={46}
+                  height={46}
+                  className="object-contain rounded-xl"
                   priority
                 />
               </div>
             </motion.div>
 
             {/* Título */}
-            <DialogTitle className="text-2xl font-semibold text-center text-gray-800">
-              {tab === "login" ? "Bienvenido a Thiart 3D" : 
-               tab === "register" ? "Crear Nueva Cuenta (Envío Gratis)" : 
+            <DialogTitle className="text-xl font-bold text-center text-gray-900 mt-1">
+              {tab === "login" ? "Thiart 3D" : 
+               tab === "register" ? "Thiart 3D" : 
                tab === "reset" ? "Recuperar contraseña" :
                tab === "verify-code" ? "Verificar código" :
                "Nueva contraseña"}
             </DialogTitle>
+            {(tab === "login" || tab === "register") && (
+                <p className="text-center text-xs text-gray-500 font-medium mt-1">
+                  {tab === "login" ? "Bienvenido a Thiart 3D" : "Crea tu cuenta gratis"}
+                </p>
+            )}
           </CardHeader>
 
-          <CardContent className="px-6 pb-6 pt-2">
+          <CardContent className="px-8 pb-8 pt-2">
             {/* Tabs para Login/Registro */}
             {tab !== "reset" && tab !== "verify-code" && tab !== "new-password" && (
               <Tabs 
@@ -441,47 +495,64 @@ export default function SupabaseAuth({ onAuth, open = false, onOpenChange }: {
                   setSuccess("");
                   setRegisterStep(1);
                 }}
-                className="mb-6"
+                className="mb-2"
               >
-                <TabsList className="grid w-full grid-cols-2 bg-gray-100">
+                <TabsList className="flex w-full border-b border-gray-100 bg-transparent rounded-none p-0 relative z-10 h-10 mb-0">
                   <TabsTrigger 
                     value="login"
-                    className="data-[state=active]:bg-black data-[state=active]:text-white data-[state=inactive]:border data-[state=inactive]:border-[#009688] data-[state=inactive]:text-gray-700"
+                    className="flex-1 rounded-none border-b-[3px] border-transparent data-[state=active]:border-[#00a19a] py-3 text-xs font-bold data-[state=active]:bg-transparent data-[state=active]:text-[#00a19a] data-[state=active]:shadow-none data-[state=inactive]:text-gray-400 transition-all focus:ring-0 outline-none"
                   >
-                    Iniciar sesión
+                    Entrar
                   </TabsTrigger>
                   <TabsTrigger 
                     value="register"
-                    className="data-[state=active]:bg-black data-[state=active]:text-white data-[state=inactive]:border data-[state=inactive]:border-[#009688] data-[state=inactive]:text-gray-700"
+                    className="flex-1 rounded-none border-b-[3px] border-transparent data-[state=active]:border-[#00a19a] py-3 text-xs font-bold data-[state=active]:bg-transparent data-[state=active]:text-[#00a19a] data-[state=active]:shadow-none data-[state=inactive]:text-gray-400 transition-all focus:ring-0 outline-none"
                   >
-                    Registrarse
+                    Registro
                   </TabsTrigger>
                 </TabsList>
 
                 {/* Contenido Tab Login */}
-                <TabsContent value="login" className="mt-6">
-                  <form className="flex flex-col gap-4" onSubmit={handleLogin}>
-                    <div className="space-y-2">
-                       <label htmlFor="login-email" className="text-sm font-semibold text-gray-700 ml-1">
+                <TabsContent value="login" className="mt-8">
+                  <form className="flex flex-col gap-5" onSubmit={handleLogin}>
+                    <div className="space-y-1 relative">
+                       <label htmlFor="login-email" className="text-[10px] sm:text-[10px] font-black tracking-widest text-[#7D8886] uppercase block mb-1">
                           Correo electrónico
                        </label>
-                       <Input 
-                          id="login-email"
-                          name="email" 
-                          placeholder="nombre@ejemplo.com" 
-                          type="email" 
-                          value={form.email} 
-                          onChange={handleChange} 
-                          required 
-                          className="h-12 border-gray-200 rounded-xl bg-gray-50/50 focus:ring-black focus:border-black transition-all"
-                       />
+                       <div className="relative">
+                         <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-gray-500" />
+                         <Input 
+                            id="login-email"
+                            name="email" 
+                            placeholder="nombre@ejemplo.com" 
+                            type="email" 
+                            value={form.email} 
+                            onChange={handleChange} 
+                            required 
+                            className="h-[46px] w-full pl-10 border-none bg-gray-100/90 rounded-xl focus:bg-white focus:ring-1 focus:ring-[#00a19a] transition-all font-medium text-gray-800 placeholder:text-gray-400"
+                         />
+                       </div>
                     </div>
 
-                    <div className="space-y-2">
-                       <label htmlFor="login-password" className="text-sm font-semibold text-gray-700 ml-1">
-                          Contraseña
-                       </label>
+                    <div className="space-y-1 relative">
+                       <div className="flex justify-between items-center mb-1">
+                         <label htmlFor="login-password" className="text-[10px] sm:text-[10px] font-black tracking-widest text-[#7D8886] uppercase block">
+                            Contraseña
+                         </label>
+                         <button
+                           type="button"
+                           onClick={() => {
+                             setTab("reset");
+                             setError("");
+                             setSuccess("");
+                           }}
+                           className="text-[10px] text-[#00a19a] font-bold hover:underline transition-all"
+                         >
+                           ¿Olvidaste tu contraseña?
+                         </button>
+                       </div>
                        <div className="relative">
+                          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-gray-500" />
                           <Input 
                             id="login-password"
                             name="password" 
@@ -490,35 +561,21 @@ export default function SupabaseAuth({ onAuth, open = false, onOpenChange }: {
                             value={form.password} 
                             onChange={handleChange} 
                             required 
-                            className="h-12 pr-10 border-gray-200 rounded-xl bg-gray-50/50 focus:ring-black focus:border-black transition-all"
+                            className="h-[46px] w-full pl-10 pr-10 border-none bg-gray-100/90 rounded-xl focus:bg-white focus:ring-1 focus:ring-[#00a19a] transition-all font-medium text-gray-800 placeholder:text-gray-400"
                           />
                           <button
                             type="button"
                             onClick={() => togglePass("password")}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black transition-colors"
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 transition-colors"
                           >
                             {showPasswords.password ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                           </button>
                        </div>
                     </div>
-                    
-                    <div className="flex justify-end">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setTab("reset");
-                          setError("");
-                          setSuccess("");
-                        }}
-                        className="text-sm text-[#009688] hover:text-[#00796b] font-medium hover:underline transition-all"
-                      >
-                        ¿Olvidaste tu contraseña?
-                      </button>
-                    </div>
 
                     <Button 
                       type="submit" 
-                      className="w-full h-12 bg-black text-white hover:bg-gray-800 rounded-xl mt-4 font-bold text-base shadow-lg transition-all active:scale-[0.98]" 
+                      className="w-full h-12 bg-gradient-to-r from-[#00c69d] to-[#007464] text-white hover:opacity-90 rounded-[10px] mt-1 font-bold uppercase tracking-widest text-xs shadow-md shadow-[#007464]/20 transition-all active:scale-[0.98]" 
                       disabled={loading}
                     >
                       {loading ? "Ingresando..." : "Acceder a mi cuenta"}
@@ -533,6 +590,35 @@ export default function SupabaseAuth({ onAuth, open = false, onOpenChange }: {
                         {error}
                       </motion.div>
                     )}
+
+                    <div className="relative mt-2 mb-2">
+                       <div className="absolute inset-0 flex items-center">
+                         <span className="w-full border-t border-gray-100"></span>
+                       </div>
+                       <div className="relative flex justify-center text-[10px] uppercase">
+                         <span className="bg-white px-3 text-[#7D8886] font-extrabold tracking-widest text-[9px]">O continuar con</span>
+                       </div>
+                     </div>
+
+                     <Button 
+                       type="button" 
+                       onClick={handleGoogleLogin} 
+                       variant="ghost"
+                       className="w-full h-[46px] bg-gray-100/80 hover:bg-gray-200 border-none rounded-[10px] font-bold text-gray-800 text-sm flex items-center justify-center gap-3 transition-all active:scale-[0.98]"
+                       disabled={loading}
+                     >
+                       <FaGoogle className="w-[18px] h-[18px] text-gray-600" />
+                       Google
+                     </Button>
+
+                     <div className="w-full flex justify-center mt-3">
+                         <span className="text-[11px] text-[#7D8886] font-bold">
+                           ¿No tienes una cuenta?{" "}
+                           <button type="button" onClick={() => {setTab("register"); setRegisterStep(1);}} className="text-[#00a19a] hover:underline cursor-pointer font-bold">
+                              Crea una ahora
+                           </button>
+                         </span>
+                     </div>
                   </form>
                 </TabsContent>
 
@@ -542,18 +628,18 @@ export default function SupabaseAuth({ onAuth, open = false, onOpenChange }: {
                     {/* Indicador de pasos */}
                     <div className="flex items-center justify-between mb-4 px-2">
                        <div className="flex items-center gap-2">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${registerStep === 1 ? 'bg-black text-white' : 'bg-[#009688] text-white'}`}>1</div>
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${registerStep === 1 ? 'bg-black text-white shadow-md' : 'bg-[#00a19a] text-white shadow-md'}`}>1</div>
                           <span className="text-xs font-bold text-gray-500">Cuenta</span>
                        </div>
                        <div className="flex-1 h-[2px] bg-gray-100 mx-4">
                           <motion.div 
-                            className="h-full bg-[#009688]" 
+                            className="h-full bg-[#00a19a]" 
                             initial={{ width: "0%" }}
                             animate={{ width: registerStep === 2 ? "100%" : "0%" }}
                           />
                        </div>
                        <div className="flex items-center gap-2">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${registerStep === 2 ? 'bg-black text-white' : 'bg-gray-100 text-gray-400'}`}>2</div>
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${registerStep === 2 ? 'bg-black text-white shadow-md' : 'bg-slate-100 text-slate-400'}`}>2</div>
                           <span className="text-xs font-bold text-gray-500">Envío</span>
                        </div>
                     </div>
@@ -570,29 +656,29 @@ export default function SupabaseAuth({ onAuth, open = false, onOpenChange }: {
                           >
                             <div className="space-y-2">
                               <label htmlFor="register-nombre" className="text-sm font-semibold text-gray-700">Nombre completo</label>
-                              <Input id="register-nombre" name="nombre" placeholder="Tu Nombre Completo" value={form.nombre} onChange={handleChange} required className="h-12 border-gray-200 rounded-xl bg-gray-50/50" />
+                              <Input id="register-nombre" name="nombre" placeholder="Tu Nombre Completo" value={form.nombre} onChange={handleChange} required className="h-14 border-slate-200 rounded-2xl bg-slate-50 border-none ring-1 ring-slate-200/50 focus:bg-white focus:ring-2 focus:ring-[#00a19a] focus:border-transparent transition-all font-semibold text-slate-800" />
                             </div>
                             <div className="space-y-2">
                               <label htmlFor="register-email" className="text-sm font-semibold text-gray-700">Correo electrónico</label>
-                              <Input id="register-email" name="email" placeholder="tu@email.com" type="email" value={form.email} onChange={handleChange} required className="h-12 border-gray-200 rounded-xl bg-gray-50/50" />
+                              <Input id="register-email" name="email" placeholder="tu@email.com" type="email" value={form.email} onChange={handleChange} required className="h-14 border-slate-200 rounded-2xl bg-slate-50 border-none ring-1 ring-slate-200/50 focus:bg-white focus:ring-2 focus:ring-[#00a19a] focus:border-transparent transition-all font-semibold text-slate-800" />
                             </div>
-                            <div className="grid grid-cols-2 gap-3">
+                             <div className="grid grid-cols-2 gap-3">
                               <div className="space-y-2">
                                 <label className="text-sm font-semibold text-gray-700">Contraseña</label>
                                 <div className="relative">
-                                  <Input name="password" type={showPasswords.password ? "text" : "password"} value={form.password} onChange={handleChange} required minLength={6} className="h-12 pr-10 border-gray-200 rounded-xl bg-gray-50/50" />
+                                  <Input name="password" type={showPasswords.password ? "text" : "password"} value={form.password} onChange={handleChange} required minLength={6} className="h-14 pr-10 border-slate-200 rounded-2xl bg-slate-50 border-none ring-1 ring-slate-200/50 focus:bg-white focus:ring-2 focus:ring-[#00a19a] focus:border-transparent transition-all font-semibold text-slate-800" />
                                   <button type="button" onClick={() => togglePass("password")} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"><Eye className="w-4 h-4" /></button>
                                 </div>
                               </div>
                               <div className="space-y-2">
                                 <label className="text-sm font-semibold text-gray-700">Confirmar</label>
                                 <div className="relative">
-                                  <Input name="confirmPassword" type={showPasswords.confirmPassword ? "text" : "password"} value={form.confirmPassword} onChange={handleChange} required minLength={6} className="h-12 pr-10 border-gray-200 rounded-xl bg-gray-50/50" />
+                                  <Input name="confirmPassword" type={showPasswords.confirmPassword ? "text" : "password"} value={form.confirmPassword} onChange={handleChange} required minLength={6} className="h-14 pr-10 border-slate-200 rounded-2xl bg-slate-50 border-none ring-1 ring-slate-200/50 focus:bg-white focus:ring-2 focus:ring-[#00a19a] focus:border-transparent transition-all font-semibold text-slate-800" />
                                   <button type="button" onClick={() => togglePass("confirmPassword")} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"><Eye className="w-4 h-4" /></button>
                                 </div>
                               </div>
                             </div>
-                            <Button type="button" onClick={nextRegisterStep} className="w-full h-12 bg-black hover:bg-gray-800 text-white rounded-xl font-bold mt-4 shadow-lg shadow-black/10">Continuar →</Button>
+                            <Button type="button" onClick={nextRegisterStep} className="w-full h-14 bg-black hover:bg-slate-800 text-white rounded-2xl font-black mt-4 shadow-xl shadow-black/10">Continuar →</Button>
                           </motion.div>
                         ) : (
                           <motion.div
@@ -604,25 +690,25 @@ export default function SupabaseAuth({ onAuth, open = false, onOpenChange }: {
                           >
                             <div className="space-y-2">
                               <label className="text-sm font-semibold text-gray-700">Teléfono (WhatsApp)</label>
-                              <Input name="telefono" placeholder="300 123 4567" value={form.telefono} onChange={handleChange} className="h-12 border-gray-200 rounded-xl bg-gray-50/50" />
+                              <Input name="telefono" placeholder="300 123 4567" value={form.telefono} onChange={handleChange} className="h-14 border-slate-200 rounded-2xl bg-slate-50 border-none ring-1 ring-slate-200/50 focus:bg-white focus:ring-2 focus:ring-[#00a19a] focus:border-transparent transition-all font-semibold text-slate-800" />
                             </div>
                             <div className="space-y-2">
                               <label className="text-sm font-semibold text-gray-700">Dirección Residencial</label>
-                              <Input name="direccion" placeholder="Calle 123 #45-67" value={form.direccion} onChange={handleChange} className="h-12 border-gray-200 rounded-xl bg-gray-50/50" />
+                              <Input name="direccion" placeholder="Calle 123 #45-67" value={form.direccion} onChange={handleChange} className="h-14 border-slate-200 rounded-2xl bg-slate-50 border-none ring-1 ring-slate-200/50 focus:bg-white focus:ring-2 focus:ring-[#00a19a] focus:border-transparent transition-all font-semibold text-slate-800" />
                             </div>
                             <div className="grid grid-cols-2 gap-3">
                               <div className="space-y-2">
                                 <label className="text-sm font-semibold text-gray-700">Ciudad</label>
-                                <Input name="ciudad" placeholder="Medellín" value={form.ciudad} onChange={handleChange} className="h-12 border-gray-200 rounded-xl bg-gray-50/50" />
+                                <Input name="ciudad" placeholder="Medellín" value={form.ciudad} onChange={handleChange} className="h-14 border-slate-200 rounded-2xl bg-slate-50 border-none ring-1 ring-slate-200/50 focus:bg-white focus:ring-2 focus:ring-[#00a19a] focus:border-transparent transition-all font-semibold text-slate-800" />
                               </div>
                               <div className="space-y-2">
                                 <label className="text-sm font-semibold text-gray-700">Departamento</label>
-                                <Input name="departamento" placeholder="Antioquia" value={form.departamento} onChange={handleChange} className="h-12 border-gray-200 rounded-xl bg-gray-50/50" />
+                                <Input name="departamento" placeholder="Antioquia" value={form.departamento} onChange={handleChange} className="h-14 border-slate-200 rounded-2xl bg-slate-50 border-none ring-1 ring-slate-200/50 focus:bg-white focus:ring-2 focus:ring-[#00a19a] focus:border-transparent transition-all font-semibold text-slate-800" />
                               </div>
                             </div>
                             <div className="flex gap-3 mt-4">
-                              <Button type="button" variant="outline" onClick={() => setRegisterStep(1)} className="flex-1 h-12 border-gray-200 rounded-xl font-bold">← Atrás</Button>
-                              <Button type="submit" className="flex-[2] h-12 bg-[#009688] hover:bg-[#00796b] text-white rounded-xl font-bold shadow-lg shadow-[#009688]/20" disabled={loading}>
+                              <Button type="button" variant="outline" onClick={() => setRegisterStep(1)} className="flex-1 h-14 border border-slate-200 bg-white hover:bg-slate-50 rounded-2xl font-bold">← Atrás</Button>
+                              <Button type="submit" className="flex-[2] h-14 bg-[#00a19a] hover:bg-[#008f89] text-white rounded-2xl font-black shadow-xl shadow-[#00a19a]/20" disabled={loading}>
                                 {loading ? "Procesando..." : "Completar Registro 🎉"}
                               </Button>
                             </div>
@@ -669,13 +755,13 @@ export default function SupabaseAuth({ onAuth, open = false, onOpenChange }: {
                     value={form.email} 
                     onChange={handleChange} 
                     required 
-                    className="h-11 border-gray-300 focus:ring-[#009688] focus:border-[#009688]"
+                    className="h-14 border-slate-200 rounded-2xl bg-slate-50 border-none ring-1 ring-slate-200/50 focus:bg-white focus:ring-2 focus:ring-[#00a19a] focus:border-transparent transition-all font-semibold text-slate-800"
                   />
                 </div>
                 
                 <Button 
                   type="submit" 
-                  className="w-full h-11 bg-black text-white hover:bg-[#00796b] transition-all mt-2" 
+                  className="w-full h-14 bg-[#00a19a] text-white hover:bg-[#008f89] rounded-2xl uppercase tracking-wider text-sm font-black mt-4 shadow-xl shadow-[#00a19a]/20 transition-all active:scale-[0.98]" 
                   disabled={loading}
                 >
                   {loading ? "Enviando..." : "Enviar código"}
@@ -689,7 +775,7 @@ export default function SupabaseAuth({ onAuth, open = false, onOpenChange }: {
                     setError("");
                     setSuccess("");
                   }}
-                  className="w-full h-11 border-gray-300"
+                  className="w-full h-14 border border-slate-200 bg-white hover:bg-slate-50 rounded-2xl font-bold text-slate-600 transition-all"
                 >
                   Volver al inicio de sesión
                 </Button>
@@ -741,13 +827,13 @@ export default function SupabaseAuth({ onAuth, open = false, onOpenChange }: {
                     required 
                     maxLength={6}
                     pattern="[0-9]{6}"
-                    className="h-11 text-center text-2xl tracking-widest font-bold border-gray-300 focus:ring-[#009688] focus:border-[#009688]"
+                    className="h-16 text-center text-3xl tracking-widest font-black border-slate-200 rounded-2xl bg-slate-50 border-none ring-1 ring-slate-200/50 focus:bg-white focus:ring-2 focus:ring-[#00a19a] focus:border-transparent transition-all"
                   />
                 </div>
                 
                 <Button 
                   type="submit" 
-                  className="w-full h-11 bg-black text-white hover:bg-[#00796b] transition-all mt-2" 
+                  className="w-full h-14 bg-[#00a19a] text-white hover:bg-[#008f89] rounded-2xl uppercase tracking-wider text-sm font-black mt-4 shadow-xl shadow-[#00a19a]/20 transition-all active:scale-[0.98]" 
                   disabled={loading}
                 >
                   {loading ? "Verificando..." : "Verificar código"}
@@ -761,7 +847,7 @@ export default function SupabaseAuth({ onAuth, open = false, onOpenChange }: {
                     setForm({ ...form, code: "" });
                     setError("");
                   }}
-                  className="w-full h-11 border-gray-300"
+                  className="w-full h-14 border border-slate-200 bg-white hover:bg-slate-50 rounded-2xl font-bold text-slate-600 transition-all"
                 >
                   Reenviar código
                 </Button>
@@ -808,7 +894,7 @@ export default function SupabaseAuth({ onAuth, open = false, onOpenChange }: {
                       onChange={handleChange} 
                       required 
                       minLength={6}
-                      className="h-11 pr-10 border-gray-300 focus:ring-[#009688] focus:border-[#009688]"
+                      className="h-14 pr-10 border-slate-200 rounded-2xl bg-slate-50 border-none ring-1 ring-slate-200/50 focus:bg-white focus:ring-2 focus:ring-[#00a19a] focus:border-transparent transition-all font-semibold text-slate-800"
                     />
                     <button
                       type="button"
@@ -835,7 +921,7 @@ export default function SupabaseAuth({ onAuth, open = false, onOpenChange }: {
                       onChange={handleChange} 
                       required 
                       minLength={6}
-                      className="h-11 pr-10 border-gray-300 focus:ring-[#009688] focus:border-[#009688]"
+                      className="h-14 pr-10 border-slate-200 rounded-2xl bg-slate-50 border-none ring-1 ring-slate-200/50 focus:bg-white focus:ring-2 focus:ring-[#00a19a] focus:border-transparent transition-all font-semibold text-slate-800"
                     />
                     <button
                       type="button"
@@ -850,7 +936,7 @@ export default function SupabaseAuth({ onAuth, open = false, onOpenChange }: {
                 
                 <Button 
                   type="submit" 
-                  className="w-full h-11 bg-black text-white hover:bg-[#00796b] transition-all mt-2" 
+                  className="w-full h-14 bg-[#00a19a] text-white hover:bg-[#008f89] rounded-2xl uppercase tracking-wider text-sm font-black mt-4 shadow-xl shadow-[#00a19a]/20 transition-all active:scale-[0.98]" 
                   disabled={loading}
                 >
                   {loading ? "Actualizando..." : "Actualizar contraseña"}

@@ -1,14 +1,13 @@
 "use client";
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "~/components/ui/dialog";
 import { Input } from "~/components/ui/input";
 import { Button } from "~/components/ui/button";
 import { Textarea } from "~/components/ui/textarea";
 import { ProductImageUpload, ProductModel3DUpload, ProductVideoUpload } from "~/components/FileUploadWidget";
-import { Model3DViewer, Model3DViewerLoading } from "~/components/Model3DViewer";
 import Image from "next/image";
 import { FiX } from "react-icons/fi";
-import { Package, Sparkles } from "lucide-react";
+import { Package } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 const categorias = [
@@ -41,11 +40,18 @@ interface Product {
   usuario_id?: string; 
 }
 
-export default function CreateProductModal({ open, onOpenChangeAction, onProductCreatedAction, product }: {
+export default function CreateProductModal({ 
+  open, 
+  onOpenChangeAction, 
+  onProductCreatedAction, 
+  product,
+  isCreatorMode = false
+}: {
   open: boolean;
   onOpenChangeAction: (open: boolean) => void;
   onProductCreatedAction?: () => void;
   product?: Product;
+  isCreatorMode?: boolean;
 }) {
   const [form, setForm] = useState({
     nombre: "",
@@ -67,7 +73,7 @@ export default function CreateProductModal({ open, onOpenChangeAction, onProduct
   const [modelUrl, setModelUrl] = useState<string>("");
   const [videoUrl, setVideoUrl] = useState<string>("");
   const [videoPreview, setVideoPreview] = useState<string | null>(null);
-  const [showModelDialog, setShowModelDialog] = useState(false);
+  
   interface Creator {
     id: string;
     nombre?: string;
@@ -125,17 +131,14 @@ export default function CreateProductModal({ open, onOpenChangeAction, onProduct
       setVideoUrl("");
       setVideoPreview(null);
     }
+    setStep(0); // Reset a paso 1 al abrir
   }, [product, open]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  const handleRemoveVideo = () => {
-    setVideoPreview(null);
-    setVideoUrl("");
-    setForm({ ...form, video_url: "" });
-  };
+
 
   const validateStep = (s: number) => {
     const newErrors: Record<string, string> = {};
@@ -178,7 +181,7 @@ export default function CreateProductModal({ open, onOpenChangeAction, onProduct
       console.log("[CreateProductModal] Enviando formData:", formData);
 
       let res: Response;
-      if (product?.id) {
+      if (product?.id && !isNaN(Number(product.id))) {
         res = await fetch(`/api/productos/${product.id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -226,34 +229,19 @@ export default function CreateProductModal({ open, onOpenChangeAction, onProduct
 
 
 
-  const handleRemoveModel = () => {
-    setModelUrl("");
-    setForm({ ...form, model_url: "" });
-  };
-
-  // Cargar creadores desde endpoint server-side para evitar problemas de RLS/permissions
+  // Cargar creadores desde endpoint server-side
   useEffect(() => {
     const loadCreators = async () => {
+      if (isCreatorMode) return; // No necesitamos cargar la lista si estamos en modo creador
+      
       try {
         const res = await fetch("/api/admin/usuarios");
-        const text = await res.clone().text();
-        console.log("/api/admin/usuarios -> status", res.status, "bodyPreview:", text.slice(0, 300));
         if (!res.ok) {
-          console.error("Error al obtener usuarios desde server (status not ok):", res.status, text);
           setCreators([]);
           return;
         }
         type UserRow = { id: string; nombre?: string; name?: string; email?: string; role?: string; rol?: string };
-        let json: { usuarios?: UserRow[] } | null = null;
-        try {
-          json = (await res.json()) as { usuarios?: UserRow[] };
-        } catch (parseErr) {
-          console.error("Error parseando JSON de /api/admin/usuarios:", parseErr, text);
-          setCreators([]);
-          return;
-        }
-
-        console.log("/api/admin/usuarios -> json:", json && Array.isArray(json.usuarios) ? `usuarios:${json.usuarios.length}` : json);
+        const json = (await res.json()) as { usuarios?: UserRow[] };
         const rows: UserRow[] = json?.usuarios ?? [];
         const filtered: Creator[] = rows
           .filter((r) => {
@@ -269,14 +257,14 @@ export default function CreateProductModal({ open, onOpenChangeAction, onProduct
       }
     };
 
-    if (open) void loadCreators();
-  }, [open]);
+    if (open && !isCreatorMode) void loadCreators();
+  }, [open, isCreatorMode]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChangeAction}>
       <DialogContent className="p-0 bg-transparent border-none shadow-none sm:max-w-xl max-w-[95vw] w-full gap-0 overflow-visible">
         <div className="w-full bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] relative border border-slate-200 animate-in fade-in zoom-in duration-300">
-          {/* Header Section Compact */}
+          {/* Header Section */}
           <div className="px-6 py-5 border-b border-slate-100 bg-white sticky top-0 z-50 shrink-0">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-3 group">
@@ -284,14 +272,12 @@ export default function CreateProductModal({ open, onOpenChangeAction, onProduct
                   <Package className="w-4 h-4" />
                 </div>
                 <div>
-                <DialogTitle>
-                  <h2 className="text-2xl font-black text-slate-900 leading-none uppercase tracking-tighter">
-                    {product ? "Editar Obra" : "Publicar Obra"}
-                  </h2>
-                </DialogTitle>
-                <DialogDescription className="sr-only">
-                  Formulario para {product ? "editar los detalles de una obra existente" : "publicar una nueva obra artística en la tienda"}.
-                </DialogDescription>
+                  <DialogTitle className="text-2xl font-black text-slate-900 leading-none uppercase tracking-tighter">
+                    {product?.id ? "Editar Obra" : "Publicar Obra"}
+                  </DialogTitle>
+                  <DialogDescription className="sr-only">
+                    Formulario para {product?.id ? "editar los detalles de una obra existente" : "publicar una nueva obra artística en la tienda"}.
+                  </DialogDescription>
                   <div className="flex items-center gap-2 mt-1.5 opacity-60">
                     <span className="text-[10px] bg-[#00a19a] text-white px-2 py-0.5 rounded-full font-bold uppercase tracking-widest">
                       Paso {step + 1} de {totalSteps}
@@ -317,7 +303,7 @@ export default function CreateProductModal({ open, onOpenChangeAction, onProduct
               </Button>
             </div>
 
-            {/* Premium Progress Bar */}
+            {/* Progress Bar */}
             <div className="flex gap-3 px-1">
               {Array.from({ length: totalSteps }).map((_, i) => (
                 <div key={i} className="flex-1 relative h-1.5 group">
@@ -336,7 +322,7 @@ export default function CreateProductModal({ open, onOpenChangeAction, onProduct
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-6 sm:px-10 py-8 bg-slate-50/50 custom-scrollbar">
+          <div className="flex-1 overflow-y-auto px-6 sm:px-10 py-8 bg-slate-50/50">
             <div className="w-full">
               <AnimatePresence mode="wait">
                 <motion.div
@@ -348,7 +334,7 @@ export default function CreateProductModal({ open, onOpenChangeAction, onProduct
                 >
                   {/* Step 1: Información Básica */}
                   {step === 0 && (
-                    <div className="space-y-6 animate-in slide-in-from-right-2 duration-300">
+                    <div className="space-y-6">
                        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
                           <div className="space-y-2.5">
                             <div className="flex justify-between items-end">
@@ -360,7 +346,7 @@ export default function CreateProductModal({ open, onOpenChangeAction, onProduct
                               placeholder="Ej: Elegancia en Resina - Edición 2025" 
                               value={form.nombre} 
                               onChange={handleChange} 
-                              className="h-11 px-5 rounded-2xl border-slate-200 bg-white text-base font-bold placeholder:text-slate-500 focus:border-[#00a19a] focus:ring-[#00a19a]/10 transition-all shadow-sm" 
+                              className="h-11 px-5 rounded-2xl border-slate-200 bg-white text-base font-bold placeholder:text-slate-500 focus:border-[#00a19a] outline-none" 
                             />
                           </div>
 
@@ -374,7 +360,7 @@ export default function CreateProductModal({ open, onOpenChangeAction, onProduct
                               placeholder="Describe la esencia y el propósito de esta creación..." 
                               value={form.descripcion} 
                               onChange={handleChange} 
-                              className="min-h-[160px] px-6 py-4 rounded-xl border-slate-200 bg-white text-sm font-medium leading-relaxed placeholder:text-slate-300 focus:border-[#00a19a] focus:ring-[#00a19a]/10 transition-all" 
+                              className="min-h-[160px] px-6 py-4 rounded-xl border-slate-200 bg-white text-sm font-medium leading-relaxed outline-none focus:border-[#00a19a]" 
                             />
                           </div>
                        </div>
@@ -387,58 +373,58 @@ export default function CreateProductModal({ open, onOpenChangeAction, onProduct
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-2.5 bg-slate-50/50 p-6 rounded-2xl border border-slate-100">
                           <label className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] ml-1">Escala Disponible</label>
-                          <div className="relative">
-                            <select 
-                              name="tamano" 
-                              value={form.tamano} 
-                              onChange={handleChange}
-                              className="w-full h-11 rounded-2xl border border-slate-200 px-5 bg-white font-bold text-slate-900 appearance-none focus:border-[#00a19a] focus:ring-4 focus:ring-[#00a19a]/5 transition-all outline-none"
-                            >
-                              {tamanos.map(t => <option key={t} value={t}>{t}</option>)}
-                            </select>
-                            <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-300">
-                               <Package className="w-4 h-4" />
-                            </div>
-                          </div>
+                          <select 
+                            name="tamano" 
+                            value={form.tamano} 
+                            onChange={handleChange}
+                            className="w-full h-11 rounded-2xl border border-slate-200 px-5 bg-white font-bold text-slate-900 outline-none focus:border-[#00a19a]"
+                          >
+                            {tamanos.map(t => <option key={t} value={t}>{t}</option>)}
+                          </select>
                         </div>
 
                         <div className="space-y-2.5 bg-slate-50/50 p-6 rounded-2xl border border-slate-100">
                           <label className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] ml-1">Estilo de la Obra</label>
-                          <div className="relative">
-                            <select 
-                              name="categoria" 
-                              value={form.categoria} 
-                              onChange={handleChange}
-                              className="w-full h-11 rounded-2xl border border-slate-200 px-5 bg-white font-bold text-slate-900 appearance-none focus:border-[#00a19a] focus:ring-4 focus:ring-[#00a19a]/5 transition-all outline-none"
-                            >
-                              {categorias.map(c => <option key={c} value={c}>{c}</option>)}
-                            </select>
-                            <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-300">
-                               <Sparkles className="w-4 h-4" />
-                            </div>
-                          </div>
+                          <select 
+                            name="categoria" 
+                            value={form.categoria} 
+                            onChange={handleChange}
+                            className="w-full h-11 rounded-2xl border border-slate-200 px-5 bg-white font-bold text-slate-900 outline-none focus:border-[#00a19a]"
+                          >
+                            {categorias.map(c => <option key={c} value={c}>{c}</option>)}
+                          </select>
                         </div>
                       </div>
 
-                      <div className="space-y-2.5 bg-slate-50/50 p-6 rounded-2xl border border-slate-100">
-                        <div className="flex justify-between items-end mb-1">
-                          <label className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] ml-1">Asignar a Artista</label>
-                          {errors.user_id && <span className="text-[10px] bg-red-50 text-red-500 px-2 py-0.5 rounded-full font-bold">{errors.user_id}</span>}
+                      {/* Solo mostrar asignación si NO es modo creador */}
+                      {!isCreatorMode && (
+                        <div className="space-y-2.5 bg-slate-50/50 p-6 rounded-2xl border border-slate-100">
+                          <div className="flex justify-between items-end mb-1">
+                            <label className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] ml-1">Asignar a Artista</label>
+                            {errors.user_id && <span className="text-[10px] bg-red-50 text-red-500 px-2 py-0.5 rounded-full font-bold">{errors.user_id}</span>}
+                          </div>
+                          <select 
+                            name="user_id" 
+                            value={form.user_id} 
+                            onChange={handleChange}
+                            className="w-full h-11 rounded-2xl border border-slate-200 px-5 bg-white font-bold text-slate-900 outline-none focus:border-[#00a19a]"
+                          >
+                            <option value="">Selecciona al creador responsable</option>
+                            {creators.map(c => <option key={c.id} value={c.id}>{c.nombre ?? c.email}</option>)}
+                          </select>
                         </div>
-                        <select 
-                          name="user_id" 
-                          value={form.user_id} 
-                          onChange={handleChange}
-                          className="w-full h-11 rounded-2xl border border-slate-200 px-5 bg-white font-bold text-slate-900 appearance-none focus:border-[#00a19a] focus:ring-4 focus:ring-[#00a19a]/5 transition-all outline-none"
-                        >
-                          <option value="">Selecciona al creador responsable</option>
-                          {creators.map(c => <option key={c.id} value={c.id}>{c.nombre ?? c.email}</option>)}
-                        </select>
-                      </div>
+                      )}
+                      
+                      {isCreatorMode && (
+                        <div className="p-4 bg-teal-50 rounded-xl border border-teal-100">
+                           <p className="text-[10px] font-black text-teal-600 uppercase tracking-widest leading-none mb-2">Artista Asignado</p>
+                           <p className="text-sm font-bold text-teal-800">Se publicará automáticamente bajo tu perfil verificado.</p>
+                        </div>
+                      )}
                     </div>
                   )}
 
-                  {/* Step 3: Precios y Stock */}
+                  {/* Step 3: Valores */}
                   {step === 2 && (
                     <div className="space-y-6">
                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -447,47 +433,25 @@ export default function CreateProductModal({ open, onOpenChangeAction, onProduct
                               <label className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] ml-1">Valor de Venta (COP)</label>
                               {errors.precio && <span className="text-[10px] bg-red-50 text-red-500 px-2 py-0.5 rounded-full font-bold">{errors.precio}</span>}
                             </div>
-                            <div className="relative">
-                              <div className="absolute left-6 top-1/2 -translate-y-1/2 font-black text-[#00a19a] text-lg">$</div>
-                              <Input 
-                                name="precio" 
-                                type="number" 
-                                value={form.precio} 
-                                onChange={handleChange} 
-                                className="h-11 pl-12 pr-5 rounded-2xl border-slate-200 bg-white font-black text-xl text-slate-900 focus:border-[#00a19a] focus:ring-[#00a19a]/10 shadow-sm transition-all" 
-                              />
-                            </div>
+                            <Input 
+                              name="precio" 
+                              type="number" 
+                              value={form.precio} 
+                              onChange={handleChange} 
+                              className="h-11 px-5 rounded-2xl border-slate-200 bg-white font-black text-xl outline-none focus:border-[#00a19a]" 
+                            />
                           </div>
 
                           <div className="space-y-2.5 bg-slate-50/50 p-6 rounded-2xl border border-slate-100">
-                            <label className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] ml-1">Reserva</label>
+                            <label className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] ml-1">Reserva / Stock</label>
                             <Input 
                               name="stock" 
                               type="number" 
                               value={form.stock} 
                               onChange={handleChange} 
-                              className="h-11 px-5 rounded-2xl border-slate-200 bg-white font-black text-xl text-slate-900 focus:border-[#00a19a] focus:ring-[#00a19a]/10 shadow-sm transition-all text-center" 
+                              className="h-11 px-5 rounded-2xl border-slate-200 bg-white font-black text-xl text-center outline-none focus:border-[#00a19a]" 
                             />
                           </div>
-                       </div>
-
-                       <div className="bg-slate-900 p-6 rounded-2xl shadow-xl flex items-center justify-between group">
-                          <div className="flex items-center gap-4">
-                            <div className="w-11 h-11 rounded-xl bg-teal-500/20 text-[#00a19a] flex items-center justify-center border border-teal-500/30">
-                              <Sparkles className="w-5 h-5" />
-                            </div>
-                            <div>
-                              <p className="font-bold text-white text-base tracking-tight leading-none">Ocultar de Portada</p>
-                              <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-1.5">Destacar este producto</p>
-                            </div>
-                          </div>
-                          <button 
-                             type="button"
-                             onClick={() => setForm({...form, destacado: !form.destacado})}
-                             className={`w-14 h-8 rounded-full transition-all duration-500 relative flex items-center px-1 ${form.destacado ? "bg-[#00a19a]" : "bg-slate-700"}`}
-                          >
-                             <div className={`w-6 h-6 bg-white rounded-full shadow-lg transition-transform duration-500 ${form.destacado ? "translate-x-6" : "translate-x-0"}`} />
-                          </button>
                        </div>
                     </div>
                   )}
@@ -496,54 +460,42 @@ export default function CreateProductModal({ open, onOpenChangeAction, onProduct
                   {step === 3 && (
                     <div className="space-y-10 pb-4">
                        <div className="space-y-4">
-                          <label className="text-xs font-black text-slate-700 uppercase tracking-[0.2em] ml-2">Galería de Imágenes (Sube hasta 4)</label>
+                          <label className="text-xs font-black text-slate-700 uppercase tracking-[0.2em] ml-2">Galería (Hasta 4 imágenes)</label>
                           <div className="grid grid-cols-2 gap-4">
                              {[0, 1, 2, 3].map((idx) => {
                                const currentUrl = idx === 0 ? imageUrl : (form.imagenes?.[idx - 1] ?? "");
                                return (
                                  <div key={idx} className="relative aspect-square">
                                    {currentUrl ? (
-                                     <div className="relative group rounded-2xl overflow-hidden h-full border-4 border-white shadow-lg">
+                                     <div className="relative group rounded-2xl overflow-hidden h-full border-2 border-slate-200 shadow-sm">
                                         <Image src={currentUrl} alt={`Preview ${idx}`} fill className="object-cover" />
-                                        <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center p-2">
-                                          <Button 
-                                            variant="destructive" 
-                                            size="sm"
-                                            className="rounded-xl h-8 text-[10px] font-bold"
-                                            onClick={() => {
-                                              if (idx === 0) {
-                                                setImageUrl("");
-                                                setForm({ ...form, image_url: "" });
-                                              } else {
-                                                const newImgs = [...(form.imagenes ?? [])];
-                                                newImgs[idx - 1] = "";
-                                                setForm({...form, imagenes: newImgs});
-                                              }
-                                            }}
-                                          >
-                                            Quitar
-                                          </Button>
+                                        <div className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center p-2">
+                                          <Button variant="destructive" size="sm" onClick={() => {
+                                            if (idx === 0) {
+                                              setImageUrl("");
+                                              setForm({ ...form, image_url: "" });
+                                            } else {
+                                              const newImgs = [...(form.imagenes ?? [])];
+                                              newImgs[idx - 1] = "";
+                                              setForm({...form, imagenes: newImgs});
+                                            }
+                                          }}>Quitar</Button>
                                         </div>
                                      </div>
                                    ) : (
-                                     <div className="h-full transform transition-all hover:scale-[1.02]">
-                                       <ProductImageUpload 
-                                         productId={product?.id?.toString() ?? "new"} 
-                                         onUploadComplete={(url) => {
-                                           if (idx === 0) {
-                                             console.log("[MULTI-IMAGE] Cargando imagen PRINCIPAL:", url);
-                                             setImageUrl(url);
-                                             setForm({ ...form, image_url: url });
-                                           } else {
-                                             const newImgs = [...(form.imagenes ?? [])];
-                                             newImgs[idx - 1] = url;
-                                             console.log(`[MULTI-IMAGE] Cargando imagen SECUNDARIA ${idx}:`, url);
-                                             console.log("[MULTI-IMAGE] Total imágenes en galería:", newImgs.filter(u => u).length + (imageUrl ? 1 : 0));
-                                             setForm({ ...form, imagenes: newImgs });
-                                           }
-                                         }} 
-                                       />
-                                     </div>
+                                     <ProductImageUpload 
+                                       productId={product?.id?.toString() ?? "new"} 
+                                       onUploadComplete={(url) => {
+                                         if (idx === 0) {
+                                           setImageUrl(url);
+                                           setForm({ ...form, image_url: url });
+                                         } else {
+                                           const newImgs = [...(form.imagenes ?? [])];
+                                           newImgs[idx - 1] = url;
+                                           setForm({ ...form, imagenes: newImgs });
+                                         }
+                                       }} 
+                                     />
                                    )}
                                  </div>
                                );
@@ -553,19 +505,11 @@ export default function CreateProductModal({ open, onOpenChangeAction, onProduct
 
                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                           <div className="space-y-4">
-                            <label className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] ml-2">Experiencia 3D (GLB)</label>
+                            <label className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] ml-2">Modelo 3D (GLB)</label>
                             {modelUrl ? (
-                              <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-xl flex items-center justify-between">
-                                 <div className="flex items-center gap-4">
-                                   <div className="w-12 h-12 bg-teal-50 rounded-xl flex items-center justify-center text-[#00a19a]">
-                                     <Sparkles className="w-5 h-5 animate-pulse" />
-                                   </div>
-                                   <div>
-                                     <p className="font-black text-slate-900 text-sm tracking-tight">Modelo Listo</p>
-                                     <button type="button" onClick={() => setShowModelDialog(true)} className="text-[10px] text-[#00a19a] font-bold uppercase tracking-widest hover:underline">Ver Interactivos</button>
-                                   </div>
-                                 </div>
-                                 <Button variant="ghost" size="icon" onClick={handleRemoveModel} className="text-red-400 hover:text-red-500 hover:bg-red-50 rounded-full"><FiX /></Button>
+                              <div className="p-4 bg-teal-50 rounded-xl border border-teal-100 flex items-center justify-between">
+                                 <span className="text-[10px] font-black text-teal-600 uppercase">Modelo Listo</span>
+                                 <Button variant="ghost" size="icon" onClick={() => {setModelUrl(""); setForm({...form, model_url: ""})}} className="text-red-400 hover:text-red-500"><FiX /></Button>
                               </div>
                             ) : (
                               <ProductModel3DUpload productId={product?.id?.toString() ?? "new"} onUploadComplete={(url) => {setModelUrl(url); setForm({...form, model_url: url})}} />
@@ -573,17 +517,13 @@ export default function CreateProductModal({ open, onOpenChangeAction, onProduct
                           </div>
 
                           <div className="space-y-4">
-                            <label className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] ml-2">Video Presentación (MP4)</label>
-                            {(videoPreview ?? videoUrl) ? (
-                              <div className="relative group rounded-2xl overflow-hidden h-28 border-2 border-slate-100 shadow-lg">
-                                 <video src={videoPreview ?? videoUrl} className="w-full h-full object-cover" />
-                                 <button 
-                                   type="button" 
-                                   onClick={handleRemoveVideo} 
-                                   className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-red-500 text-white w-10 h-10 flex items-center justify-center rounded-full opacity-0 group-hover:opacity-100 transition-all shadow-xl hover:scale-110"
-                                 >
-                                   <FiX className="w-5 h-5" />
-                                 </button>
+                            <label className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] ml-2">Video Presentación</label>
+                            {videoPreview ? (
+                              <div className="relative group rounded-xl overflow-hidden h-24 border border-slate-200">
+                                 <video src={videoPreview} className="w-full h-full object-cover" />
+                                 <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                                    <Button variant="destructive" size="icon" onClick={() => {setVideoPreview(null); setVideoUrl(""); setForm({...form, video_url: ""})}}><FiX /></Button>
+                                 </div>
                               </div>
                             ) : (
                               <ProductVideoUpload productId={product?.id?.toString() ?? "new"} onUploadComplete={(url) => {setVideoUrl(url); setVideoPreview(url); setForm({...form, video_url: url})}} />
@@ -597,66 +537,28 @@ export default function CreateProductModal({ open, onOpenChangeAction, onProduct
             </div>
           </div>
 
-          {/* Sticky Controls Panel Compact */}
-          <div className="px-6 py-4 border-t border-slate-200 bg-white sticky bottom-0 z-50 shrink-0">
-            <div className="max-w-3xl mx-auto flex items-center justify-between gap-4">
+          {/* Controls */}
+          <div className="px-6 py-4 border-t border-slate-100 bg-white sticky bottom-0 shrink-0 flex items-center justify-between gap-4">
               <Button 
                 variant="ghost" 
                 onClick={() => setStep(Math.max(0, step - 1))} 
                 disabled={step === 0}
-                className="h-13 px-6 rounded-xl font-bold text-slate-600 hover:text-slate-900 transition-all border border-transparent hover:border-slate-100"
+                className="h-12 rounded-xl font-bold"
               >
                 Regresar
               </Button>
               
               <div className="flex items-center gap-3">
-                <p className="hidden md:block text-[9px] font-black text-slate-300 uppercase tracking-[0.3em]">
-                  {step + 1} / {totalSteps}
-                </p>
                 {step < totalSteps - 1 ? (
-                  <Button 
-                    onClick={handleNext} 
-                    className="h-13 px-10 rounded-xl bg-[#00a19a] hover:bg-[#007973] text-white font-black shadow-xl transition-all active:scale-95"
-                  >
-                    Siguiente
-                  </Button>
+                  <Button onClick={handleNext} className="h-12 px-8 rounded-xl bg-[#00a19a] hover:bg-[#008f89] text-white font-black shadow-lg">Siguiente</Button>
                 ) : (
-                  <Button 
-                    onClick={() => void handleSubmit()} 
-                    disabled={loading}
-                    className="h-13 px-10 rounded-xl bg-black hover:bg-slate-900 text-white font-black shadow-xl transition-all active:scale-95 flex items-center gap-2"
-                  >
-                    {loading ? (
-                      <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                    ) : (
-                      <>
-                        <Sparkles className="w-4 h-4" />
-                        Publicar
-                      </>
-                    )}
+                  <Button onClick={() => void handleSubmit()} disabled={loading} className="h-12 px-8 rounded-xl bg-black hover:bg-slate-900 text-white font-black shadow-lg flex items-center gap-2">
+                    {loading ? <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" /> : "Publicar Obra"}
                   </Button>
                 )}
               </div>
-            </div>
           </div>
         </div>
-
-        {/* Dialog para Modelo 3D */}
-        {showModelDialog && (
-          <Dialog open={showModelDialog} onOpenChange={setShowModelDialog}>
-            <DialogContent className="max-w-4xl p-0 overflow-hidden rounded-[2.5rem] bg-white border-none shadow-2xl">
-              <div className="p-8 pb-4 border-b border-slate-50 flex items-center justify-between">
-                <h3 className="text-xl font-black text-slate-900">Vista Previa 3D</h3>
-                <Button variant="ghost" size="icon" onClick={() => setShowModelDialog(false)}><FiX /></Button>
-              </div>
-              <div className="aspect-square sm:aspect-video w-full bg-slate-50">
-                <Suspense fallback={<Model3DViewerLoading />}>
-                  <Model3DViewer modelUrl={modelUrl || ""} height="100%" />
-                </Suspense>
-              </div>
-            </DialogContent>
-          </Dialog>
-        )}
       </DialogContent>
     </Dialog>
   );
