@@ -11,6 +11,9 @@ import CreateProductModal from "~/components/CreateProductModal";
 import CreatorChat from "./CreatorChat";
 import { supabase } from "~/lib/supabaseClient";
 
+/**
+ * Propiedades del Dashboard del Creador.
+ */
 interface CreatorDashboardProps {
   user: {
     id: string;
@@ -24,12 +27,19 @@ interface CreatorDashboardProps {
   onModalHandled?: () => void;
 }
 
+/**
+ * Estructura de estadísticas para el creador.
+ */
 interface Stats {
   totalVentas: number;
   totalPedidos: number;
   totalProductos: number;
 }
 
+/**
+ * Componente CreatorDashboard: Centro de control visual para los artistas/creadores.
+ * Muestra métricas de ventas, accesos directos a mensajería y gestión de obras.
+ */
 export default function CreatorDashboard({ 
   user, 
   externalView, 
@@ -46,12 +56,12 @@ export default function CreatorDashboard({
   const [showAddProduct, setShowAddProduct] = useState(false);
   const [view, setView] = useState<"stats" | "chat">("stats");
 
-  // Sincronizar vista interna con externa
+  // Sincronizar vista interna con cambios externos (del padre)
   useEffect(() => {
     if (externalView) setView(externalView);
   }, [externalView]);
 
-  // Sincronizar apertura de modal externa
+  // Permitir que el componente padre fuerce la apertura del modal de creación
   useEffect(() => {
     if (forceOpenModal) {
       setShowAddProduct(true);
@@ -59,10 +69,15 @@ export default function CreatorDashboard({
     }
   }, [forceOpenModal, onModalHandled]);
 
+  /**
+   * Obtiene estadísticas de ventas y productos vinculados al creador.
+   * Cruza los pedidos pagados con el inventario del artista.
+   */
   useEffect(() => {
     async function fetchCreatorStats() {
       setLoading(true);
       try {
+        // 1. Obtener los IDs de productos del este creador
         const { data: rawProducts, error: prodError } = await supabase
           .from("productos")
           .select("id")
@@ -74,6 +89,7 @@ export default function CreatorDashboard({
         const productIds = (products ?? []).map((p: { id: string }) => p.id);
         const totalProductos = productIds.length;
 
+        // 2. Consultar pedidos completados
         const { data: pedidos, error: pedError } = await supabase
           .from("pedidos")
           .select("productos, total, estado")
@@ -87,6 +103,7 @@ export default function CreatorDashboard({
         interface PedidoRaw { productos: string | unknown[] }
         interface ItemRaw { producto_id?: string; id?: string; id_producto?: string; precio_unitario?: number; precio?: number; cantidad?: number; }
 
+        // 3. Lógica de cruce: Filtrar las ventas que contienen obras de este creador
         (pedidos ?? []).forEach((pedido: PedidoRaw, index: number) => {
           try {
             const items = typeof pedido.productos === "string" 
@@ -97,6 +114,7 @@ export default function CreatorDashboard({
               let pedidoHasCreatorProduct = false;
               (items as ItemRaw[]).forEach((item: ItemRaw) => {
                 const pid = item.producto_id ?? item.id ?? item.id_producto;
+                // Si el ID del producto en el pedido coincide con uno de mis productos
                 if (productIds.includes(pid ?? "")) {
                   totalVentas += (Number(item.precio_unitario ?? item.precio ?? 0) * (item.cantidad ?? 1));
                   pedidoHasCreatorProduct = true;
@@ -107,7 +125,7 @@ export default function CreatorDashboard({
               }
             }
           } catch {
-            // silently ignore parse errors
+            // Ignorar errores de parseo de JSON en pedidos antiguos/corruptos
           }
         });
 
@@ -116,8 +134,8 @@ export default function CreatorDashboard({
           totalPedidos: totalPedidosSet.size,
           totalProductos,
         });
-      } catch {
-        // silently ignore stats fetch errors
+      } catch (err) {
+        console.error("Error al cargar estadísticas del creador:", err);
       } finally {
         setLoading(false);
       }
@@ -128,11 +146,15 @@ export default function CreatorDashboard({
     }
   }, [user?.id, user?.email]);
 
+  /**
+   * Cambia la vista interna y notifica al padre.
+   */
   const handleInternalViewChange = (newView: "stats" | "chat") => {
     setView(newView);
     onViewChange?.(newView);
   };
 
+  // Pantalla de carga animada
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-20 px-4 space-y-6">
@@ -150,13 +172,15 @@ export default function CreatorDashboard({
     );
   }
 
+  // Vista de Chat
   if (view === "chat") {
     return <CreatorChat creatorEmail={user.email} onBack={() => handleInternalViewChange("stats")} />;
   }
 
+  // Vista Principal de Estadísticas
   return (
     <div className="space-y-8">
-      {/* Metrics Grid */}
+      {/* Cuadrícula de Métricas */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
           <Card className="p-6 border-none bg-emerald-50 shadow-sm hover:shadow-md transition-shadow rounded-[1.5rem]">
@@ -195,7 +219,7 @@ export default function CreatorDashboard({
         </motion.div>
       </div>
 
-      {/* Main Actions Bar */}
+      {/* Acciones Principales */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Button 
           onClick={() => setShowAddProduct(true)}
@@ -216,7 +240,7 @@ export default function CreatorDashboard({
         </Button>
       </div>
 
-      {/* Info Banner */}
+      {/* Banner de Ayuda Técnico */}
       <motion.div 
         initial={{ opacity: 0 }} 
         animate={{ opacity: 1 }} 
@@ -228,7 +252,7 @@ export default function CreatorDashboard({
         </p>
       </motion.div>
 
-      {/* MODAL MULTIPASO PROFESIONAL */}
+      {/* Modal de Creación de Producto */}
       <CreateProductModal 
         open={showAddProduct} 
         isCreatorMode={true}

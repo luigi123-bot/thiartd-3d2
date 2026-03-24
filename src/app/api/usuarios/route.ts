@@ -82,7 +82,7 @@ export async function POST(req: Request) {
         .from("usuarios")
         .upsert([{ clerk_id, email, nombre }], { onConflict: "clerk_id" })
         .select()
-        .single();
+        .single<{ id: number | string; clerk_id: string; email: string; nombre: string }>();
         
       if (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });
@@ -123,7 +123,7 @@ export async function POST(req: Request) {
       .from("usuarios")
       .insert([{ nombre, email, password, auth_id }])
       .select()
-      .single();
+      .single<{ id: number | string; auth_id: string; email: string; nombre: string }>();
       
     if (dbError) {
       return NextResponse.json({ error: dbError.message }, { status: 500 });
@@ -159,7 +159,7 @@ export async function DELETE(req: Request) {
       .from("usuarios")
       .select("auth_id")
       .eq("id", id)
-      .single();
+      .single<{ auth_id: string }>();
 
     // 2. Si existe en Supabase Auth, borrarlo del sistema de autenticación
     if (user?.auth_id) {
@@ -207,7 +207,7 @@ export async function PATCH(req: Request) {
       .update({ role: newRole })
       .eq("id", userId)
       .select()
-      .single();
+      .single<{ id: string | number; role: string }>();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 

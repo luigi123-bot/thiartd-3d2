@@ -15,6 +15,9 @@ import {
 } from "lucide-react";
 import CreateProductModal from "~/components/CreateProductModal";
 
+/**
+ * Interfaz para el producto artístico.
+ */
 interface Producto {
   id: string;
   nombre: string;
@@ -29,13 +32,20 @@ interface Producto {
   detalles?: string;
 }
 
+/**
+ * Interfaz para el perfil del usuario.
+ */
 interface UsuarioDB {
   id: string;
   nombre: string;
   email: string;
   role: string;
+  auth_id?: string | null;
 }
 
+/**
+ * Estructura de producto proveniente de la API.
+ */
 interface ProductoAPI {
   id: string;
   nombre: string;
@@ -50,6 +60,10 @@ interface ProductoAPI {
   usuario_id?: string;
 }
 
+/**
+ * Página de Gestión de Obras del Creador.
+ * Permite listar, crear, editar y eliminar productos propios del artista.
+ */
 export default function MisObrasPage() {
   const router = useRouter();
   const [creatorUser, setCreatorUser] = useState<UsuarioDB | null>(null);
@@ -60,10 +74,14 @@ export default function MisObrasPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Producto | null>(null);
 
+  // Métricas rápidas para el resumen visual
   const totalObras = productos.length;
   const sinStock = productos.filter(p => p.stock <= 0).length;
   const destacadas = productos.filter(p => p.destacado).length;
 
+  /**
+   * Obtiene los productos desde la API y filtra solo los que pertenecen al creador.
+   */
   const fetchProductos = useCallback(async (userId: string) => {
     setLoadingProds(true);
     try {
@@ -73,22 +91,23 @@ export default function MisObrasPage() {
       const json = await res.json() as { productos: ProductoAPI[] };
       const allProducts: ProductoAPI[] = json.productos ?? [];
       
-      if (allProducts.length > 0) {
-        console.log("[DEBUG MisObras] Ejemplo de producto recibido:", allProducts[0]);
-      }
-      
+      // Filtramos por ID de usuario (contemplando ambas claves posibles en la BD: user_id o usuario_id)
       const misObras = allProducts.filter((p: ProductoAPI) => 
         p.user_id === userId || p.usuario_id === userId
       ) as Producto[];
       
       setProductos(misObras);
     } catch (err) {
-      console.error(err);
+      console.error("Error cargando productos:", err);
     } finally {
       setLoadingProds(false);
     }
   }, []);
 
+  /**
+   * Lógica de verificación de usuario Robusta (Con email-fallback y auto-vínculo).
+   * Asegura que el acceso de creadores manuales funcione sin errores de ID.
+   */
   const checkUser = useCallback(async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -97,23 +116,43 @@ export default function MisObrasPage() {
         return;
       }
 
-      const { data: userData } = await supabase
+      // 1. Fase de Identificación: Buscar por ID directo
+      const { data: initialData } = await supabase
         .from("usuarios")
         .select("*")
         .eq("id", session.user.id)
-        .single() as { data: UsuarioDB | null };
+        .maybeSingle() as { data: UsuarioDB | null };
 
-      if (!userData || (userData.role !== "creador" && userData.role !== "admin")) {
+      let userData = initialData;
+
+      // 2. Fase de Fallback: Si no se encuentra por ID, buscar por Email
+      if (!userData && session.user.email) {
+        const { data: userDataByEmail } = await supabase
+          .from("usuarios")
+          .select("*")
+          .eq("email", session.user.email)
+          .maybeSingle() as { data: UsuarioDB | null };
+        
+        if (userDataByEmail) {
+          userData = userDataByEmail;
+          // 3. Fase de Auto-Vínculo: Sincronizar auth_id para futuros accesos rápidos
+          if (!userDataByEmail.auth_id) {
+            await supabase.from("usuarios").update({ auth_id: session.user.id }).eq("id", userDataByEmail.id);
+          }
+        }
+      }
+
+      // 4. Fase de Autorización: Validar rol 'creador' o 'admin'
+      if (!userData || (userData.role?.toLowerCase() !== "creador" && userData.role?.toLowerCase() !== "admin")) {
         router.push("/");
         return;
       }
 
       setCreatorUser(userData);
       setLoadingUser(false);
-      console.log("[DEBUG MisObras] Usuario identificado:", userData.id, userData.nombre);
       void fetchProductos(userData.id);
     } catch (err) {
-      console.error(err);
+      console.error("Error en checkUser:", err);
       router.push("/");
     }
   }, [router, fetchProductos]);
@@ -122,21 +161,22 @@ export default function MisObrasPage() {
     void checkUser();
   }, [checkUser]);
 
+  // Filtro de búsqueda local
   const filteredProducts = productos.filter(p => 
     p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
     p.categoria.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  /**
+   * Maneja la eliminación de un producto previa confirmación.
+   */
   const handleDelete = async (id: string) => {
     if (!confirm("¿Estás seguro de que deseas eliminar esta obra? Esta acción no se puede deshacer.")) return;
     
     try {
-      const { error } = await supabase
-        .from("productos")
-        .delete()
-        .eq("id", id);
-      
+      const { error } = await supabase.from("productos").delete().eq("id", id);
       if (error) throw error;
+
       setProductos(productos.filter(p => p.id !== id));
       alert("Obra eliminada con éxito");
     } catch (err) {
@@ -145,10 +185,16 @@ export default function MisObrasPage() {
     }
   };
 
+  // Estado de carga inicial decorado
   if (loadingUser) {
-    return <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <div className="w-12 h-12 border-4 border-teal-500 border-t-transparent rounded-full animate-spin"></div>
-    </div>;
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-teal-500 border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Verificando Credenciales...</p>
+        </div>
+      </div>
+    );
   }
 
   if (!creatorUser) return null;
@@ -158,7 +204,7 @@ export default function MisObrasPage() {
       <TopbarCreador user={creatorUser} />
 
       <main className="flex-1 max-w-7xl mx-auto w-full p-4 md:p-8 space-y-8">
-        {/* Header Section */}
+        {/* Encabezado de la Sección */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
            <div>
               <div className="flex items-center gap-2 mb-2">
@@ -184,7 +230,7 @@ export default function MisObrasPage() {
            </Button>
         </div>
 
-        {/* Stats Summary Bar */}
+        {/* Tarjetas de Estadísticas Rápidas */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
            <StatMiniCard label="Total Obras" value={totalObras} icon={Package as React.ComponentType<{ className?: string }>} color="teal" />
            <StatMiniCard label="En Stock" value={totalObras - sinStock} icon={LayoutGrid as React.ComponentType<{ className?: string }>} color="blue" />
@@ -192,7 +238,7 @@ export default function MisObrasPage() {
            <StatMiniCard label="Destacadas" value={destacadas} icon={Edit2 as React.ComponentType<{ className?: string }>} color="amber" />
         </div>
 
-        {/* Search & Filters */}
+        {/* Barra de Filtros y Búsqueda */}
         <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 flex flex-col md:flex-row gap-4 items-center">
            <div className="relative flex-1 w-full">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 w-4 h-4" />
@@ -209,7 +255,7 @@ export default function MisObrasPage() {
            </Button>
         </div>
 
-        {/* Products List/Grid */}
+        {/* Listado Dinámico de Obras */}
         {loadingProds ? (
           <div className="py-20 text-center flex flex-col items-center">
              <div className="w-10 h-10 border-4 border-teal-500/20 border-t-teal-500 rounded-full animate-spin mb-4"></div>
@@ -296,6 +342,9 @@ export default function MisObrasPage() {
   );
 }
 
+/**
+ * Componente interno para tarjetas de estadísticas.
+ */
 function StatMiniCard({ label, value, icon: Icon, color }: { label: string; value: number | string; icon: React.ComponentType<{ className?: string }>; color: string }) {
   const colors: Record<string, string> = {
     teal: "bg-teal-50 text-teal-600 border-teal-100",

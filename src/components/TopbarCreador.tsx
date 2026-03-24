@@ -13,6 +13,9 @@ import {
 import { useRouter, usePathname } from "next/navigation";
 import { supabase } from "~/lib/supabaseClient";
 
+/**
+ * Propiedades de la barra superior para creadores.
+ */
 interface TopbarCreadorProps {
   user: {
     id: string;
@@ -20,11 +23,14 @@ interface TopbarCreadorProps {
     email: string;
     avatar_url?: string;
   };
-  // Callbacks opcionales para cuando se usa dentro del Dashboard
   onViewChange?: (view: string) => void;
   onOpenAddProduct?: () => void;
 }
 
+/**
+ * Componente TopbarCreador: Barra de navegación dedicada al panel del artista.
+ * Incluye navegación rápida a 'Mis Obras', notificaciones y gestión de perfil.
+ */
 export default function TopbarCreador({ user, onViewChange, onOpenAddProduct: _onOpenAddProduct }: TopbarCreadorProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
@@ -32,16 +38,23 @@ export default function TopbarCreador({ user, onViewChange, onOpenAddProduct: _o
   const router = useRouter();
   const pathname = usePathname();
 
+  // Asegurar hidratación correcta en el cliente
   useEffect(() => { setIsMounted(true); }, []);
 
   if (!isMounted) return null;
 
+  /**
+   * Cierra la sesión del usuario y redirige al inicio.
+   */
   const handleLogout = async () => {
     await supabase.auth.signOut();
     router.push("/");
     window.location.reload();
   };
 
+  /**
+   * Navega al panel principal o cambia la vista si ya se está en él.
+   */
   const handlePanelClick = () => {
     if (pathname === "/creador") {
       onViewChange?.("stats");
@@ -51,6 +64,9 @@ export default function TopbarCreador({ user, onViewChange, onOpenAddProduct: _o
     setMenuOpen(false);
   };
 
+  /**
+   * Navega a la sección de gestión de productos.
+   */
   const handleObrasClick = () => {
     router.push("/creador/productos");
     setMenuOpen(false);
@@ -60,7 +76,8 @@ export default function TopbarCreador({ user, onViewChange, onOpenAddProduct: _o
     <nav className="w-full border-b shadow-md sticky top-0 z-50 bg-[#00a19a]">
       <div className="max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 lg:h-20">
-          {/* Logo & Brand */}
+          
+          {/* Logo y Marca */}
           <Link href="/" className="flex items-center gap-2 min-w-max group">
             <span className="bg-white rounded-full p-1 shadow-md group-hover:scale-105 transition-transform">
               <Image 
@@ -77,7 +94,7 @@ export default function TopbarCreador({ user, onViewChange, onOpenAddProduct: _o
             </div>
           </Link>
 
-          {/* Desktop Navigation */}
+          {/* Navegación para Escritorio */}
           <div className="hidden lg:flex items-center gap-8">
              <button 
                 onClick={handlePanelClick}
@@ -99,30 +116,30 @@ export default function TopbarCreador({ user, onViewChange, onOpenAddProduct: _o
              </Link>
           </div>
 
-          {/* User & Options */}
+          {/* Opciones de Usuario */}
           <div className="flex items-center gap-2 lg:gap-4">
              <Button variant="ghost" size="icon" className="text-white hover:bg-white/10 relative">
                 <FiBell className="w-6 h-6" />
                 <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-amber-400 rounded-full border-2 border-[#00a19a]"></span>
              </Button>
 
-             {/* User Profile */}
+             {/* Perfil del Usuario y Menú Desplegable */}
              <div className="relative group">
                 <button 
-                  onClick={() => setAvatarMenuOpen(!avatarMenuOpen)} 
-                  className="flex items-center gap-2 p-1 pl-2 pr-2 sm:pr-4 rounded-full bg-white/10 hover:bg-white/20 transition-all border border-white/20"
+                   onClick={() => setAvatarMenuOpen(!avatarMenuOpen)} 
+                   className="flex items-center gap-2 p-1 pl-2 pr-2 sm:pr-4 rounded-full bg-white/10 hover:bg-white/20 transition-all border border-white/20"
                 >
-                  <div className="hidden sm:flex flex-col items-end mr-2 leading-none">
-                    <span className="text-xs font-black text-white">{user.nombre.split(' ')[0]}</span>
-                    <span className="text-[8px] text-white/60 font-bold uppercase tracking-widest mt-0.5">Creador</span>
-                  </div>
-                  <div className="w-8 h-8 lg:w-9 lg:h-9 rounded-full border-2 border-white overflow-hidden bg-white flex items-center justify-center shadow-sm">
-                    {user.avatar_url ? (
-                      <Image src={user.avatar_url} alt="Profile" width={40} height={40} className="w-full h-full object-cover" />
-                    ) : (
-                      <IoMdPerson className="w-5 h-5 lg:w-6 lg:h-6 text-[#00a19a]" />
-                    )}
-                  </div>
+                   <div className="hidden sm:flex flex-col items-end mr-2 leading-none">
+                     <span className="text-xs font-black text-white">{user.nombre.split(' ')[0]}</span>
+                     <span className="text-[8px] text-white/60 font-bold uppercase tracking-widest mt-0.5">Creador</span>
+                   </div>
+                   <div className="w-8 h-8 lg:w-9 lg:h-9 rounded-full border-2 border-white overflow-hidden bg-white flex items-center justify-center shadow-sm">
+                     {user.avatar_url ? (
+                       <Image src={user.avatar_url} alt="Perfil" width={40} height={40} className="w-full h-full object-cover" />
+                     ) : (
+                       <IoMdPerson className="w-5 h-5 lg:w-6 lg:h-6 text-[#00a19a]" />
+                     )}
+                   </div>
                 </button>
 
                 {avatarMenuOpen && (
@@ -154,7 +171,7 @@ export default function TopbarCreador({ user, onViewChange, onOpenAddProduct: _o
                 )}
              </div>
 
-             {/* Mobile Menu Toggle */}
+             {/* Botón de Menú Móvil */}
              <Button variant="ghost" size="icon" className="lg:hidden text-white" onClick={() => setMenuOpen(!menuOpen)}>
                 <IoMdMenu className="w-7 h-7" />
              </Button>
@@ -162,7 +179,7 @@ export default function TopbarCreador({ user, onViewChange, onOpenAddProduct: _o
         </div>
       </div>
 
-      {/* Mobile Menu */}
+      {/* Menú para Móviles */}
       <div 
         className={`lg:hidden bg-white border-t transition-all duration-300 overflow-hidden ${
           menuOpen ? "max-h-96 opacity-100" : "max-h-0 opacity-0 pointer-events-none"
