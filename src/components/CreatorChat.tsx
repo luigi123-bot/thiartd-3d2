@@ -6,6 +6,9 @@ import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { supabase } from "~/lib/supabaseClient";
 
+/**
+ * Propiedades del mensaje individual.
+ */
 interface Mensaje {
   id: number;
   nombre: string;
@@ -16,6 +19,9 @@ interface Mensaje {
   leido: boolean;
 }
 
+/**
+ * Propiedades de un hilo de conversación agrupado por el email del cliente.
+ */
 interface Thread {
   email: string;
   nombre: string;
@@ -24,6 +30,10 @@ interface Thread {
   unreadCount: number;
 }
 
+/**
+ * Componente CreatorChat: Provee una interfaz de mensajería para que los creadores
+ * se comuniquen con sus clientes. Es una versión simplificada del panel de admin.
+ */
 export default function CreatorChat({ onBack }: { creatorEmail?: string, onBack: () => void }) {
   const [threads, setThreads] = useState<Thread[]>([]);
   const [selectedEmail, setSelectedEmail] = useState<string | null>(null);
@@ -32,6 +42,10 @@ export default function CreatorChat({ onBack }: { creatorEmail?: string, onBack:
   const [loading, setLoading] = useState(true);
   const chatRef = useRef<HTMLDivElement>(null);
 
+  /**
+   * Carga los hilos de conversación agrupados por cliente.
+   * Cruza la información con la tabla de 'usuarios' para obtener el nombre registrado.
+   */
   const fetchThreads = useCallback(async (showLoading = true) => {
     if (showLoading) setLoading(true);
     try {
@@ -40,19 +54,17 @@ export default function CreatorChat({ onBack }: { creatorEmail?: string, onBack:
         .select("*")
         .order("creado_en", { ascending: false });
 
-      // Buscar nombres registrados para no depender solo del nombre del mensaje
+      // Obtener nombres reales desde la tabla de usuarios
       const { data: usersRaw } = await supabase.from("usuarios").select("email, nombre");
       const usersData = usersRaw as { email: string, nombre: string }[] | null;
       const emailToName = new Map<string, string>();
       usersData?.forEach(u => { if (u.email && u.nombre) emailToName.set(u.email.toLowerCase(), u.nombre); });
 
-      if (error) {
-        // console.error("Error fetching messages:", error);
-        return;
-      }
+      if (error) return;
 
       const grouped = new Map<string, Thread>();
       const messages = data as Mensaje[];
+      
       messages.forEach((m) => {
         const lowerEmail = m.email.toLowerCase();
         const isFromClient = m.nombre !== "Admin";
@@ -61,7 +73,7 @@ export default function CreatorChat({ onBack }: { creatorEmail?: string, onBack:
           const registeredName = emailToName.get(lowerEmail);
           let displayName = registeredName ?? m.nombre;
 
-          // Si el nombre es "Admin", buscamos en el historial de este email un nombre de cliente
+          // Si el último mensaje es del Admin, buscamos el nombre del cliente en el historial
           if (displayName === "Admin") {
             const clientMsg = messages.find(om => om.email.toLowerCase() === lowerEmail && om.nombre !== "Admin");
             if (clientMsg) displayName = clientMsg.nombre;
@@ -76,6 +88,7 @@ export default function CreatorChat({ onBack }: { creatorEmail?: string, onBack:
           });
         }
 
+        // Contar mensajes no leídos del cliente en hilos que NO están abiertos
         if (isFromClient && !m.leido) {
           const thread = grouped.get(lowerEmail)!;
           if (lowerEmail !== selectedEmail?.toLowerCase()) {
@@ -85,28 +98,33 @@ export default function CreatorChat({ onBack }: { creatorEmail?: string, onBack:
       });
 
       setThreads(Array.from(grouped.values()));
-    } catch {
-      // silently ignore chat fetch errors
+    } catch (err) {
+      console.error("Error cargando hilos de chat:", err);
     } finally {
       if (showLoading) setLoading(false);
     }
   }, [selectedEmail]);
 
+  /**
+   * Suscripción en tiempo real a la tabla de mensajes.
+   */
   useEffect(() => {
     void fetchThreads();
     
-    // Subscribe to all messages
     const channel = supabase
       .channel('creator-chat-updates')
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "mensajes" }, (payload) => {
         void fetchThreads(false);
         const newMessage = payload.new as Mensaje;
+        
+        // Si el mensaje es para el correo actual, lo añadimos a la vista en vivo
         if (newMessage.email === selectedEmail) {
            setMensajes(prev => {
              if (prev.some(m => m.id === newMessage.id)) return prev;
              return [...prev, newMessage];
            });
            
+           // Marcar como leído si estamos dentro del chat
            if (newMessage.nombre !== "Admin" && !newMessage.leido) {
              void supabase.from("mensajes").update({ leido: true }).eq("id", newMessage.id);
            }
@@ -117,19 +135,22 @@ export default function CreatorChat({ onBack }: { creatorEmail?: string, onBack:
     return () => { void supabase.removeChannel(channel); };
   }, [fetchThreads, selectedEmail]);
 
+  /**
+   * Carga los mensajes individuales cuando se abre un hilo.
+   */
   useEffect(() => {
     if (!selectedEmail) return;
     const loadMensajes = async () => {
       const { data } = await supabase.from("mensajes").select("*").eq("email", selectedEmail).order("creado_en", { ascending: true });
       if (data) {
         setMensajes(data as Mensaje[]);
-        // Mark as read
+        // Marcar como leídos todos los mensajes del cliente al abrir el chat
         const unreadIds = (data as Mensaje[]).filter(m => !m.leido && m.nombre !== "Admin").map(m => m.id);
         if (unreadIds.length > 0) {
           await supabase.from("mensajes").update({ leido: true }).in("id", unreadIds);
         }
         
-        // Limpia instantáneamente el contador UI para este hilo
+        // Actualización instantánea del contador de la interfaz
         setThreads(prev => prev.map(t => 
            t.email === selectedEmail ? { ...t, unreadCount: 0 } : t
         ));
@@ -138,14 +159,19 @@ export default function CreatorChat({ onBack }: { creatorEmail?: string, onBack:
     void loadMensajes();
   }, [selectedEmail]);
 
+  // Manejar el scroll automático hacia el final del chat
   useEffect(() => { if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight; }, [mensajes]);
 
+  /**
+   * Envía una respuesta al cliente.
+   */
   const enviarMensaje = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!msg.trim() || !selectedEmail) return;
     const txt = msg;
     setMsg("");
     
+    // El sistema envía respuestas como "Admin" por defecto para mantener consistencia
     const { data, error } = await supabase.from("mensajes").insert([{
       nombre: "Admin", 
       email: selectedEmail,
@@ -158,6 +184,7 @@ export default function CreatorChat({ onBack }: { creatorEmail?: string, onBack:
     }
   };
 
+  // Renderizado del chat individual
   if (selectedEmail) {
     return (
       <div className="flex flex-col h-[500px]">
@@ -201,6 +228,7 @@ export default function CreatorChat({ onBack }: { creatorEmail?: string, onBack:
     );
   }
 
+  // Renderizado de la lista de hilos de chat
   return (
     <div className="flex flex-col h-[500px]">
       <div className="flex items-center justify-between p-3 border-b">

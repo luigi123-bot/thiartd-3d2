@@ -8,11 +8,18 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { useToast } from "~/components/ui/use-toast";
 import { Badge } from "~/components/ui/badge";
 
+// Configuración de Supabase utilizando variables de entorno
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "TU_SUPABASE_URL";
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "TU_SUPABASE_ANON_KEY";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+/**
+ * Página de administración de mensajes.
+ * Permite a los administradores gestionar chats con clientes en tiempo real,
+ * agrupar mensajes por hilo de conversación y consultar el historial de pedidos del cliente.
+ */
 export default function AdminMensajesPage() {
+	// Definición de tipos para los mensajes individuales
 	interface Mensaje {
 		id: number;
 		nombre: string;
@@ -23,6 +30,7 @@ export default function AdminMensajesPage() {
 		leido: boolean;
 	}
 
+	// Definición de hilos de conversación (agrupación de mensajes por email)
 	interface Thread {
 		email: string;
 		nombre: string;
@@ -33,12 +41,14 @@ export default function AdminMensajesPage() {
 		cliente_id?: string;
 	}
 
+	// Estructura simplificada para visualizar pedidos rápidos en el chat
 	interface Pedido {
 		id: number;
 		estado: string;
 		created_at: string;
 	}
 
+	// Estados principales de la interfaz
 	const [threads, setThreads] = useState<Thread[]>([]);
 	const [selectedEmail, setSelectedEmail] = useState<string | null>(null);
 	const [mensajes, setMensajes] = useState<Mensaje[]>([]);
@@ -48,50 +58,63 @@ export default function AdminMensajesPage() {
 	const [modalUser, setModalUser] = useState<Thread | null>(null);
 	const [pedidos, setPedidos] = useState<Pedido[]>([]);
 	const [loadingPedidos, setLoadingPedidos] = useState(false);
+	
+	// Referencias para manejo de scroll y estados persistentes dentro de callbacks
 	const chatRef = useRef<HTMLDivElement>(null);
 	const { toast } = useToast();
-
 	const selectedEmailRef = useRef<string | null>(null);
+
+	// Sincronizar la referencia con el estado para que sea accesible en Realtime
 	useEffect(() => {
 		selectedEmailRef.current = selectedEmail;
 	}, [selectedEmail]);
 
-	// Cargar hilos de conversación (agrupados por email del cliente)
+	/**
+	 * Cargar hilos de conversación agrupados por email del cliente.
+	 * Incluye una lógica robusta para identificar el nombre real del cliente cross-referenciando la tabla 'usuarios'.
+	 */
 	useEffect(() => {
 		async function fetchThreads(showLoading = true) {
 			if (showLoading) setLoading(true);
+			
+			// 1. Obtener todos los mensajes ordenados por fecha
 			const { data, error } = await supabase
 				.from("mensajes")
 				.select("*")
 				.order("creado_en", { ascending: false });
 
-            // Buscar nombres registrados de usuarios para no depender solo del nombre del mensaje
+            // 2. Obtener nombres oficiales de la tabla de usuarios registrados
             const { data: usersRaw } = await supabase
                 .from("usuarios")
                 .select("email, nombre");
             const usersData = usersRaw as { email: string; nombre: string }[] | null;
 
+            // Creamos un mapa para búsquedas rápidas de nombre por email
             const emailToName = new Map<string, string>();
             usersData?.forEach(u => {
                 if (u.email && u.nombre) emailToName.set(u.email.toLowerCase(), u.nombre);
             });
 
 			if (error) {
-				console.error("Error fetching messages for threads:", error);
+				console.error("Error al cargar hilos de mensajes:", error);
 				if (showLoading) setLoading(false);
 				return;
 			}
 
+            // 3. Lógica de Agrupación por Hilos
             const grouped = new Map<string, Thread>();
             (data as Mensaje[]).forEach((m) => {
                 const lowerEmail = m.email.toLowerCase();
                 const isFromClient = m.nombre !== "Admin";
                 
                 if (!grouped.has(lowerEmail)) {
+                    // Si el usuario está registrado, usamos su nombre oficial.
+                    // Si no, usamos el nombre que envió en el mensaje.
                     const registeredName = emailToName.get(lowerEmail);
                     let displayName = registeredName ?? m.nombre;
 
-                    // Si el nombre es "Admin", buscamos en el historial de este email un nombre de cliente
+                    // Caso especial: Si el último mensaje es de un Admin, buscamos en el historial
+                    // para encontrar el nombre del cliente original y no mostrar "Admin" en el sidebar.
                     if (displayName === "Admin") {
                         const clientMsg = (data as Mensaje[]).find(om => om.email.toLowerCase() === lowerEmail && om.nombre !== "Admin");
                         if (clientMsg) displayName = clientMsg.nombre;
@@ -107,9 +130,10 @@ export default function AdminMensajesPage() {
                     });
                 }
 
+                // Contar mensajes no leídos del cliente
                 if (isFromClient && !m.leido) {
                     const thread = grouped.get(lowerEmail)!;
-                    // Solo incrementa si no es el chat activo
+                    // Solo incrementa si no es el chat que el admin tiene abierto en este momento
                     if (lowerEmail !== selectedEmailRef.current?.toLowerCase()) {
                         thread.unreadCount += 1;
                     }
@@ -119,30 +143,33 @@ export default function AdminMensajesPage() {
 			setThreads(Array.from(grouped.values()));
 			if (showLoading) setLoading(false);
 		}
+		
 		void fetchThreads();
 
-		// Realtime para actualizar TODO (Lista de hilos y Mensajes del chat seleccionados)
-		// Nombre de canal fijo para el administrador
+		/**
+		 * Suscripción Realtime para actualizaciones en vivo.
+		 * Usa un canal global único para que el admin reciba notificaciones de CUALQUIER chat nuevo.
+		 */
 		const channel = supabase
 			.channel('admin-global-mensajes')
 			.on(
 				"postgres_changes",
 				{ event: "INSERT", schema: "public", table: "mensajes" },
 				(payload) => {
-					console.log("[Admin Realtime] Mensaje detectado en tabla:", payload);
+					console.log("[Admin Realtime] Nuevo mensaje detectado:", payload);
 					const newMessage = payload.new as Mensaje;
 					
-					// 1. Actualizar lista de hilos sin el loading para que no parpadee
+					// Recargar la lista de hilos para actualizar el 'ultimoMensaje' y contadores
 					void fetchThreads(false);
 
-					// 2. Si el mensaje es para el correo actualmente seleccionado, agregarlo al chat
+					// Si el mensaje entrante pertenece al chat que está abierto ahora, lo añadimos directamente
 					if (newMessage.email === selectedEmailRef.current) {
 						setMensajes((prev) => {
 							if (prev.some((m) => m.id === newMessage.id)) return prev;
 							return [...prev, newMessage];
 						});
 						
-						// Marcar como leído automáticamente porque lo está viendo en vivo
+						// Si es del cliente y el admin lo está viendo, marcar como leído en la BD
 						if (newMessage.nombre !== "Admin" && !newMessage.leido) {
 							void supabase.from("mensajes").update({ leido: true }).eq("id", newMessage.id);
 						}
@@ -150,7 +177,7 @@ export default function AdminMensajesPage() {
 				}
 			)
 			.subscribe((status) => {
-				console.log(`[Admin Realtime] Estado conexión Global:`, status);
+				console.log(`[Admin Realtime] Estado canal:`, status);
 			});
 
 		return () => {
@@ -158,7 +185,9 @@ export default function AdminMensajesPage() {
 		};
 	}, []);
 
-	// Cargar mensajes del hilo seleccionado
+	/**
+	 * Cargar mensajes detallados cuando se selecciona un hilo específico.
+	 */
 	useEffect(() => {
 		if (!selectedEmail) return;
 		
@@ -172,6 +201,7 @@ export default function AdminMensajesPage() {
 			const msgData = Array.isArray(data) ? (data as Mensaje[]) : [];
 			setMensajes(msgData);
 
+			// Marcar todos los mensajes pendientes de este hilo como leídos al abrirlo
 			const unreadIds = msgData.filter(m => !m.leido && m.nombre !== "Admin").map(m => m.id);
 			if (unreadIds.length > 0) {
 				await supabase
@@ -180,7 +210,7 @@ export default function AdminMensajesPage() {
 					.in("id", unreadIds);
 			}
             
-			// SIEMPRE que se abre el chat, limpiar la burbuja localmente al instante
+			// Actualización inmediata del contador local para evitar latencia visual
 			setThreads(prev => prev.map(t => 
 				t.email === selectedEmail ? { ...t, unreadCount: 0 } : t
 			));
@@ -188,26 +218,28 @@ export default function AdminMensajesPage() {
 		void fetchMensajes();
 	}, [selectedEmail]);
 
+	// Mantener el scroll siempre al final al recibir mensajes nuevos
 	useEffect(() => {
 		if (chatRef.current) {
 			chatRef.current.scrollTop = chatRef.current.scrollHeight;
 		}
 	}, [mensajes]);
 
+	// Cargar pedidos del usuario filtrado en el modal lateral
 	useEffect(() => {
 		if (!modalUser?.email) return;
 		setLoadingPedidos(true);
-		// Intentamos buscar pedidos por email ya que es lo que tenemos vinculado
 		supabase
 			.from("pedidos")
 			.select("*")
-			.eq("email_cliente", modalUser.email) // Asumiendo que esta es la columna en pedidos
+			.eq("email_cliente", modalUser.email)
 			.then(({ data }) => {
 				setPedidos(Array.isArray(data) ? data : []);
 				setLoadingPedidos(false);
 			});
 	}, [modalUser]);
 
+	// Filtrado de la lista lateral según el input de búsqueda
 	const threadsFiltrados = threads.filter((t) =>
 		t.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
 		t.email.toLowerCase().includes(busqueda.toLowerCase())
@@ -215,6 +247,7 @@ export default function AdminMensajesPage() {
 
 	const selectedThread = threads.find((t) => t.email === selectedEmail);
 
+	// Helpers de formato visual
 	function formatDate(dateStr: string) {
 		const date = new Date(dateStr);
 		return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -226,7 +259,7 @@ export default function AdminMensajesPage() {
 
 	return (
 		<div className="bg-gray-50 flex flex-col md:flex-row h-[calc(100vh-64px)] overflow-hidden w-full">
-			{/* Sidebar Izquierda */}
+			{/* Sidebar de Chats */}
 			<div className={`w-full md:w-96 bg-white border-r flex flex-col shadow-sm z-10 h-full ${selectedEmail ? 'hidden md:flex' : 'flex'}`}>
 				<div className="p-6 border-b bg-white/50 backdrop-blur-md sticky top-0">
 					<div className="flex items-center justify-between mb-6">
@@ -310,11 +343,11 @@ export default function AdminMensajesPage() {
 				</div>
 			</div>
 
-			{/* Área de Chat Derecha */}
+			{/* Pantalla de Conversación */}
 			<div className={`flex-1 flex flex-col relative bg-[#f8fafc] h-full ${!selectedEmail ? 'hidden md:flex' : 'flex'}`}>
 				{selectedThread ? (
 					<>
-						{/* Header del Chat */}
+						{/* Cabecera del Chat */}
 						<div className="h-20 bg-white/80 backdrop-blur-md border-b flex items-center justify-between px-4 md:px-8 sticky top-0 z-10">
 							<div className="flex items-center gap-3">
 								<button 
@@ -340,7 +373,7 @@ export default function AdminMensajesPage() {
 							</div>
 						</div>
 
-						{/* Mensajes */}
+						{/* Lista de Mensajes */}
 						<div 
 							ref={chatRef}
 							className="flex-1 overflow-y-auto p-6 md:p-10 space-y-4 custom-scrollbar"
@@ -384,7 +417,7 @@ export default function AdminMensajesPage() {
 							))}
 						</div>
 
-						{/* Input */}
+						{/* Formulario de envío */}
 						<div className="p-6 bg-white border-t border-gray-100 shadow-[0_-4px_20px_rgba(0,0,0,0.02)]">
 							<form
 								className="max-w-4xl mx-auto relative flex items-center gap-3"
@@ -394,6 +427,7 @@ export default function AdminMensajesPage() {
 									const msgText = msg;
 									setMsg("");
 									
+									// 1. Guardar mensaje en la tabla de Supabase
 									const { data, error } = await supabase.from("mensajes").insert([
 										{
 											nombre: "Admin",
@@ -446,7 +480,7 @@ export default function AdminMensajesPage() {
 				)}
 			</div>
 			
-			{/* Modal de perfil y pedidos */}
+			{/* Modal de Detalle de Usuario y Pedidos */}
 			<Dialog open={!!modalUser} onOpenChange={(v) => !v && setModalUser(null)}>
 				<DialogContent className="max-w-md rounded-3xl">
 					<DialogHeader>

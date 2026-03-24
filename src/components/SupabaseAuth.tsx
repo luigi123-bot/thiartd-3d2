@@ -21,6 +21,15 @@ type UsuarioDB = {
   role: string;
 };
 
+/**
+ * Componente SupabaseAuth: Maneja todo el flujo de autenticación de la plataforma.
+ * Incluye Inicio de Sesión, Registro, Recuperación de Contraseña y OAuth con Google.
+ * 
+ * @param onAuth Callback que se ejecuta cuando el usuario se autentica exitosamente.
+ * @param open Controla la visibilidad del modal de autenticación.
+ * @param onOpenChange Función para cambiar el estado de visibilidad del modal.
+ * @param defaultTab Pestaña inicial que se mostrará ('login', 'register', etc).
+ */
 export default function SupabaseAuth({ onAuth, open = false, onOpenChange, defaultTab = "login" }: { 
   onAuth?: (user: UsuarioDB) => void;
   open?: boolean;
@@ -214,6 +223,9 @@ export default function SupabaseAuth({ onAuth, open = false, onOpenChange, defau
     }
   };
 
+  /**
+   * Maneja el inicio de sesión tradicional con Email y Contraseña.
+   */
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -237,6 +249,7 @@ export default function SupabaseAuth({ onAuth, open = false, onOpenChange, defau
       return;
     }
 
+    // Buscamos el perfil extendido en nuestra tabla 'usuarios'
     const { data: usuarioData, error: usuarioError } = await supabase
       .from("usuarios")
       .select("*")
@@ -250,13 +263,15 @@ export default function SupabaseAuth({ onAuth, open = false, onOpenChange, defau
     }
     setLoading(false);
     
-    // Cerramos el modal inmediatamente tras éxito
+    // Logueo exitoso: notificamos y cerramos modal
     if (onAuth) onAuth(usuarioData);
     if (onOpenChange) onOpenChange(false);
 
-    // Redirección si es admin o creador a sus respectivos paneles si no están allí
+    // Redirección inmediata para roles administrativos
     if (usuarioData.role === "admin") {
        router.push("/admin");
+    } else if (usuarioData.role === "creador") {
+       router.push("/creador");
     }
   };
 

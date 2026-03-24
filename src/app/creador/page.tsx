@@ -8,6 +8,9 @@ import { Button } from "~/components/ui/button";
 import { AlertCircle } from "lucide-react";
 import TopbarCreador from "~/components/TopbarCreador";
 
+/**
+ * Interfaz para los datos del usuario extraídos de la tabla 'usuarios' de la base de datos.
+ */
 interface UsuarioDB {
   id: string;
   nombre: string;
@@ -16,6 +19,10 @@ interface UsuarioDB {
   auth_id?: string | null;
 }
 
+/**
+ * Página principal del Dashboard del Creador.
+ * Realiza la verificación de identidad y rol antes de renderizar el contenido.
+ */
 export default function CreadorPage() {
   const router = useRouter();
   const [creatorUser, setCreatorUser] = useState<UsuarioDB | null>(null);
@@ -28,6 +35,9 @@ export default function CreadorPage() {
   useEffect(() => {
     let mounted = true;
 
+    /**
+     * Verifica la sesión del usuario y valida su permiso de creador.
+     */
     async function checkUser() {
       try {
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
@@ -37,12 +47,13 @@ export default function CreadorPage() {
           return;
         }
 
+        // Si no hay sesión activa, redirigir al inicio
         if (!session) {
           if (mounted) router.push("/");
           return;
         }
 
-        // 1. Intentar buscar por ID de autenticación directamente
+        // 1. Fase de Identificación: Buscar por ID de autenticación (UUID de Supabase Auth)
         const { data: initialData, error: dbError } = await supabase
           .from("usuarios")
           .select("*")
@@ -51,7 +62,8 @@ export default function CreadorPage() {
 
         let userData = initialData;
 
-        // 2. Fallback por EMAIL si el ID no coincide (usuarios creados manualmente o antes de su primer login)
+        // 2. Fase de Fallback: Si el ID no coincide, buscar por Email.
+        // Esto es necesario para usuarios creados manualmente o en procesos de migración parcial.
         if (!userData && session.user.email) {
           const { data: userDataByEmail } = await supabase
             .from("usuarios")
@@ -61,25 +73,27 @@ export default function CreadorPage() {
           
           if (userDataByEmail) {
             userData = userDataByEmail;
-            // 3. Auto-vincular el auth_id de Supabase con el registro en la tabla de usuarios
+            // 3. Fase de Auto-Vínculo: Guardamos el auth_id de Supabase en nuestro registro para futuras visitas
             if (!userDataByEmail.auth_id) {
               await supabase.from("usuarios").update({ auth_id: session.user.id }).eq("id", userDataByEmail.id);
             }
           }
         }
 
+        // Si después de ambas fases no hay datos, denegar el acceso
         if (dbError ?? !userData) {
           if (mounted) setErrorStatus("No se pudieron cargar los datos del usuario creador.");
           return;
         }
 
-        // 4. Verificar rol (insensible a mayúsculas)
+        // 4. Fase de Autorización: Verificar que el rol sea 'creador' o 'admin'
         const userRole = userData.role?.toLowerCase() ?? "cliente";
         if (userRole !== "creador" && userRole !== "admin") {
           if (mounted) router.push("/");
           return;
         }
 
+        // Acceso concedido
         if (mounted) {
           setCreatorUser(userData);
           setErrorStatus(null);
@@ -96,6 +110,7 @@ export default function CreadorPage() {
     return () => { mounted = false; };
   }, [router]);
 
+  // Estados de carga y error
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
@@ -141,6 +156,7 @@ export default function CreadorPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
+      {/* Barra superior personalizada para el creador */}
       <TopbarCreador 
         user={creatorUser} 
         onViewChange={(v) => setActiveView(v as "stats" | "chat")}
@@ -149,6 +165,7 @@ export default function CreadorPage() {
 
       <main className="flex-1 max-w-5xl mx-auto w-full p-4 md:p-8">
         <div className="bg-white rounded-[2.5rem] shadow-xl shadow-black/5 border border-gray-100 overflow-hidden">
+          {/* Cabecera del panel inspirada en Glassmorphism */}
           <div className="bg-[#0f172a] p-8 md:p-12 text-white relative overflow-hidden">
              <div className="absolute top-0 right-0 w-96 h-96 bg-[#009688]/15 rounded-full blur-[100px] -mr-48 -mt-48 transition-opacity duration-1000"></div>
              <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-500/10 rounded-full blur-[80px] -ml-32 -mb-32"></div>
@@ -169,6 +186,7 @@ export default function CreadorPage() {
              </div>
           </div>
           
+          {/* Contenido dinámico del Dashboard */}
           <div className="p-4 md:p-12 bg-gray-50/10">
              <CreatorDashboard 
                 user={creatorUser} 
