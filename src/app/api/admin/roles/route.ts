@@ -26,7 +26,8 @@ export async function GET() {
 
           const mapped = asUnknown.map((row) => {
             const obj = (row as Record<string, unknown>) ?? {};
-            const id = getString(obj.id ?? obj.key ?? obj.role);
+            // Prioritize name/slug/role keys over UUID IDs for the identifier that will be saved in the user's 'role' column
+            const id = getString(obj.nombre ?? obj.name ?? obj.role ?? obj.key ?? obj.id);
             const label = getString(
               obj.nombre ?? obj.name ?? obj.label ?? obj.title ?? obj.role ?? obj.key ?? id
             );

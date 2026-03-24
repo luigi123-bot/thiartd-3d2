@@ -73,7 +73,7 @@ export default function AdminMensajesPage() {
 
             const emailToName = new Map<string, string>();
             usersData?.forEach(u => {
-                if (u.email && u.nombre) emailToName.set(u.email, u.nombre);
+                if (u.email && u.nombre) emailToName.set(u.email.toLowerCase(), u.nombre);
             });
 
 			if (error) {
@@ -82,29 +82,39 @@ export default function AdminMensajesPage() {
 				return;
 			}
 
-			const grouped = new Map<string, Thread>();
-			(data as Mensaje[]).forEach((m) => {
-				const isFromClient = m.nombre !== "Admin";
-				
-				if (!grouped.has(m.email)) {
-					grouped.set(m.email, {
-						email: m.email,
-						nombre: emailToName.get(m.email) ?? m.nombre,
-						ultimoMensaje: m.mensaje,
-						fecha: m.creado_en,
-						leido: m.leido,
-						unreadCount: 0,
-					});
-				}
+            const grouped = new Map<string, Thread>();
+            (data as Mensaje[]).forEach((m) => {
+                const lowerEmail = m.email.toLowerCase();
+                const isFromClient = m.nombre !== "Admin";
+                
+                if (!grouped.has(lowerEmail)) {
+                    const registeredName = emailToName.get(lowerEmail);
+                    let displayName = registeredName ?? m.nombre;
 
-				if (isFromClient && !m.leido) {
-					const thread = grouped.get(m.email)!;
-					// Solo incrementa si no es el chat activo
-					if (m.email !== selectedEmailRef.current) {
-						thread.unreadCount += 1;
-					}
-				}
-			});
+                    // Si el nombre es "Admin", buscamos en el historial de este email un nombre de cliente
+                    if (displayName === "Admin") {
+                        const clientMsg = (data as Mensaje[]).find(om => om.email.toLowerCase() === lowerEmail && om.nombre !== "Admin");
+                        if (clientMsg) displayName = clientMsg.nombre;
+                    }
+
+                    grouped.set(lowerEmail, {
+                        email: m.email,
+                        nombre: displayName,
+                        ultimoMensaje: m.mensaje,
+                        fecha: m.creado_en,
+                        leido: m.leido,
+                        unreadCount: 0,
+                    });
+                }
+
+                if (isFromClient && !m.leido) {
+                    const thread = grouped.get(lowerEmail)!;
+                    // Solo incrementa si no es el chat activo
+                    if (lowerEmail !== selectedEmailRef.current?.toLowerCase()) {
+                        thread.unreadCount += 1;
+                    }
+                }
+            });
 
 			setThreads(Array.from(grouped.values()));
 			if (showLoading) setLoading(false);

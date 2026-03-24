@@ -13,6 +13,7 @@ interface UsuarioDB {
   nombre: string;
   email: string;
   role: string;
+  auth_id?: string | null;
 }
 
 export default function CreadorPage() {
@@ -41,18 +42,40 @@ export default function CreadorPage() {
           return;
         }
 
-        const { data: userData, error: dbError } = await supabase
+        // 1. Intentar buscar por ID de autenticación directamente
+        const { data: initialData, error: dbError } = await supabase
           .from("usuarios")
           .select("*")
           .eq("id", session.user.id)
-          .single() as { data: UsuarioDB | null; error: { message: string } | null };
+          .maybeSingle() as { data: UsuarioDB | null; error: { message: string } | null };
+
+        let userData = initialData;
+
+        // 2. Fallback por EMAIL si el ID no coincide (usuarios creados manualmente o antes de su primer login)
+        if (!userData && session.user.email) {
+          const { data: userDataByEmail } = await supabase
+            .from("usuarios")
+            .select("*")
+            .eq("email", session.user.email)
+            .maybeSingle() as { data: UsuarioDB | null; error: { message: string } | null };
+          
+          if (userDataByEmail) {
+            userData = userDataByEmail;
+            // 3. Auto-vincular el auth_id de Supabase con el registro en la tabla de usuarios
+            if (!userDataByEmail.auth_id) {
+              await supabase.from("usuarios").update({ auth_id: session.user.id }).eq("id", userDataByEmail.id);
+            }
+          }
+        }
 
         if (dbError ?? !userData) {
           if (mounted) setErrorStatus("No se pudieron cargar los datos del usuario creador.");
           return;
         }
 
-        if (userData.role !== "creador" && userData.role !== "admin") {
+        // 4. Verificar rol (insensible a mayúsculas)
+        const userRole = userData.role?.toLowerCase() ?? "cliente";
+        if (userRole !== "creador" && userRole !== "admin") {
           if (mounted) router.push("/");
           return;
         }
@@ -61,7 +84,8 @@ export default function CreadorPage() {
           setCreatorUser(userData);
           setErrorStatus(null);
         }
-      } catch {
+      } catch (err) {
+        console.error("Error en CreadorPage:", err);
         if (mounted) setErrorStatus("Error crítico al cargar el panel.");
       } finally {
         if (mounted) setLoading(false);

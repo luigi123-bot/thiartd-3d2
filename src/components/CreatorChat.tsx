@@ -44,7 +44,7 @@ export default function CreatorChat({ onBack }: { creatorEmail?: string, onBack:
       const { data: usersRaw } = await supabase.from("usuarios").select("email, nombre");
       const usersData = usersRaw as { email: string, nombre: string }[] | null;
       const emailToName = new Map<string, string>();
-      usersData?.forEach(u => { if (u.email && u.nombre) emailToName.set(u.email, u.nombre); });
+      usersData?.forEach(u => { if (u.email && u.nombre) emailToName.set(u.email.toLowerCase(), u.nombre); });
 
       if (error) {
         // console.error("Error fetching messages:", error);
@@ -52,13 +52,24 @@ export default function CreatorChat({ onBack }: { creatorEmail?: string, onBack:
       }
 
       const grouped = new Map<string, Thread>();
-      (data as Mensaje[]).forEach((m) => {
+      const messages = data as Mensaje[];
+      messages.forEach((m) => {
+        const lowerEmail = m.email.toLowerCase();
         const isFromClient = m.nombre !== "Admin";
         
-        if (!grouped.has(m.email)) {
-          grouped.set(m.email, {
+        if (!grouped.has(lowerEmail)) {
+          const registeredName = emailToName.get(lowerEmail);
+          let displayName = registeredName ?? m.nombre;
+
+          // Si el nombre es "Admin", buscamos en el historial de este email un nombre de cliente
+          if (displayName === "Admin") {
+            const clientMsg = messages.find(om => om.email.toLowerCase() === lowerEmail && om.nombre !== "Admin");
+            if (clientMsg) displayName = clientMsg.nombre;
+          }
+
+          grouped.set(lowerEmail, {
             email: m.email,
-            nombre: emailToName.get(m.email) ?? m.nombre,
+            nombre: displayName,
             ultimoMensaje: m.mensaje,
             fecha: m.creado_en,
             unreadCount: 0,
@@ -66,8 +77,8 @@ export default function CreatorChat({ onBack }: { creatorEmail?: string, onBack:
         }
 
         if (isFromClient && !m.leido) {
-          const thread = grouped.get(m.email)!;
-          if (m.email !== selectedEmail) {
+          const thread = grouped.get(lowerEmail)!;
+          if (lowerEmail !== selectedEmail?.toLowerCase()) {
             thread.unreadCount += 1;
           }
         }

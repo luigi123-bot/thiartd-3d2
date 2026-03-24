@@ -20,13 +20,35 @@ export async function middleware(req: NextRequest) {
     const { data: { user } } = await supabaseClient.auth.getUser(authCookie);
 
     if (user) {
-      const { data: usuario } = await supabaseClient
+      // Intentar buscar por id directamente
+      let { data: usuario } = await supabaseClient
         .from('usuarios')
         .select('role')
         .eq('id', user.id)
-        .single() as { data: { role: string } | null };
+        .maybeSingle() as { data: { role: string } | null };
 
-      const role = (usuario?.role) ?? 'cliente';
+      // Si no se encuentra (puede pasar con usuarios creados manualmente con otro UUID), 
+      // buscamos por email y vinculamos el ID.
+      if (!usuario && user.email) {
+        const { data: usuarioByEmail } = await supabaseClient
+          .from('usuarios')
+          .select('id, role, auth_id')
+          .eq('email', user.email)
+          .maybeSingle() as { data: { id: string; role: string; auth_id: string | null } | null };
+        
+        if (usuarioByEmail) {
+          usuario = { role: usuarioByEmail.role };
+          // Vincular el auth_id de Supabase con el registro en la tabla usuarios para futuras consultas
+          if (!usuarioByEmail.auth_id) {
+            await supabaseClient
+              .from('usuarios')
+              .update({ auth_id: user.id })
+              .eq('id', usuarioByEmail.id);
+          }
+        }
+      }
+
+      const role = (usuario?.role?.toLowerCase()) ?? 'cliente';
 
       if (pathname.startsWith('/admin') && role !== 'admin') {
         return NextResponse.redirect(new URL('/', req.url));
