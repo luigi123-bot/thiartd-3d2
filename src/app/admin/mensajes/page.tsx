@@ -65,6 +65,17 @@ export default function AdminMensajesPage() {
 				.select("*")
 				.order("creado_en", { ascending: false });
 
+            // Buscar nombres registrados de usuarios para no depender solo del nombre del mensaje
+            const { data: usersRaw } = await supabase
+                .from("usuarios")
+                .select("email, nombre");
+            const usersData = usersRaw as { email: string; nombre: string }[] | null;
+
+            const emailToName = new Map<string, string>();
+            usersData?.forEach(u => {
+                if (u.email && u.nombre) emailToName.set(u.email, u.nombre);
+            });
+
 			if (error) {
 				console.error("Error fetching messages for threads:", error);
 				if (showLoading) setLoading(false);
@@ -78,7 +89,7 @@ export default function AdminMensajesPage() {
 				if (!grouped.has(m.email)) {
 					grouped.set(m.email, {
 						email: m.email,
-						nombre: m.nombre,
+						nombre: emailToName.get(m.email) ?? m.nombre,
 						ultimoMensaje: m.mensaje,
 						fecha: m.creado_en,
 						leido: m.leido,
@@ -258,9 +269,14 @@ export default function AdminMensajesPage() {
 								
 								<div className="flex-1 min-w-0">
 									<div className="flex justify-between items-start mb-0.5">
-										<p className={`text-sm font-bold truncate ${selectedEmail === t.email ? "text-emerald-900" : "text-gray-900"}`}>
+										<div>
+                                          <p className={`text-sm font-bold truncate ${selectedEmail === t.email ? "text-emerald-900" : "text-gray-900"}`}>
 											{t.nombre}
-										</p>
+										  </p>
+                                          <p className="text-[10px] text-gray-400 font-medium truncate mt-0.5 lowercase">
+                                            {t.email}
+                                          </p>
+                                        </div>
 										<span className={`text-[10px] font-medium uppercase tracking-wider whitespace-nowrap ml-2 ${t.unreadCount > 0 ? "text-emerald-500 font-black" : "text-gray-400"}`}>
 											{formatDate(t.fecha)}
 										</span>

@@ -40,6 +40,12 @@ export default function CreatorChat({ onBack }: { creatorEmail?: string, onBack:
         .select("*")
         .order("creado_en", { ascending: false });
 
+      // Buscar nombres registrados para no depender solo del nombre del mensaje
+      const { data: usersRaw } = await supabase.from("usuarios").select("email, nombre");
+      const usersData = usersRaw as { email: string, nombre: string }[] | null;
+      const emailToName = new Map<string, string>();
+      usersData?.forEach(u => { if (u.email && u.nombre) emailToName.set(u.email, u.nombre); });
+
       if (error) {
         // console.error("Error fetching messages:", error);
         return;
@@ -52,7 +58,7 @@ export default function CreatorChat({ onBack }: { creatorEmail?: string, onBack:
         if (!grouped.has(m.email)) {
           grouped.set(m.email, {
             email: m.email,
-            nombre: m.nombre,
+            nombre: emailToName.get(m.email) ?? m.nombre,
             ultimoMensaje: m.mensaje,
             fecha: m.creado_en,
             unreadCount: 0,
@@ -214,7 +220,10 @@ export default function CreatorChat({ onBack }: { creatorEmail?: string, onBack:
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex justify-between items-start mb-0.5">
-                  <p className="text-sm font-bold text-gray-800 truncate leading-none">{t.nombre}</p>
+                  <div>
+                    <p className="text-sm font-bold text-gray-800 truncate leading-none">{t.nombre}</p>
+                    <p className="text-[10px] text-gray-400 font-medium truncate mt-1 lowercase">{t.email}</p>
+                  </div>
                   <span className="text-[9px] text-gray-400 font-bold uppercase tracking-tighter">{new Date(t.fecha).toLocaleDateString()}</span>
                 </div>
                 <p className="text-xs text-gray-500 truncate">{t.ultimoMensaje}</p>
