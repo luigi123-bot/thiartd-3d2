@@ -85,7 +85,7 @@ export default function AdminTopbar() {
       const [notifsSys, pedidosPending, mensajesNew] = await Promise.all([
         supabase.from("notificaciones").select("*").order("created_at", { ascending: false }).limit(20) as unknown as Promise<{ data: NotifDb[] | null }>,
         supabase.from("pedidos").select("id, created_at").eq("estado", "pendiente_cotizacion").order("created_at", { ascending: false }).limit(5) as unknown as Promise<{ data: PedidoDb[] | null }>,
-        supabase.from("mensajes").select("id, asunto, created_at").order("created_at", { ascending: false }).limit(5) as unknown as Promise<{ data: MensajeDb[] | null }>,
+        supabase.from("mensajes").select("id, asunto, created_at").eq("leido", false).neq("nombre", "Admin").order("created_at", { ascending: false }).limit(5) as unknown as Promise<{ data: MensajeDb[] | null }>,
       ]);
 
       const compiled: Notification[] = [];
@@ -151,6 +151,9 @@ export default function AdminTopbar() {
         void fetchNotifications();
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notificaciones' }, () => {
+        void fetchNotifications();
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'mensajes' }, () => {
         void fetchNotifications();
       })
       .subscribe();

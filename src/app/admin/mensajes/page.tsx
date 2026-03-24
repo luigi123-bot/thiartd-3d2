@@ -88,7 +88,10 @@ export default function AdminMensajesPage() {
 
 				if (isFromClient && !m.leido) {
 					const thread = grouped.get(m.email)!;
-					thread.unreadCount += 1;
+					// Solo incrementa si no es el chat activo
+					if (m.email !== selectedEmailRef.current) {
+						thread.unreadCount += 1;
+					}
 				}
 			});
 
@@ -117,6 +120,11 @@ export default function AdminMensajesPage() {
 							if (prev.some((m) => m.id === newMessage.id)) return prev;
 							return [...prev, newMessage];
 						});
+						
+						// Marcar como leído automáticamente porque lo está viendo en vivo
+						if (newMessage.nombre !== "Admin" && !newMessage.leido) {
+							void supabase.from("mensajes").update({ leido: true }).eq("id", newMessage.id);
+						}
 					}
 				}
 			)
@@ -143,19 +151,18 @@ export default function AdminMensajesPage() {
 			const msgData = Array.isArray(data) ? (data as Mensaje[]) : [];
 			setMensajes(msgData);
 
-			// Marcar como leídos
 			const unreadIds = msgData.filter(m => !m.leido && m.nombre !== "Admin").map(m => m.id);
 			if (unreadIds.length > 0) {
 				await supabase
 					.from("mensajes")
 					.update({ leido: true })
 					.in("id", unreadIds);
-				
-				// Actualizar el conteo localmente para que desaparezca el badge
-				setThreads(prev => prev.map(t => 
-					t.email === selectedEmail ? { ...t, unreadCount: 0 } : t
-				));
 			}
+            
+			// SIEMPRE que se abre el chat, limpiar la burbuja localmente al instante
+			setThreads(prev => prev.map(t => 
+				t.email === selectedEmail ? { ...t, unreadCount: 0 } : t
+			));
 		};
 		void fetchMensajes();
 	}, [selectedEmail]);

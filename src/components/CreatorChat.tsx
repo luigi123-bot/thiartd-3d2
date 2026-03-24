@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { FiSend, FiMessageCircle, FiArrowLeft } from "react-icons/fi";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
@@ -32,7 +32,7 @@ export default function CreatorChat({ onBack }: { creatorEmail?: string, onBack:
   const [loading, setLoading] = useState(true);
   const chatRef = useRef<HTMLDivElement>(null);
 
-  const fetchThreads = async (showLoading = true) => {
+  const fetchThreads = useCallback(async (showLoading = true) => {
     if (showLoading) setLoading(true);
     try {
       const { data, error } = await supabase
@@ -61,7 +61,9 @@ export default function CreatorChat({ onBack }: { creatorEmail?: string, onBack:
 
         if (isFromClient && !m.leido) {
           const thread = grouped.get(m.email)!;
-          thread.unreadCount += 1;
+          if (m.email !== selectedEmail) {
+            thread.unreadCount += 1;
+          }
         }
       });
 
@@ -71,7 +73,7 @@ export default function CreatorChat({ onBack }: { creatorEmail?: string, onBack:
     } finally {
       if (showLoading) setLoading(false);
     }
-  };
+  }, [selectedEmail]);
 
   useEffect(() => {
     void fetchThreads();
@@ -83,13 +85,20 @@ export default function CreatorChat({ onBack }: { creatorEmail?: string, onBack:
         void fetchThreads(false);
         const newMessage = payload.new as Mensaje;
         if (newMessage.email === selectedEmail) {
-           setMensajes(prev => [...prev, newMessage]);
+           setMensajes(prev => {
+             if (prev.some(m => m.id === newMessage.id)) return prev;
+             return [...prev, newMessage];
+           });
+           
+           if (newMessage.nombre !== "Admin" && !newMessage.leido) {
+             void supabase.from("mensajes").update({ leido: true }).eq("id", newMessage.id);
+           }
         }
       })
       .subscribe();
 
     return () => { void supabase.removeChannel(channel); };
-  }, [selectedEmail]);
+  }, [fetchThreads, selectedEmail]);
 
   useEffect(() => {
     if (!selectedEmail) return;
@@ -102,6 +111,11 @@ export default function CreatorChat({ onBack }: { creatorEmail?: string, onBack:
         if (unreadIds.length > 0) {
           await supabase.from("mensajes").update({ leido: true }).in("id", unreadIds);
         }
+        
+        // Limpia instantáneamente el contador UI para este hilo
+        setThreads(prev => prev.map(t => 
+           t.email === selectedEmail ? { ...t, unreadCount: 0 } : t
+        ));
       }
     };
     void loadMensajes();
