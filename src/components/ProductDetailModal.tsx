@@ -105,7 +105,7 @@ export function ProductDetailModal({
           <div className="relative flex-shrink-0 flex flex-col items-center justify-center w-full md:w-[340px] bg-gradient-to-bl from-white to-cyan-50 rounded-t-3xl md:rounded-l-3xl md:rounded-tr-none p-6 md:p-8">
             <div className="relative group w-64 h-64 md:w-72 md:h-72">
               <Image
-                src={allImages[currentImageIndex] ?? "/Logo%20Thiart%20Tiktok.png"}
+                src={allImages[currentImageIndex] ?? "/logo.png"}
                 alt={producto?.nombre ?? "Producto"}
                 fill
                 className="object-cover rounded-2xl shadow-xl ring-1 ring-white/10 border border-gray-100 bg-white"

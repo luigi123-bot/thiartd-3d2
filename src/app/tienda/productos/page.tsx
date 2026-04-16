@@ -465,7 +465,7 @@ function ProductCardModern({ producto, idx, router, addToCarrito, carrito }: {
                     id: String(producto.id),
                     nombre: data.nombre,
                     precio: data.precio,
-                    imagen: producto.image_url ?? "/Logo%20Thiart%20Tiktok.png",
+                    imagen: producto.image_url ?? "/logo.png",
                     cantidad: 1, 
                     stock: producto.stock,
                     categoria: data.categoria,

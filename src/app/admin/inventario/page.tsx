@@ -237,7 +237,7 @@ export default function AdminInventarioPage() {
 										<div className="bg-gradient-to-br from-cyan-50 to-white rounded-xl shadow p-1 transition-transform duration-200 hover:scale-105 flex items-center justify-center" style={{ width: 120, height: 120 }}>
 											{/** Usar image_url real si existe; mantener proporción y cubrir sin salirse del card */}
 											<Image
-												src={producto.image_url ?? "/Logo%20Thiart%20Tiktok.png"}
+												src={producto.image_url ?? "/logo.png"}
 												alt={producto.nombre}
 												width={120}
 												height={120}

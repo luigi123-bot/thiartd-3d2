@@ -477,7 +477,7 @@ export default function SupabaseAuth({ onAuth, open = false, onOpenChange, defau
             >
               <div className="w-16 h-16 rounded-2xl bg-[#eff7f6] flex items-center justify-center p-2 shadow-sm border border-teal-100/50">
                 <Image
-                  src="/IG Foto de Perfil.png"
+                  src="/logo.png"
                   alt="Thiart 3D Logo"
                   width={46}
                   height={46}

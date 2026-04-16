@@ -204,7 +204,7 @@ export default function AdminTopbar() {
         <div className="flex items-center justify-between px-6 py-3">
           <div className="flex items-center gap-3">
             <Image
-              src="/IG%20Foto%20de%20Perfil.png"
+              src="/logo.png"
               alt="Logo Thiart3D"
               width={36}
               height={36}

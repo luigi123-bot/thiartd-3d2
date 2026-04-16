@@ -172,7 +172,7 @@ export default function TopbarTienda() {
           <div className="flex items-center justify-between h-16 lg:h-20">
             <Link href="/" className="flex items-center gap-2 min-w-max">
               <span className="bg-white rounded-full p-1 shadow-md">
-                <Image src="/IG%20Foto%20de%20Perfil.png" alt="Logo" width={40} height={40} className="h-8 w-8 lg:h-10 lg:w-10 rounded-full object-cover" />
+                <Image src="/logo.png" alt="Logo" width={40} height={40} className="h-8 w-8 lg:h-10 lg:w-10 rounded-full object-cover" />
               </span>
               <span className="font-extrabold text-lg lg:text-2xl text-white">Thiart3D</span>
             </Link>

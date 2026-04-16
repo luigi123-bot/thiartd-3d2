@@ -81,7 +81,7 @@ export default function TopbarCreador({ user, onViewChange, onOpenAddProduct: _o
           <Link href="/" className="flex items-center gap-2 min-w-max group">
             <span className="bg-white rounded-full p-1 shadow-md group-hover:scale-105 transition-transform">
               <Image 
-                src="/IG%20Foto%20de%20Perfil.png" 
+                src="/logo.png" 
                 alt="Logo" 
                 width={40} 
                 height={40} 

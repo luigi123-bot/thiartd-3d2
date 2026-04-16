@@ -279,7 +279,7 @@ export default function AdminProductosPage() {
                   {/* Imagen centrada */}
                   <div className="flex items-center justify-center w-full mb-4">
                     <Image
-                      src={producto.image_url ?? "/Logo%20Thiart%20Tiktok.png"}
+                      src={producto.image_url ?? "/logo.png"}
                       alt={producto.nombre}
                       width={120}
                       height={120}

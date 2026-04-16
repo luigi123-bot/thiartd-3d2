@@ -34,7 +34,7 @@ const mockProductos: Producto[] = [
     categoria: "Figuras",
     precio: 85000,
     destacado: true,
-    image_url: "/Logo%20Thiart%20Tiktok.png",
+    image_url: "/logo.png",
   },
   {
     id: 2,
@@ -43,7 +43,7 @@ const mockProductos: Producto[] = [
     categoria: "Juguetes",
     precio: 45000,
     destacado: false,
-    image_url: "/Logo%20Thiart%20Tiktok.png",
+    image_url: "/logo.png",
   },
   {
     id: 3,
@@ -52,7 +52,7 @@ const mockProductos: Producto[] = [
     categoria: "Decoración",
     precio: 65000,
     destacado: false,
-    image_url: "/Logo%20Thiart%20Tiktok.png",
+    image_url: "/logo.png",
   },
   {
     id: 4,
@@ -61,7 +61,7 @@ const mockProductos: Producto[] = [
     categoria: "Personalizados",
     precio: 120000,
     destacado: true,
-    image_url: "/Logo%20Thiart%20Tiktok.png",
+    image_url: "/logo.png",
   },
 ];
 
@@ -201,7 +201,7 @@ export default function ProductosCarrusel({ soloDestacados = false }: ProductosC
             {/* Image Wrap with Gradient Background */}
             <div className="relative aspect-square rounded-[2rem] overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100 mb-6 group/img p-8">
                <Image
-                  src={prod.image_url ?? "/Logo%20Thiart%20Tiktok.png"}
+                  src={prod.image_url ?? "/logo.png"}
                   alt={prod.nombre}
                   fill
                   className="object-contain transition-transform duration-700 group-hover/img:scale-110 drop-shadow-xl"
