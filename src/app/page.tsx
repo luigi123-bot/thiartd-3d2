@@ -5,7 +5,6 @@ import { Button } from "~/components/ui/button";
 import ContactModal from "~/components/ContactModal";
 import ProductosCarrusel from "~/components/ProductosCarrusel";
 import UsuariosAdminModal from "~/components/UsuariosAdminModal";
-import BecomeCreatorModal from "~/components/BecomeCreatorModal";
 import { useUser } from "@clerk/nextjs";
 import { supabase } from "~/lib/supabaseClient";
 import { motion } from "framer-motion";
@@ -57,7 +56,10 @@ export default function Home() {
 
 	return (
 		<main className="min-h-screen bg-slate-50 font-sans selection:bg-[#00a19a]/30">
-			<TopbarTienda />
+<TopbarTienda
+                becomeCreatorOpen={becomeCreatorModalOpen}
+                setBecomeCreatorOpen={setBecomeCreatorModalOpen}
+            />
 
 			{/* Hero Section */}
             <section className="relative w-full min-h-[90vh] flex items-center justify-center overflow-hidden bg-[#007973] pt-20">
@@ -269,10 +271,6 @@ export default function Home() {
 				</>
 			)}
 
-            <BecomeCreatorModal 
-                open={becomeCreatorModalOpen} 
-                onOpenChange={setBecomeCreatorModalOpen} 
-            />
 		</main>
 	);
 }

@@ -1,7 +1,6 @@
+import type { ReactNode } from "react";
 import { type Metadata } from "next";
-import {
-  ClerkProvider,
-} from "@clerk/nextjs";
+import { ClerkProvider } from "@clerk/nextjs";
 import "../styles/globals.css";
 
 import { ToastProvider } from "~/components/ui/use-toast";
@@ -23,7 +22,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({
   children,
-}: Readonly<{ children: React.ReactNode }>) {
+}: Readonly<{ children: ReactNode }>) {
   return (
     <ClerkProvider>
       <html lang="en" suppressHydrationWarning>

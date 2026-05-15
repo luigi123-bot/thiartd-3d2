@@ -25,12 +25,17 @@ interface UserNotification {
     created_at: string;
 }
 
-export default function TopbarTienda() {
+interface TopbarTiendaProps {
+  becomeCreatorOpen?: boolean;
+  setBecomeCreatorOpen?: (open: boolean) => void;
+}
+
+export default function TopbarTienda({ becomeCreatorOpen, setBecomeCreatorOpen }: TopbarTiendaProps) {
   const [isMounted, setIsMounted] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [showMobileSearch, setShowMobileSearch] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
-  const [becomeCreatorModalOpen, setBecomeCreatorModalOpen] = useState(false);
+  const [localBecomeCreatorModalOpen, setLocalBecomeCreatorModalOpen] = useState(false);
   const [usuario, setUsuario] = useState<{ id?: string; nombre?: string; email?: string; avatar_url?: string } | null>(null);
   const [role, setRole] = useState<string | null>(null);
   const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
@@ -41,6 +46,8 @@ export default function TopbarTienda() {
   const [notifOpen, setNotifOpen] = useState(false);
   const [loadingNotif, setLoadingNotif] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
+  const isBecomeCreatorModalOpen = typeof becomeCreatorOpen === "boolean" ? becomeCreatorOpen : localBecomeCreatorModalOpen;
+  const handleSetBecomeCreatorModalOpen = setBecomeCreatorOpen ?? setLocalBecomeCreatorModalOpen;
 
   const { carrito } = useCarrito();
   const cartCount = carrito.reduce((acc, item) => acc + (item.cantidad ?? 0), 0);
@@ -197,7 +204,7 @@ export default function TopbarTienda() {
               ) : (
                 usuario && (
                   <button 
-                    onClick={() => setBecomeCreatorModalOpen(true)}
+                    onClick={() => handleSetBecomeCreatorModalOpen(true)}
                     className="bg-gradient-to-r from-teal-400 to-emerald-400 px-4 py-2 rounded-xl text-white hover:scale-105 font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-teal-900/10 flex items-center gap-2 border border-white/20"
                   >
                     <FiStar className="w-3 h-3 text-yellow-200 animate-pulse" /> Ser Creador 🎨
@@ -288,7 +295,7 @@ export default function TopbarTienda() {
                         <button 
                           className="w-full text-left px-4 py-2 hover:bg-amber-50 flex items-center gap-3 text-sm text-amber-700 font-bold" 
                           onClick={() => { 
-                            setBecomeCreatorModalOpen(true);
+                            handleSetBecomeCreatorModalOpen(true);
                             setAvatarMenuOpen(false);
                           }}
                         >
@@ -343,7 +350,7 @@ export default function TopbarTienda() {
             ) : (
               usuario && (
                 <button 
-                  onClick={() => { setBecomeCreatorModalOpen(true); setMenuOpen(false); }}
+                  onClick={() => { handleSetBecomeCreatorModalOpen(true); setMenuOpen(false); }}
                   className="mx-2 px-4 py-3 text-white font-black bg-gradient-to-r from-teal-500 to-emerald-500 rounded-xl flex items-center justify-between group shadow-lg shadow-teal-900/10 transition-all active:scale-[0.98]"
                 >
                   <span className="flex items-center gap-3">
@@ -382,8 +389,8 @@ export default function TopbarTienda() {
       />
 
       <BecomeCreatorModal 
-        open={becomeCreatorModalOpen} 
-        onOpenChange={setBecomeCreatorModalOpen} 
+        open={isBecomeCreatorModalOpen} 
+        onOpenChange={handleSetBecomeCreatorModalOpen} 
       />
     </>
   );
