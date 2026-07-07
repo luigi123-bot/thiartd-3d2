@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import crypto from "crypto";
 import { enviarEmailConfirmacion } from "./emailConfirmacion";
 import type { SentMessageInfo } from "nodemailer";
+import { crearEnvioParaPedido } from "../../../../../utils/envia";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -212,6 +213,13 @@ async function procesarTransaccionActualizada(
   // Solo enviar email si el pago fue APROBADO
   if (transaction.status === "APPROVED" && pedidoActualizado) {
     await enviarEmailConfirmacionCompleto(pedidoActualizado, transaction);
+
+    // Generar guía de envío automática con Envía
+    try {
+      await crearEnvioParaPedido(pedidoId);
+    } catch (enviaError) {
+      console.error("❌ [ENVIA] Error generando envío automático:", enviaError);
+    }
     
     // Limpiar el carrito en la base de datos ya que la compra fue exitosa
     if (pedidoActualizado.cliente_id) {

@@ -7,10 +7,11 @@ import { Card } from "~/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "~/components/ui/dialog";
 import Loader from "~/components/providers/UiProvider";
 import { useUser } from "@clerk/nextjs";
-import { Package, Star, AlertTriangle, Layers, ChevronDown, Search, Filter, BadgeDollarSign } from "lucide-react";
+import { Package, Star, AlertTriangle, Layers, ChevronDown, Search, Filter, BadgeDollarSign, Settings } from "lucide-react";
 import clsx from "clsx";
 import { createClient } from "@supabase/supabase-js";
 import { ProductDetailModal } from "../../../components/ProductDetailModal";
+import ConfiguracionModal from "~/components/ConfiguracionModal";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "TU_SUPABASE_URL";
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "TU_SUPABASE_ANON_KEY";
@@ -44,6 +45,7 @@ export default function AdminProductosPage() {
   const [orden, setOrden] = useState("nombre");
   const [modalDetalle, setModalDetalle] = useState<Producto | null>(null);
   const [pagina, setPagina] = useState(1);
+  const [configModalOpen, setConfigModalOpen] = useState(false);
   const productosPorPagina = 12; 
 
   // Estadísticas para las burbujas
@@ -256,6 +258,14 @@ export default function AdminProductosPage() {
                 <option value="precio">Precio</option>
               </select>
             </div>
+            <Button 
+              onClick={() => setConfigModalOpen(true)}
+              variant="outline" 
+              className="h-10 w-10 p-0 rounded-full border border-slate-200 hover:border-slate-900 bg-white text-slate-900 flex items-center justify-center shrink-0 shadow-sm"
+              title="Configuración de Parámetros"
+            >
+              <Settings className="w-5 h-5 animate-hover-spin" />
+            </Button>
             <Button onClick={() => setModalOpen(true)} className="rounded-full font-semibold w-full sm:w-auto">
               Crear producto
             </Button>
@@ -429,13 +439,14 @@ export default function AdminProductosPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-        {/* Modal ver más */}
         <ProductDetailModal
           open={!!modalDetalle}
           onOpenChange={v => { if (!v) setModalDetalle(null); }}
           producto={modalDetalle}
           getStockColor={getStockColor}
         />
+        {/* Modal Configuraciones */}
+        <ConfiguracionModal open={configModalOpen} onOpenChange={setConfigModalOpen} />
         {/* Animaciones */}
         <style jsx global>{`
           .animate-fade-in {

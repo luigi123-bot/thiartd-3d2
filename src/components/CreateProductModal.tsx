@@ -73,6 +73,7 @@ export default function CreateProductModal({
   const [modelUrl, setModelUrl] = useState<string>("");
   const [videoUrl, setVideoUrl] = useState<string>("");
   const [videoPreview, setVideoPreview] = useState<string | null>(null);
+  const [questions, setQuestions] = useState<string[]>([]);
   
   interface Creator {
     id: string;
@@ -83,12 +84,51 @@ export default function CreateProductModal({
   }
   const [creators, setCreators] = useState<Creator[]>([]);
   const [step, setStep] = useState<number>(0);
-  const totalSteps = 4;
+  const totalSteps = 5;
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Intercambiar orden de imágenes
+  const swapImages = (idx1: number, idx2: number) => {
+    if (idx1 < 0 || idx1 > 3 || idx2 < 0 || idx2 > 3) return;
+    const allImages: string[] = [
+      imageUrl || form.image_url || "",
+      form.imagenes?.[0] || "",
+      form.imagenes?.[1] || "",
+      form.imagenes?.[2] || ""
+    ];
+    
+    // Intercambiar
+    const temp = allImages[idx1] ?? "";
+    allImages[idx1] = allImages[idx2] ?? "";
+    allImages[idx2] = temp;
+    
+    const newCover = allImages[0] || "";
+    setImageUrl(newCover);
+    
+    const newSecondaries = [allImages[1] || "", allImages[2] || "", allImages[3] || ""];
+    setForm({
+      ...form,
+      image_url: newCover,
+      imagenes: newSecondaries
+    });
+  };
 
   // Sincronizar form con product si existe
   useEffect(() => {
     if (product) {
+      // Parsear preguntas adicionales desde columna detalles
+      let parsedQuestions: string[] = [];
+      try {
+        if (product.detalles && (product.detalles.startsWith("[") || product.detalles.startsWith("{"))) {
+          parsedQuestions = JSON.parse(product.detalles) as string[];
+        } else if (product.detalles) {
+          parsedQuestions = [product.detalles];
+        }
+      } catch {
+        parsedQuestions = product.detalles ? [product.detalles] : [];
+      }
+      setQuestions(parsedQuestions);
+
       setForm({
         nombre: product.nombre ?? "",
         precio: product.precio ?? 0,
@@ -111,6 +151,7 @@ export default function CreateProductModal({
         setVideoPreview(product.video_url);
       }
     } else {
+      setQuestions([]);
       setForm({
         nombre: "",
         precio: 0,
@@ -137,8 +178,6 @@ export default function CreateProductModal({
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
-
-
 
   const validateStep = (s: number) => {
     const newErrors: Record<string, string> = {};
@@ -176,6 +215,7 @@ export default function CreateProductModal({
         image_url: imageUrl || form.image_url,
         model_url: modelUrl || form.model_url,
         video_url: finalVideoUrl,
+        detalles: JSON.stringify(questions),
       };
 
       console.log("[CreateProductModal] Enviando formData:", formData);
@@ -287,7 +327,8 @@ export default function CreateProductModal({
                       {step === 0 ? "Información Básica" : 
                        step === 1 ? "Clasificación" : 
                        step === 2 ? "Valores" : 
-                       "Multimedia"
+                       step === 3 ? "Multimedia" :
+                       "Preguntas Adicionales"
                       }
                     </span>
                   </div>
@@ -452,6 +493,23 @@ export default function CreateProductModal({
                               className="h-11 px-5 rounded-2xl border-slate-200 bg-white font-black text-xl text-center outline-none focus:border-[#00a19a]" 
                             />
                           </div>
+
+                          <div className="flex items-center gap-3 bg-slate-50/50 p-6 rounded-2xl border border-slate-100 col-span-1 md:col-span-2">
+                            <input 
+                              type="checkbox" 
+                              name="destacado"
+                              id="destacadoForm" 
+                              checked={form.destacado} 
+                              onChange={(e) => setForm({ ...form, destacado: e.target.checked })}
+                              className="w-5 h-5 rounded text-[#00a19a] focus:ring-[#00a19a]"
+                            />
+                            <div className="flex flex-col">
+                              <label htmlFor="destacadoForm" className="text-sm font-bold text-slate-800 cursor-pointer select-none">
+                                Destacar esta obra
+                              </label>
+                              <span className="text-xs text-slate-500">Marcar este producto como recomendado en la tienda.</span>
+                            </div>
+                          </div>
                        </div>
                     </div>
                   )}
@@ -469,8 +527,12 @@ export default function CreateProductModal({
                                    {currentUrl ? (
                                      <div className="relative group rounded-2xl overflow-hidden h-full border-2 border-slate-200 shadow-sm">
                                         <Image src={currentUrl} alt={`Preview ${idx}`} fill className="object-cover" />
-                                        <div className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center p-2">
-                                          <Button variant="destructive" size="sm" onClick={() => {
+                                        <div className="absolute inset-0 bg-slate-900/75 opacity-0 group-hover:opacity-100 transition-all flex flex-col items-center justify-between p-2">
+                                          <span className="text-[9px] font-black uppercase tracking-widest text-white bg-slate-800/80 px-2 py-0.5 rounded">
+                                            {idx === 0 ? "Portada" : `Imagen ${idx + 1}`}
+                                          </span>
+                                          
+                                          <Button variant="destructive" size="sm" className="h-8 px-3 text-xs font-bold" onClick={() => {
                                             if (idx === 0) {
                                               setImageUrl("");
                                               setForm({ ...form, image_url: "" });
@@ -480,6 +542,29 @@ export default function CreateProductModal({
                                               setForm({...form, imagenes: newImgs});
                                             }
                                           }}>Quitar</Button>
+
+                                          {/* Botones de ordenamiento */}
+                                          <div className="flex items-center gap-3 bg-black/60 rounded-full px-2 py-0.5">
+                                            <button
+                                              type="button"
+                                              disabled={idx === 0}
+                                              onClick={() => swapImages(idx, idx - 1)}
+                                              className="text-white hover:text-teal-400 disabled:opacity-20 disabled:hover:text-white font-bold px-1 transition-colors"
+                                              title="Mover a la izquierda"
+                                            >
+                                              &larr;
+                                            </button>
+                                            <span className="text-[9px] font-black text-white">{idx + 1}</span>
+                                            <button
+                                              type="button"
+                                              disabled={idx === 3}
+                                              onClick={() => swapImages(idx, idx + 1)}
+                                              className="text-white hover:text-teal-400 disabled:opacity-20 disabled:hover:text-white font-bold px-1 transition-colors"
+                                              title="Mover a la derecha"
+                                            >
+                                              &rarr;
+                                            </button>
+                                          </div>
                                         </div>
                                      </div>
                                    ) : (
@@ -529,6 +614,78 @@ export default function CreateProductModal({
                               <ProductVideoUpload productId={product?.id?.toString() ?? "new"} onUploadComplete={(url) => {setVideoUrl(url); setVideoPreview(url); setForm({...form, video_url: url})}} />
                             )}
                           </div>
+                        </div>
+                     </div>
+                  )}
+
+                  {/* Step 5: Preguntas Adicionales */}
+                  {step === 4 && (
+                    <div className="space-y-6">
+                       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
+                          <div className="space-y-3">
+                            <label className="text-xs font-black text-slate-700 uppercase tracking-[0.2em] ml-1">Preguntas de Personalización</label>
+                            <p className="text-xs text-slate-500">
+                              Agrega preguntas que el comprador deberá responder al realizar el pedido de este producto (ej. grabado de nombre, especificaciones de color, etc.).
+                            </p>
+                          </div>
+
+                          <div className="flex gap-2">
+                            <Input 
+                              type="text"
+                              id="new-question-input"
+                              placeholder="Ej: ¿Qué texto deseas grabar en la base?"
+                              className="h-11 px-4 rounded-xl border-slate-200 flex-1 bg-white text-sm" 
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  const input = document.getElementById('new-question-input') as HTMLInputElement;
+                                  if (input && input.value.trim()) {
+                                    setQuestions([...questions, input.value.trim()]);
+                                    input.value = "";
+                                  }
+                                }
+                              }}
+                            />
+                            <Button 
+                              type="button"
+                              onClick={() => {
+                                const input = document.getElementById('new-question-input') as HTMLInputElement;
+                                if (input && input.value.trim()) {
+                                  setQuestions([...questions, input.value.trim()]);
+                                  input.value = "";
+                                }
+                              }}
+                              className="bg-[#00a19a] hover:bg-[#007973] text-white px-5 font-bold rounded-xl"
+                            >
+                              Agregar
+                            </Button>
+                          </div>
+
+                          {questions.length === 0 ? (
+                            <div className="p-8 text-center text-slate-400 text-xs font-semibold bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                              Sin preguntas adicionales de personalización.
+                            </div>
+                          ) : (
+                            <div className="space-y-2 max-h-[220px] overflow-y-auto pr-2 custom-scrollbar">
+                              {questions.map((q, idx) => (
+                                <div key={idx} className="flex items-center justify-between p-3.5 bg-slate-50 border border-slate-100 rounded-xl">
+                                  <span className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                                    <span className="text-xs text-[#00a19a] bg-teal-50 border border-teal-100 w-5 h-5 rounded-full flex items-center justify-center font-black">{idx + 1}</span>
+                                    {q}
+                                  </span>
+                                  <Button 
+                                    type="button" 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    onClick={() => setQuestions(questions.filter((_, i) => i !== idx))}
+                                    className="text-red-400 hover:text-red-500 rounded-full w-8 h-8 flex items-center justify-center"
+                                  >
+                                    <FiX className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                        </div>
                     </div>
                   )}

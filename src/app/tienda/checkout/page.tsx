@@ -124,7 +124,7 @@ export default function CheckoutPage() {
   };
 
   const validarFormulario = () => {
-    const camposRequeridos = ['nombre', 'email', 'telefono', 'direccion', 'ciudad', 'departamento'];
+    const camposRequeridos = ['nombre', 'email', 'telefono', 'direccion', 'ciudad', 'departamento', 'codigoPostal'];
     return camposRequeridos.every(campo => datosCheckout[campo as keyof DatosCheckout]);
   };
 
@@ -382,13 +382,14 @@ export default function CheckoutPage() {
                 </div>
                 
                 <div>
-                  <label className="block text-xs sm:text-sm font-medium mb-1">Código postal</label>
+                  <label className="block text-xs sm:text-sm font-medium mb-1">Código postal *</label>
                   <Input
                     name="codigoPostal"
                     value={datosCheckout.codigoPostal}
                     onChange={handleInputChange}
                     placeholder="110111"
                     className="text-sm sm:text-base"
+                    required
                   />
                 </div>
                 

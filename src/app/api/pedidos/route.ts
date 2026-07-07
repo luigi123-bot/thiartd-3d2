@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { crearEnvioParaPedido } from "../../../../utils/envia";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 // Usar service_role key para bypass RLS policies
@@ -338,6 +339,13 @@ export async function PATCH(req: Request) {
         }
       } catch (emailErr) {
         console.error("❌ Error en envío automático de factura:", emailErr);
+      }
+
+      // Generar guía de envío automática con Envía
+      try {
+        await crearEnvioParaPedido(pedidoId);
+      } catch (enviaError) {
+        console.error("❌ [ENVIA] Error generando envío automático (PATCH):", enviaError);
       }
     }
 

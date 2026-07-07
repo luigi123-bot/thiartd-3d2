@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { NotificationService } from "~/lib/notificationService";
+import { crearEnvioParaPedido } from "../../../../utils/envia";
+import { sendShippingEmail } from "~/lib/email-service";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -102,7 +104,90 @@ export async function POST(req: Request) {
       // No devolvemos error porque el tracking se guardó correctamente
     }
 
-    return NextResponse.json({ success: true });
+    // 4. Si el estado es en_preparacion o en_envio y no hay tracking aún → generar guía con Envía
+    const estadosQueDisparan = ["en_preparacion", "en_envio", "pagado"];
+    let trackingGenerado: { numero_tracking?: string; empresa_envio?: string } | null = null;
+
+    if (estadosQueDisparan.includes(estado)) {
+      // Verificar si el pedido ya tiene número de tracking
+      const { data: pedidoActual } = await supabase
+        .from("pedidos")
+        .select("numero_tracking, empresa_envio, datos_contacto, ciudad_envio, fecha_estimada_entrega")
+        .eq("id", pedido_id)
+        .single<{
+          numero_tracking: string | null;
+          empresa_envio: string | null;
+          datos_contacto: string | null;
+          ciudad_envio: string | null;
+          fecha_estimada_entrega: string | null;
+        }>();
+
+      if (!pedidoActual?.numero_tracking) {
+        console.log(`[TRACKING] Disparando generación de guía Envía para pedido #${pedido_id} (estado: ${estado})`);
+        try {
+          await crearEnvioParaPedido(pedido_id);
+          console.log(`[TRACKING] ✅ Guía generada automáticamente para pedido #${pedido_id}`);
+
+          // Leer el pedido actualizado para obtener el tracking recién asignado
+          const { data: pedidoConGuia } = await supabase
+            .from("pedidos")
+            .select("numero_tracking, empresa_envio, datos_contacto, ciudad_envio, fecha_estimada_entrega")
+            .eq("id", pedido_id)
+            .single<{
+              numero_tracking: string | null;
+              empresa_envio: string | null;
+              datos_contacto: string | null;
+              ciudad_envio: string | null;
+              fecha_estimada_entrega: string | null;
+            }>();
+
+          if (pedidoConGuia?.numero_tracking) {
+            trackingGenerado = {
+              numero_tracking: pedidoConGuia.numero_tracking,
+              empresa_envio: pedidoConGuia.empresa_envio ?? undefined,
+            };
+
+            // Enviar email al cliente con la información de envío
+            try {
+              let contacto: { nombre?: string; email?: string } = {};
+              try {
+                if (pedidoConGuia.datos_contacto) {
+                  contacto = JSON.parse(pedidoConGuia.datos_contacto) as { nombre?: string; email?: string };
+                }
+              } catch { /* ignorar error de parsing */ }
+
+              if (contacto.email) {
+                await sendShippingEmail({
+                  to: contacto.email,
+                  nombreCliente: contacto.nombre ?? "Cliente",
+                  pedidoId: pedido_id,
+                  numeroTracking: pedidoConGuia.numero_tracking,
+                  empresaEnvio: pedidoConGuia.empresa_envio ?? "Transportista",
+                  ciudadDestino: pedidoConGuia.ciudad_envio ?? undefined,
+                  fechaEstimada: pedidoConGuia.fecha_estimada_entrega ?? undefined,
+                });
+                console.log(`[TRACKING] ✉️ Email de envío enviado a ${contacto.email} para pedido #${pedido_id}`);
+              } else {
+                console.warn(`[TRACKING] No se encontró email del cliente para pedido #${pedido_id}`);
+              }
+            } catch (emailErr) {
+              console.error(`[TRACKING] Error enviando email de envío:`, emailErr);
+            }
+          }
+        } catch (enviaErr) {
+          console.error(`[TRACKING] ❌ Error generando guía Envía para pedido #${pedido_id}:`, enviaErr);
+          // No interrumpimos el flujo — el tracking ya se guardó
+        }
+      } else {
+        console.log(`[TRACKING] Pedido #${pedido_id} ya tiene guía: ${pedidoActual.numero_tracking}. Omitiendo.`);
+        trackingGenerado = {
+          numero_tracking: pedidoActual.numero_tracking,
+          empresa_envio: pedidoActual.empresa_envio ?? undefined,
+        };
+      }
+    }
+
+    return NextResponse.json({ success: true, tracking_generado: trackingGenerado });
 
   } catch (error) {
     console.error("Error en POST /api/tracking:", error);

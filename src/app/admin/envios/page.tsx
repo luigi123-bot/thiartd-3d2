@@ -54,6 +54,14 @@ interface TrackingApiResponse {
   historial: HistorialEnvio[];
 }
 
+interface ActualizarTrackingResponse {
+  success?: boolean;
+  tracking_generado?: {
+    numero_tracking?: string;
+    empresa_envio?: string;
+  } | null;
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type IconType = React.ComponentType<any>;
 
@@ -195,10 +203,26 @@ export default function EnviosAdminPage() {
       });
 
       if (response.ok) {
-        toast({
-          title: "Tracking actualizado",
-          description: "El estado del envío ha sido actualizado correctamente"
-        });
+        const responseData = await response.json() as ActualizarTrackingResponse;
+
+        // Auto-rellenar campos con el tracking generado por Envía (si aplica)
+        if (responseData.tracking_generado?.numero_tracking) {
+          const tg = responseData.tracking_generado;
+          setFormTracking(prev => ({
+            ...prev,
+            numero_tracking: tg.numero_tracking ?? prev.numero_tracking,
+            empresa_envio: tg.empresa_envio ?? prev.empresa_envio,
+          }));
+          toast({
+            title: "✅ Guía generada automáticamente",
+            description: `Nº ${tg.numero_tracking ?? ''} vía ${tg.empresa_envio ?? ''} — Se notificó al cliente por email.`
+          });
+        } else {
+          toast({
+            title: "Tracking actualizado",
+            description: "El estado del envío ha sido actualizado correctamente"
+          });
+        }
 
         const { data } = await supabase
           .from("pedidos")

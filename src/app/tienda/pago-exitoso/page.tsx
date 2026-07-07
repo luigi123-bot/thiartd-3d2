@@ -11,6 +11,9 @@ interface EstadoPago {
   estado: string;
   payment_id?: string;
   mensaje: string;
+  numero_tracking?: string;
+  empresa_envio?: string;
+  pdf_guia_url?: string;
 }
 
 export default function PagoExitosoPage() {
@@ -74,7 +77,15 @@ export default function PagoExitosoPage() {
       const response = await fetch(`/api/pedidos?id=${pedido}`);
       if (!response.ok) throw new Error("Error al consultar pedido");
       
-      const data = await response.json() as { pedido?: { estado: string; payment_id?: string } };
+      const data = await response.json() as { 
+        pedido?: { 
+          estado: string; 
+          payment_id?: string;
+          numero_tracking?: string;
+          empresa_envio?: string;
+          pdf_guia_url?: string;
+        } 
+      };
       const pedidoData = data.pedido;
       
       if (!pedidoData) throw new Error("Pedido no encontrado");
@@ -104,7 +115,10 @@ export default function PagoExitosoPage() {
       setEstadoPago({
         estado: displayStatus,
         payment_id: pedidoData.payment_id ?? paymentId,
-        mensaje
+        mensaje,
+        numero_tracking: pedidoData.numero_tracking,
+        empresa_envio: pedidoData.empresa_envio,
+        pdf_guia_url: pedidoData.pdf_guia_url
       });
       
       // Polling si sigue pendiente
@@ -235,11 +249,29 @@ export default function PagoExitosoPage() {
             {pedidoId && (
               <div>
                 <h2 className="text-sm sm:text-base md:text-lg font-semibold mb-2">Número de pedido</h2>
-                <div className="inline-block">
+                <div className="inline-block mb-4">
                   <span className="text-lg sm:text-xl md:text-2xl font-mono bg-gray-100 py-2 px-4 sm:py-3 sm:px-6 rounded-lg border">
                     #{pedidoId}
                   </span>
                 </div>
+              </div>
+            )}
+
+            {estadoPago?.numero_tracking && (
+              <div className="mt-2 p-5 bg-teal-50/50 border border-teal-100 rounded-2xl max-w-md mx-auto space-y-3">
+                <div className="text-sm font-black text-teal-800 uppercase tracking-widest leading-none">
+                  🚚 Guía de Envío Generada
+                </div>
+                <div className="text-xs font-semibold text-slate-600">
+                  Paquetería: <span className="uppercase font-bold text-slate-800">{estadoPago.empresa_envio}</span> | Guía: <span className="font-bold text-slate-800">{estadoPago.numero_tracking}</span>
+                </div>
+                {estadoPago.pdf_guia_url && (
+                  <Button asChild size="sm" className="bg-[#00a19a] hover:bg-[#008f89] text-white font-bold h-9 px-4 rounded-lg shadow-md">
+                    <a href={estadoPago.pdf_guia_url} target="_blank" rel="noopener noreferrer">
+                      Descargar Etiqueta de Envío (PDF)
+                    </a>
+                  </Button>
+                )}
               </div>
             )}
           </div>

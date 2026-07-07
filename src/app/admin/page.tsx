@@ -4,7 +4,7 @@ import { Card } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { 
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter 
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter 
 } from "~/components/ui/dialog";
 import { createClient } from "@supabase/supabase-js";
 import {
@@ -14,7 +14,7 @@ import { motion } from "framer-motion";
 import { 
   TrendingUp, Users, Package, 
   MessageSquare, Bell, Download, FileText, 
-  Activity, DollarSign, Wallet, ArrowUpRight, Mail, Settings2
+  Activity, DollarSign, Wallet, ArrowUpRight, Mail
 } from "lucide-react";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
@@ -63,7 +63,9 @@ export default function AdminDashboardPage() {
   const [usuariosPorMes, setUsuariosPorMes] = useState<UsuarioPorMes[]>([]);
   const [generandoReporte, setGenerandoReporte] = useState(false);
   const [managerEmail, setManagerEmail] = useState("");
-  const [openConfig, setOpenConfig] = useState(false);
+  const [tempEmail, setTempEmail] = useState("");
+  const [saveAsDefault, setSaveAsDefault] = useState(false);
+  const [reportModalOpen, setReportModalOpen] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
@@ -132,44 +134,45 @@ export default function AdminDashboardPage() {
       .then(r => r.json())
       .then((d: unknown) => {
         const data = d as { valor?: string };
-        setManagerEmail(data.valor ?? "");
+        const val = data.valor ?? "";
+        setManagerEmail(val);
+        setTempEmail(val);
       })
       .catch(console.error);
   }, []);
 
-  const handleUpdateEmail = async () => {
-    try {
-      const resp = await fetch("/api/admin/configuraciones", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ valor: managerEmail })
-      });
-      if (resp.ok) {
-        alert("✅ Correo del gerente configurado correctamente.");
-        setOpenConfig(false);
-      } else {
-        alert("❌ Error al guardar la configuración.");
-      }
-    } catch (e) {
-      console.error(e);
-      alert("❌ Error de comunicación.");
-    }
+  const openSendReportDialog = () => {
+    setTempEmail(managerEmail);
+    setSaveAsDefault(false);
+    setReportModalOpen(true);
   };
 
   const handleGenerarReporte = async () => {
-    if (!managerEmail) {
-      setOpenConfig(true);
+    if (!tempEmail.trim()) {
+      alert("Por favor introduce un correo válido.");
       return;
     }
     setGenerandoReporte(true);
     try {
+      // 1. Guardar como predeterminado si aplica
+      if (saveAsDefault && tempEmail !== managerEmail) {
+        await fetch("/api/admin/configuraciones", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ valor: tempEmail })
+        });
+        setManagerEmail(tempEmail);
+      }
+
+      // 2. Enviar reporte
       const resp = await fetch("/api/admin/reporte-gerencial", { 
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ managerEmail }) 
+        body: JSON.stringify({ managerEmail: tempEmail }) 
       });
       if (resp.ok) {
-        alert(`📊 Reporte enviado exitosamente a: ${managerEmail}`);
+        alert(`📊 Reporte enviado exitosamente a: ${tempEmail}`);
+        setReportModalOpen(false);
       } else {
         const d = (await resp.json()) as { error?: string };
         alert(d.error ?? "Error al procesar el reporte.");
@@ -223,52 +226,73 @@ export default function AdminDashboardPage() {
               Exportar CSV
             </Button>
             
-            <div className="flex items-center">
+            <Dialog open={reportModalOpen} onOpenChange={setReportModalOpen}>
               <Button 
-                onClick={handleGenerarReporte}
-                disabled={generandoReporte}
-                className="h-12 px-6 rounded-l-xl bg-slate-900 text-white font-bold shadow-xl hover:bg-slate-800 transition-all flex items-center gap-2 border-r border-slate-700"
+                onClick={openSendReportDialog}
+                className="h-12 px-6 rounded-xl bg-slate-900 text-white font-bold shadow-xl hover:bg-slate-800 transition-all flex items-center gap-2"
               >
-                {generandoReporte ? (
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                ) : (
-                  <FileText className="w-4 h-4" />
-                )}
-                {generandoReporte ? "Generando..." : "Enviar Reporte"}
+                <FileText className="w-4 h-4" />
+                Enviar Reporte
               </Button>
-              
-              <Dialog open={openConfig} onOpenChange={setOpenConfig}>
-                <DialogTrigger asChild>
-                  <Button className="h-12 px-3 rounded-r-xl bg-slate-900 text-white hover:bg-slate-800 transition-all border-l border-slate-700">
-                    <Settings2 className="w-4 h-4" />
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <Mail className="w-5 h-5 text-[#00a19a]" />
+                    Enviar Reporte por Correo
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="py-4 space-y-4">
+                  <p className="text-sm text-slate-500">
+                    Introduce el correo electrónico destinatario para recibir el informe ejecutivo del sistema.
+                  </p>
+                  <Input 
+                    type="email"
+                    placeholder="correo@gerente.com" 
+                    value={tempEmail}
+                    onChange={(e) => setTempEmail(e.target.value)}
+                    className="h-11 rounded-lg"
+                  />
+
+                  {/* Opción de guardar como predeterminado (si cambió del actual) */}
+                  {tempEmail.trim() !== managerEmail && (
+                    <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
+                      <input 
+                        type="checkbox" 
+                        id="saveDefaultReportEmail" 
+                        checked={saveAsDefault} 
+                        onChange={(e) => setSaveAsDefault(e.target.checked)}
+                        className="w-4 h-4 rounded border-slate-350 text-[#00a19a] focus:ring-[#00a19a]"
+                      />
+                      <label htmlFor="saveDefaultReportEmail" className="text-xs font-bold text-slate-650 cursor-pointer select-none">
+                        Guardar como destinatario predeterminado
+                      </label>
+                    </div>
+                  )}
+                </div>
+                <DialogFooter>
+                  <Button 
+                    variant="outline"
+                    className="rounded-lg h-11"
+                    onClick={() => setReportModalOpen(false)}
+                    disabled={generandoReporte}
+                  >
+                    Cancelar
                   </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-[425px]">
-                  <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2">
-                      <Mail className="w-5 h-5 text-[#00a19a]" />
-                      Configurar Destinatario
-                    </DialogTitle>
-                  </DialogHeader>
-                  <div className="py-4 space-y-4">
-                    <p className="text-sm text-slate-500">
-                      Introduce el correo electrónico del gerente para recibir los informes ejecutivos.
-                    </p>
-                    <Input 
-                      placeholder="correo@gerente.com" 
-                      value={managerEmail}
-                      onChange={(e) => setManagerEmail(e.target.value)}
-                      className="h-11 rounded-lg"
-                    />
-                  </div>
-                  <DialogFooter>
-                    <Button onClick={handleUpdateEmail} className="bg-[#00a19a] hover:bg-[#007973] font-bold">
-                      Guardar Cambios
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-            </div>
+                  <Button 
+                    onClick={handleGenerarReporte} 
+                    disabled={generandoReporte || !tempEmail.trim()}
+                    className="bg-[#00a19a] hover:bg-[#007973] font-bold rounded-lg h-11 flex items-center gap-2 text-white"
+                  >
+                    {generandoReporte ? (
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      <FileText className="w-4 h-4" />
+                    )}
+                    {generandoReporte ? "Enviando..." : "Enviar Reporte"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
 

@@ -7,7 +7,6 @@ import { CreateUserModal } from "~/components/CreateUserModal";
 import { 
   Users, 
   UserPlus, 
-  RefreshCw, 
   Search, 
   ShieldCheck, 
   UserCheck, 
@@ -84,10 +83,32 @@ export default function AdminUsuariosPage() {
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [syncing, setSyncing] = useState(false);
+  const [resendingId, setResendingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [roles, setRoles] = useState<{ id: string, label: string }[]>([]);
+
+  const reenviarCredenciales = async (id: string) => {
+    if (!confirm("¿Deseas generar una nueva contraseña temporal y reenviar las credenciales a este usuario?")) return;
+    setResendingId(id);
+    try {
+      const res = await fetch("/api/usuarios/reenviar-credenciales", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      if (res.ok) {
+        alert("Credenciales reenviadas con éxito.");
+      } else {
+        const data = await res.json() as { error?: string };
+        alert(data.error ?? "Error al reenviar las credenciales");
+      }
+    } catch {
+      alert("Error de red al reenviar credenciales");
+    } finally {
+      setResendingId(null);
+    }
+  };
 
   const deleteUsuario = async (id: string) => {
     if (!confirm("¿Estás seguro de que deseas eliminar este usuario?")) return;
@@ -118,18 +139,6 @@ export default function AdminUsuariosPage() {
     }
     setLoading(false);
   }, []);
-
-  const syncClerkUsuarios = async () => {
-    setSyncing(true);
-    try {
-      await fetch("/api/usuarios/clerk-usuarios");
-      await fetchUsuarios();
-    } catch (error) {
-      console.error("Error syncing users:", error);
-    } finally {
-      setSyncing(false);
-    }
-  };
 
   const fetchRoles = useCallback(async () => {
     try {
@@ -229,15 +238,6 @@ export default function AdminUsuariosPage() {
             >
               <UserPlus className="w-5 h-5 mr-3" />
               Nuevo Usuario
-            </Button>
-            <Button 
-              onClick={syncClerkUsuarios}
-              disabled={syncing}
-              variant="outline"
-              className="h-14 px-8 border-2 border-slate-100 hover:border-slate-900 text-slate-900 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl bg-white"
-            >
-              <RefreshCw className={`w-5 h-5 mr-3 ${syncing ? 'animate-spin' : ''}`} />
-              Sincronizar
             </Button>
           </div>
         </div>
@@ -411,6 +411,17 @@ export default function AdminUsuariosPage() {
                                 title="Ver detalles"
                               >
                                 <MoreVertical className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                onClick={() => u.id && void reenviarCredenciales(u.id)}
+                                disabled={resendingId === u.id}
+                                className="h-10 w-10 p-0 border-2 border-teal-50 hover:border-teal-500 hover:bg-teal-50 text-teal-600 rounded-xl transition-all"
+                                title="Reenviar credenciales"
+                              >
+                                {resendingId === u.id
+                                  ? <span className="w-4 h-4 border-2 border-teal-400 border-t-transparent rounded-full animate-spin inline-block" />
+                                  : <Mail className="w-4 h-4" />}
                               </Button>
                               <Button
                                 variant="outline"

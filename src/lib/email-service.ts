@@ -944,3 +944,164 @@ export async function sendManagerReportEmail(params: ManagerReportParams) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EMAIL DE ENVÍO / GUÍA GENERADA
+// ─────────────────────────────────────────────────────────────────────────────
+export interface SendShippingEmailParams {
+  to: string;
+  nombreCliente: string;
+  pedidoId: number;
+  numeroTracking: string;
+  empresaEnvio: string;
+  ciudadDestino?: string;
+  fechaEstimada?: string;
+}
+
+export async function sendShippingEmail(
+  params: SendShippingEmailParams
+): Promise<{ success: true; data: SentMessageInfo } | { success: false; error: string }> {
+  const { to, nombreCliente, pedidoId, numeroTracking, empresaEnvio, ciudadDestino, fechaEstimada } = params;
+
+  const trackingUrl = `https://thiart3d.com/tienda/tracking/${pedidoId}`;
+
+  const fechaFormateada = fechaEstimada
+    ? new Date(fechaEstimada).toLocaleDateString("es-CO", {
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+      })
+    : null;
+
+  const html = `
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tu pedido está en camino - Thiart 3D</title>
+</head>
+<body style="margin:0; padding:0; background-color:#f8fafc; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f8fafc; padding: 40px 16px;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px; width:100%;">
+
+          <!-- HEADER -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); border-radius: 20px 20px 0 0; padding: 40px 48px; text-align: center;">
+              <div style="font-size: 28px; font-weight: 900; color: #ffffff; letter-spacing: -1px; margin-bottom: 4px;">
+                Thiart<span style="color: #14b8a6;">3D</span>
+              </div>
+              <div style="font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 3px; font-weight: 700;">
+                Impresión 3D Premium
+              </div>
+              <div style="margin-top: 28px; background: rgba(20, 184, 166, 0.1); border: 1px solid rgba(20, 184, 166, 0.3); border-radius: 50px; display: inline-block; padding: 10px 24px;">
+                <span style="color: #14b8a6; font-size: 13px; font-weight: 800; letter-spacing: 1px;">🚚 TU PEDIDO ESTÁ EN CAMINO</span>
+              </div>
+            </td>
+          </tr>
+
+          <!-- BODY -->
+          <tr>
+            <td style="background: #ffffff; padding: 40px 48px;">
+              <p style="font-size: 22px; font-weight: 900; color: #0f172a; margin: 0 0 8px 0; letter-spacing: -0.5px;">
+                ¡${nombreCliente}, tu pedido fue despachado! 📦
+              </p>
+              <p style="font-size: 15px; color: #475569; margin: 0 0 32px 0; line-height: 1.6;">
+                Tu pedido <strong>#${pedidoId}</strong> ya salió de nuestras instalaciones. 
+                Puedes rastrear tu envío en cualquier momento usando el número de guía.
+              </p>
+
+              <!-- TRACKING CARD -->
+              <table width="100%" cellpadding="0" cellspacing="0" style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); border-radius: 20px; margin-bottom: 32px; overflow: hidden;">
+                <tr>
+                  <td style="padding: 32px 36px; text-align: center;">
+                    <p style="font-size: 11px; font-weight: 800; color: #14b8a6; margin: 0 0 12px 0; text-transform: uppercase; letter-spacing: 3px;">Número de Guía</p>
+                    <p style="font-size: 32px; font-weight: 900; color: #ffffff; margin: 0 0 8px 0; font-family: 'Courier New', monospace; letter-spacing: 3px;">${numeroTracking}</p>
+                    <p style="font-size: 13px; color: #64748b; margin: 0; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">via ${empresaEnvio}</p>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- DETALLES -->
+              <table width="100%" cellpadding="0" cellspacing="0" style="background: #f8fafc; border-radius: 16px; margin-bottom: 32px; overflow: hidden;">
+                <tr>
+                  <td style="padding: 20px 24px; border-bottom: 1px solid #e2e8f0;">
+                    <span style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 2px; color: #94a3b8;">Detalles del Envío</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 20px 24px;">
+                    <table width="100%" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td style="padding: 8px 0;"><span style="font-size: 13px; color: #64748b;">Pedido</span></td>
+                        <td style="padding: 8px 0; text-align: right;"><span style="font-size: 13px; font-weight: 800; color: #0f172a;">#${pedidoId}</span></td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 8px 0;"><span style="font-size: 13px; color: #64748b;">Transportista</span></td>
+                        <td style="padding: 8px 0; text-align: right;"><span style="font-size: 13px; font-weight: 800; color: #0f172a;">${empresaEnvio}</span></td>
+                      </tr>
+                      ${ciudadDestino ? `
+                      <tr>
+                        <td style="padding: 8px 0;"><span style="font-size: 13px; color: #64748b;">Destino</span></td>
+                        <td style="padding: 8px 0; text-align: right;"><span style="font-size: 13px; font-weight: 800; color: #0f172a;">${ciudadDestino}</span></td>
+                      </tr>` : ""}
+                      ${fechaFormateada ? `
+                      <tr>
+                        <td style="padding: 8px 0;"><span style="font-size: 13px; color: #64748b;">Entrega estimada</span></td>
+                        <td style="padding: 8px 0; text-align: right;"><span style="font-size: 13px; font-weight: 800; color: #14b8a6;">${fechaFormateada}</span></td>
+                      </tr>` : ""}
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- CTA -->
+              <div style="text-align: center; margin-bottom: 32px;">
+                <a href="${trackingUrl}" style="background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%); color: #ffffff; padding: 18px 40px; border-radius: 14px; text-decoration: none; font-weight: 800; display: inline-block; font-size: 15px; box-shadow: 0 10px 20px rgba(20,184,166,0.25); letter-spacing: 0.5px;">
+                  📍 VER RASTREO EN TIEMPO REAL
+                </a>
+              </div>
+
+              <p style="font-size: 13px; color: #94a3b8; text-align: center; margin: 0;">
+                ¿Tienes preguntas? Escríbenos a <a href="mailto:thiart3d@gmail.com" style="color: #14b8a6; text-decoration: none; font-weight: 700;">thiart3d@gmail.com</a>
+              </p>
+            </td>
+          </tr>
+
+          <!-- FOOTER -->
+          <tr>
+            <td style="background: #f1f5f9; border-radius: 0 0 20px 20px; padding: 24px 48px; text-align: center; border-top: 1px solid #e2e8f0;">
+              <p style="margin: 0; font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: 2px; font-weight: 700;">
+                Thiart3D · Impresión 3D Premium
+              </p>
+              <p style="margin: 8px 0 0 0; font-size: 11px; color: #cbd5e1;">
+                © 2025 Thiart 3D - Todos los derechos reservados
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `;
+
+  try {
+    const transporter = createTransporter();
+    const info = await transporter.sendMail({
+      from: `"Thiart 3D" <${process.env.GMAIL_USER}>`,
+      to,
+      subject: `🚚 Tu pedido #${pedidoId} está en camino – Thiart 3D`,
+      html,
+    });
+    console.log('✅ Email de envío enviado:', (info as { messageId?: string }).messageId);
+    return { success: true, data: info };
+  } catch (err: unknown) {
+    console.error('❌ Error en sendShippingEmail:', err);
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}

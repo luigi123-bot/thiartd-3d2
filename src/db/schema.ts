@@ -90,6 +90,7 @@ export const pedidos = pgTable("public.pedidos", {
   // Tracking de envío
   numero_tracking: varchar("numero_tracking", { length: 100 }),
   empresa_envio: varchar("empresa_envio", { length: 50 }),
+  pdf_guia_url: text("pdf_guia_url"),
   fecha_estimada_entrega: timestamp("fecha_estimada_entrega", { withTimezone: true }),
   fecha_real_entrega: timestamp("fecha_real_entrega", { withTimezone: true }),
   created_at: timestamp("created_at", { withTimezone: true }).defaultNow(),

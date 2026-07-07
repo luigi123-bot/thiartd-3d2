@@ -57,6 +57,9 @@ interface Pedido {
   notas_envio?: string;
   payment_id?: string;
   payment_method?: string;
+  numero_tracking?: string;
+  empresa_envio?: string;
+  pdf_guia_url?: string;
 }
 
 interface DetallePedidoModalProps {
@@ -295,6 +298,24 @@ export function DetallePedidoModal({
                   <GlassCard label="Entrega" value={pedido.direccion_envio} icon={MapPin as React.ComponentType<IconProps>} theme="emerald" />
                   <GlassCard label="Teléfono" value={pedido.telefono_envio} icon={Phone as React.ComponentType<IconProps>} theme="amber" />
                 </div>
+
+                {pedido.numero_tracking && (
+                  <div className="p-6 rounded-[24px] bg-teal-50/50 border border-teal-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 relative overflow-hidden group">
+                    <div className="space-y-1">
+                      <span className="text-[9px] font-black text-teal-600 uppercase tracking-widest block">Guía de Envío (Envía)</span>
+                      <div className="text-base font-black text-slate-800">
+                        {pedido.numero_tracking} <span className="text-xs text-slate-400 font-bold uppercase ml-2">({pedido.empresa_envio})</span>
+                      </div>
+                    </div>
+                    {pedido.pdf_guia_url && (
+                      <Button asChild size="sm" className="bg-[#00a19a] hover:bg-[#008f89] text-white font-bold h-10 px-5 rounded-xl shrink-0">
+                        <a href={pedido.pdf_guia_url} target="_blank" rel="noopener noreferrer">
+                          Ver Etiqueta PDF
+                        </a>
+                      </Button>
+                    )}
+                  </div>
+                )}
 
                 <div className="p-6 sm:p-8 rounded-[24px] bg-white border border-slate-200/60 shadow-sm relative overflow-hidden group">
                   <div className="absolute top-0 right-0 p-6 opacity-[0.02] group-hover:scale-110 transition-transform">

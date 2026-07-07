@@ -109,10 +109,15 @@ export default function AdminPedidosPage() {
   const [detallePedido, setDetallePedido] = useState<Pedido | null>(null);
   const [procesandoPago, setProcesandoPago] = useState<number | null>(null);
   const [filtroEstado, setFiltroEstado] = useState<string>("todos");
+  const [currentPage, setCurrentPage] = useState(1);
 
   const [generandoReporte, setGenerandoReporte] = useState(false);
   const [managerEmail, setManagerEmail] = useState("");
   const [openConfig, setOpenConfig] = useState(false);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filtroEstado]);
 
   const fetchPedidos = async () => {
     const { data, error } = await supabase
@@ -212,6 +217,10 @@ export default function AdminPedidosPage() {
   const filteredPedidos = filtroEstado === "todos"
     ? pedidos
     : pedidos.filter(p => p.estado === filtroEstado);
+
+  const ITEMS_PER_PAGE = 8;
+  const totalPages = Math.ceil(filteredPedidos.length / ITEMS_PER_PAGE);
+  const paginatedPedidos = filteredPedidos.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
   // Calcular estadísticas
   const totalIngresos = pedidos
@@ -370,7 +379,7 @@ export default function AdminPedidosPage() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 <AnimatePresence>
-                  {filteredPedidos.map((p, idx) => {
+                  {paginatedPedidos.map((p, idx) => {
                     const datosContacto = (typeof p.datos_contacto === "string"
                       ? JSON.parse(p.datos_contacto)
                       : p.datos_contacto) as unknown as DatosContacto || {};
@@ -472,6 +481,45 @@ export default function AdminPedidosPage() {
               </tbody>
             </table>
           </div>
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="px-10 py-6 border-t border-slate-100 flex items-center justify-between bg-slate-50/20">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                className="h-10 px-4 rounded-xl text-xs font-bold border-slate-200"
+              >
+                Anterior
+              </Button>
+              <div className="flex items-center gap-1.5">
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                  <button
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                    className={`w-9 h-9 rounded-xl text-xs font-black transition-all ${
+                      currentPage === page
+                        ? "bg-slate-900 text-white shadow-md scale-105"
+                        : "bg-white text-slate-500 border border-slate-200 hover:border-slate-900"
+                    }`}
+                  >
+                    {page}
+                  </button>
+                ))}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+                className="h-10 px-4 rounded-xl text-xs font-bold border-slate-200"
+              >
+                Siguiente
+              </Button>
+            </div>
+          )}
         </Card>
       </div>
 

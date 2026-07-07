@@ -8,7 +8,7 @@ import UsuariosAdminModal from "~/components/UsuariosAdminModal";
 import { useUser } from "@clerk/nextjs";
 import { supabase } from "~/lib/supabaseClient";
 import { motion } from "framer-motion";
-import { FiStar, FiArrowRight, FiShield } from "react-icons/fi";
+import { FiStar, FiArrowRight, FiShield, FiBriefcase, FiUser, FiCheck } from "react-icons/fi";
 import Link from "next/link";
 
 const TopbarTienda = dynamic(() => import("./tienda/componentes/TopbarTienda"), { ssr: false });
@@ -80,10 +80,11 @@ export default function Home() {
                         </span>
                         <h1 className="text-4xl sm:text-6xl md:text-7xl lg:text-[5rem] font-black text-white leading-[1.05] tracking-tight mb-6 drop-shadow-xl">
                             Imprimiendo <br />
-                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-200 to-[#00a19a] filter brightness-125 saturate-150">tus ideas</span>
+                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-200 to-[#00a19a] filter brightness-125 saturate-150">tus ideas</span> <br />
+                            <span className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-teal-100 block mt-2 opacity-95">con un impacto sostenible.</span>
                         </h1>
                         <p className="text-base sm:text-lg md:text-xl text-teal-50/90 mb-10 max-w-xl mx-auto lg:mx-0 font-medium leading-relaxed">
-                            Descubre figuras personalizadas, repuestos y arte tridimensional con una calidad excepcional y precisión en cada capa.
+                            En THIART 3D transformamos botellas plásticas recicladas en piezas 3D únicas para marcas y personas que quieren diseño con propósito.
                         </p>
                         <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
                             <Link 
@@ -129,12 +130,7 @@ export default function Home() {
                     </motion.div>
                 </div>
                 
-                {/* Bottom Wave Divider */}
-                <div className="absolute bottom-0 left-0 right-0 w-full overflow-hidden leading-[0] z-20">
-                    <svg className="relative block w-full h-[60px] lg:h-[120px]" viewBox="0 0 1200 120" preserveAspectRatio="none">
-                        <path d="M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V120H0V95.8C59.71,118,130.68,124.93,196.5,115.2,240.24,108.76,281.33,83.87,321.39,56.44Z" fill="#f8fafc"></path>
-                    </svg>
-                </div>
+
             </section>
 
 			{/* Categorías */}
@@ -173,6 +169,107 @@ export default function Home() {
 							<p className="text-sm font-medium text-slate-500 leading-relaxed">{cat.desc}</p>
 						</motion.div>
 					))}
+				</div>
+			</section>
+
+			{/* Sección: ¿Para quién es THIART 3D? */}
+			<section className="bg-white py-20 md:py-28 relative z-10">
+				<div className="max-w-7xl mx-auto px-6 lg:px-12">
+					<div className="text-center mb-16 max-w-3xl mx-auto">
+						<motion.h2 
+							initial={{ opacity: 0, y: 20 }}
+							whileInView={{ opacity: 1, y: 0 }}
+							viewport={{ once: true }}
+							className="text-4xl sm:text-5xl font-black text-slate-900 tracking-tight mb-4"
+						>
+							¿Para quién es <span className="text-[#00a19a]">THIART 3D?</span>
+						</motion.h2>
+						<motion.p 
+							initial={{ opacity: 0, y: 20 }}
+							whileInView={{ opacity: 1, y: 0 }}
+							viewport={{ once: true }}
+							transition={{ delay: 0.1 }}
+							className="text-lg text-slate-500 font-medium leading-relaxed"
+						>
+							Creamos piezas 3D sostenibles tanto para empresas como para personas que valoran el diseño con propósito.
+						</motion.p>
+					</div>
+
+					<div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12">
+						{/* Card 1: Marcas y Empresas */}
+						<motion.div 
+							initial={{ opacity: 0, x: -30 }}
+							whileInView={{ opacity: 1, x: 0 }}
+							viewport={{ once: true }}
+							transition={{ duration: 0.6 }}
+							whileHover={{ y: -6 }}
+							className="bg-slate-50/50 hover:bg-slate-50 border border-slate-100/80 rounded-[2.5rem] p-8 md:p-10 shadow-lg shadow-slate-100/50 hover:shadow-xl transition-all duration-300 flex flex-col justify-between"
+						>
+							<div className="space-y-6">
+								<div className="w-14 h-14 bg-teal-50 text-[#00a19a] rounded-2xl flex items-center justify-center shadow-inner">
+									<FiBriefcase className="w-6 h-6" />
+								</div>
+								<div className="space-y-3">
+									<h3 className="text-2xl font-black text-slate-900">Marcas y empresas</h3>
+									<p className="text-sm font-medium text-slate-500 leading-relaxed">
+										Ideal para marcas con propósito, emprendimientos sostenibles y empresas que buscan merchandising y piezas 3D que cuenten una historia de impacto ambiental.
+									</p>
+								</div>
+								
+								<div className="space-y-3 pt-2">
+									{[
+										"Merchandising sostenible y diferente.",
+										"Trofeos y reconocimientos ecológicos.",
+										"Prototipos y piezas 3D funcionales."
+									].map((item, idx) => (
+										<div key={idx} className="flex items-center gap-3">
+											<div className="w-5 h-5 rounded-full bg-teal-50 border border-teal-100 flex items-center justify-center shrink-0">
+												<FiCheck className="w-3.5 h-3.5 text-[#00a19a] stroke-[3]" />
+											</div>
+											<span className="text-sm font-bold text-slate-700">{item}</span>
+										</div>
+									))}
+								</div>
+							</div>
+						</motion.div>
+
+						{/* Card 2: Personas y Creadores */}
+						<motion.div 
+							initial={{ opacity: 0, x: 30 }}
+							whileInView={{ opacity: 1, x: 0 }}
+							viewport={{ once: true }}
+							transition={{ duration: 0.6 }}
+							whileHover={{ y: -6 }}
+							className="bg-slate-50/50 hover:bg-slate-50 border border-slate-100/80 rounded-[2.5rem] p-8 md:p-10 shadow-lg shadow-slate-100/50 hover:shadow-xl transition-all duration-300 flex flex-col justify-between"
+						>
+							<div className="space-y-6">
+								<div className="w-14 h-14 bg-teal-50 text-[#00a19a] rounded-2xl flex items-center justify-center shadow-inner">
+									<FiUser className="w-6 h-6" />
+								</div>
+								<div className="space-y-3">
+									<h3 className="text-2xl font-black text-slate-900">Personas y creadores</h3>
+									<p className="text-sm font-medium text-slate-500 leading-relaxed">
+										Perfecto para quienes quieren decoración única, regalos personalizados y piezas 3D creativas hechas a partir de botellas recicladas.
+									</p>
+								</div>
+								
+								<div className="space-y-3 pt-2">
+									{[
+										"Decoración para hogar y oficina.",
+										"Regalos personalizados con historia.",
+										"Figuras y piezas 3D creativas."
+									].map((item, idx) => (
+										<div key={idx} className="flex items-center gap-3">
+											<div className="w-5 h-5 rounded-full bg-teal-50 border border-teal-100 flex items-center justify-center shrink-0">
+												<FiCheck className="w-3.5 h-3.5 text-[#00a19a] stroke-[3]" />
+											</div>
+											<span className="text-sm font-bold text-slate-700">{item}</span>
+										</div>
+									))}
+								</div>
+							</div>
+						</motion.div>
+					</div>
 				</div>
 			</section>
 

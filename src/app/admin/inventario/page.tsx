@@ -6,7 +6,8 @@ import { createClient } from "@supabase/supabase-js";
 import Loader from "~/components/providers/UiProvider";
 import CreateProductModal from "~/components/CreateProductModal";
 import AjustarInventarioModal from "./AjustarInventarioModal";
-import { FiSettings, FiEdit2, FiEye, FiStar } from "react-icons/fi";
+import ConfiguracionModal from "~/components/ConfiguracionModal";
+import { FiSettings, FiEdit2, FiEye, FiStar, FiTrash2 } from "react-icons/fi";
 import { Star, BadgeDollarSign } from "lucide-react";
 import clsx from "clsx";
 import { ProductDetailModal } from "~/components/ProductDetailModal";
@@ -49,6 +50,8 @@ export default function AdminInventarioPage() {
 	const [modalDetalle, setModalDetalle] = useState<Producto | null>(null);
 	const [ajustarProducto, setAjustarProducto] = useState<Producto | null>(null);
 	const [destacando, setDestacando] = useState<string | number | null>(null);
+	const [urlPopupProduct, setUrlPopupProduct] = useState<Producto | null>(null);
+	const [configModalOpen, setConfigModalOpen] = useState(false);
 
 	// Métricas
 	const totalProductos = productos.length;
@@ -214,6 +217,14 @@ export default function AdminInventarioPage() {
 							<option value="stock">Stock</option>
 							<option value="precio">Precio</option>
 						</select>
+						<Button 
+							onClick={() => setConfigModalOpen(true)}
+							variant="outline" 
+							className="h-10 w-10 p-0 rounded-full border border-slate-200 hover:border-slate-900 bg-white text-slate-900 flex items-center justify-center shrink-0 shadow-sm"
+							title="Configuración de Parámetros"
+						>
+							<FiSettings className="w-5 h-5 animate-hover-spin" />
+						</Button>
 						<Button onClick={() => setModalOpen(true)} className="rounded-full font-semibold">
 							Nuevo producto
 						</Button>
@@ -297,10 +308,10 @@ export default function AdminInventarioPage() {
 										<Button
 											size="sm"
 											variant="outline"
-											className="rounded-full text-xs px-3 flex items-center gap-1"
-											onClick={() => setAjustarProducto(producto)}
+											className="rounded-full text-xs px-3 flex items-center gap-1 bg-red-50 hover:bg-red-100 text-red-600 border-red-200"
+											onClick={() => setDeleteProduct(producto)}
 										>
-											<FiSettings className="w-4 h-4" /> Ajustar
+											<FiTrash2 className="w-4 h-4" /> Eliminar
 										</Button>
 										<Button
 											size="sm"
@@ -319,15 +330,15 @@ export default function AdminInventarioPage() {
 											{producto.destacado ? "Recomendado" : "Destacar"}
 										</Button>
 									</div>
-									{/* Botón Ver más */}
+									{/* Botón Visualizar */}
 									<div className="w-full flex justify-center mt-2">
 										<Button
 											size="sm"
 											variant="ghost"
-											className="rounded-full text-xs px-3 flex items-center gap-1"
-											onClick={() => setModalDetalle(producto)}
+											className="rounded-full text-xs px-3 flex items-center gap-1 text-[#00a19a] hover:text-[#007973] hover:bg-teal-50"
+											onClick={() => setUrlPopupProduct(producto)}
 										>
-											<FiEye className="w-4 h-4" /> Ver más
+											<FiEye className="w-4 h-4" /> Visualizar
 										</Button>
 									</div>
 								</div>
@@ -441,6 +452,48 @@ export default function AdminInventarioPage() {
 					producto={modalDetalle}
 					getStockColor={getStockColor}
 				/>
+				{/* Modal Visualizar Producto */}
+				<Dialog open={!!urlPopupProduct} onOpenChange={(v) => { if (!v) setUrlPopupProduct(null); }}>
+					<DialogContent className="rounded-3xl max-w-4xl h-[85vh] flex flex-col p-6 bg-slate-50">
+						<DialogHeader className="flex flex-row justify-between items-center pr-8">
+							<div>
+								<DialogTitle className="text-xl font-bold">Visualización del Producto</DialogTitle>
+								<p className="text-xs text-gray-400">Previsualización interactiva de la tienda pública</p>
+							</div>
+							{urlPopupProduct && (
+								<Button
+									size="sm"
+									variant="outline"
+									className="rounded-xl px-4 ml-auto"
+									onClick={() => {
+										const url = `${window.location.origin}/tienda/productos/${urlPopupProduct.id}`;
+										void navigator.clipboard.writeText(url);
+										alert("¡Enlace copiado al portapapeles!");
+									}}
+								>
+									Copiar Enlace
+								</Button>
+							)}
+						</DialogHeader>
+						<div className="flex-1 w-full bg-white rounded-2xl overflow-hidden shadow-inner border border-slate-100 mt-2">
+							{urlPopupProduct && (
+								<iframe
+									src={`${window.location.origin}/tienda/productos/${urlPopupProduct.id}`}
+									className="w-full h-full border-0"
+									title="Visualización de Producto"
+								/>
+							)}
+						</div>
+						<DialogFooter className="mt-4">
+							<Button variant="secondary" className="rounded-xl" onClick={() => setUrlPopupProduct(null)}>
+								Cerrar Vista
+							</Button>
+						</DialogFooter>
+					</DialogContent>
+				</Dialog>
+
+				{/* Modal Configuraciones */}
+				<ConfiguracionModal open={configModalOpen} onOpenChange={setConfigModalOpen} />
 				{/* Animaciones */}
 				<style jsx global>{`
 					.animate-fade-in {

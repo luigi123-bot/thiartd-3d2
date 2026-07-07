@@ -3,12 +3,29 @@ import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { Card } from "~/components/ui/card";
 import { Package, Truck, MapPin, CheckCircle, AlertTriangle } from "lucide-react";
-
 import { createClient } from "@supabase/supabase-js";
+import clsx from "clsx";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
 const supabase = createClient(supabaseUrl, supabaseKey);
+
+const getFunnelStep = (estado: string): number => {
+  switch (estado) {
+    case "pendiente_pago":
+    case "pagado":
+      return 0; // Pedido Activo
+    case "en_preparacion":
+      return 1; // Producción
+    case "en_envio":
+    case "en_transito":
+      return 2; // Tránsito
+    case "entregado":
+      return 3; // Entregado
+    default:
+      return 0;
+  }
+};
 
 interface Pedido {
   id: number;
@@ -188,6 +205,79 @@ export default function TrackingPage() {
                 )}
               </div>
             </div>
+          </div>
+        </Card>
+
+        {/* Rediseño de Seguimiento en Funnel de 4 Etapas */}
+        <Card className="p-6 md:p-8 mb-6 overflow-hidden bg-white border border-slate-100 shadow-md rounded-[2rem]">
+          <h2 className="text-lg sm:text-xl font-black text-slate-800 mb-6 uppercase tracking-tight text-center md:text-left">
+            Estado de tu <span className="text-[#00a19a]">Pedido</span>
+          </h2>
+          
+          <div className="relative flex flex-col md:flex-row items-stretch md:items-center justify-between gap-6 md:gap-4 pt-4">
+            {/* Línea de progreso de fondo (Desktop) */}
+            <div className="hidden md:block absolute left-8 right-8 top-[36px] h-1.5 bg-slate-100 -z-10 rounded-full">
+              <div 
+                className="h-full bg-gradient-to-r from-[#00a19a] to-emerald-400 rounded-full transition-all duration-1000"
+                style={{ width: `${(getFunnelStep(pedido.estado) / 3) * 100}%` }}
+              />
+            </div>
+
+            {([
+              { label: "Pedido Activo", desc: "Registrado e inicializado", icon: CheckCircle },
+              { label: "Producción", desc: "Modelando e imprimiendo 3D", icon: Package },
+              { label: "Tránsito", desc: "Guía de envío generada", icon: Truck },
+              { label: "Entregado", desc: "Entregado con éxito", icon: MapPin }
+            ] as { label: string; desc: string; icon: React.ComponentType<{ className?: string }> }[]).map((step, idx) => {
+              const currentStep = getFunnelStep(pedido.estado);
+              const isCompleted = idx < currentStep;
+              const isActive = idx === currentStep;
+              const isPending = idx > currentStep;
+              const StepIcon = step.icon;
+
+              return (
+                <div key={idx} className="flex flex-row md:flex-col items-center gap-4 md:gap-3 flex-1 text-left md:text-center relative">
+                  {/* Conector de línea de progreso para móvil */}
+                  {idx > 0 && (
+                    <div className="md:hidden absolute left-7 -top-6 bottom-10 w-1 bg-slate-100 -z-10">
+                      <div 
+                        className="w-full bg-[#00a19a] transition-all duration-1000"
+                        style={{ height: idx <= currentStep ? "100%" : "0%" }}
+                      />
+                    </div>
+                  )}
+
+                  {/* Círculo indicador de etapa */}
+                  <div 
+                    className={clsx(
+                      "w-14 h-14 rounded-2xl flex items-center justify-center border-2 transition-all duration-500 shadow-md shrink-0",
+                      isCompleted && "bg-emerald-500 border-emerald-500 text-white shadow-emerald-200",
+                      isActive && "bg-white border-[#00a19a] text-[#00a19a] ring-4 ring-teal-50 scale-110",
+                      isPending && "bg-slate-50 border-slate-200 text-slate-400"
+                    )}
+                  >
+                    {isCompleted ? (
+                      <CheckCircle className="w-6 h-6 stroke-[3]" />
+                    ) : (
+                      <StepIcon className={clsx("w-6 h-6", isActive && "animate-pulse")} />
+                    )}
+                  </div>
+
+                  {/* Detalles textuales */}
+                  <div className="flex flex-col">
+                    <span 
+                      className={clsx(
+                        "text-xs md:text-sm font-black uppercase tracking-wider",
+                        (isActive || isCompleted) ? "text-slate-800" : "text-slate-400"
+                      )}
+                    >
+                      {step.label}
+                    </span>
+                    <span className="text-[11px] font-semibold text-slate-400 leading-snug">{step.desc}</span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </Card>
 
