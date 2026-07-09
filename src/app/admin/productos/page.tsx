@@ -6,7 +6,6 @@ import CreateProductModal from "~/components/CreateProductModal";
 import { Card } from "~/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "~/components/ui/dialog";
 import Loader from "~/components/providers/UiProvider";
-import { useUser } from "@clerk/nextjs";
 import { Package, Star, AlertTriangle, Layers, ChevronDown, Search, Filter, BadgeDollarSign, Settings } from "lucide-react";
 import clsx from "clsx";
 import { createClient } from "@supabase/supabase-js";
@@ -33,7 +32,6 @@ interface Producto {
 }
 
 export default function AdminProductosPage() {
-  const { user, isLoaded } = useUser();
   const [modalOpen, setModalOpen] = useState(false);
   const [productos, setProductos] = useState<Producto[]>([]);
   const [loading, setLoading] = useState(true);
@@ -54,40 +52,50 @@ export default function AdminProductosPage() {
   const stockTotal = productos.reduce((acc, p) => acc + (p.stock || 0), 0);
   const sinStock = productos.filter((p) => p.stock === 0).length;
 
-  // Validación de rol: primero intentar con Clerk `publicMetadata`,
-  // si no está definido consultamos la tabla `usuario` en Supabase.
+  // Validación de rol usando la tabla `usuarios` en Supabase
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
+  const [roleLoading, setRoleLoading] = useState<boolean>(true);
 
   useEffect(() => {
     let mounted = true;
     async function checkRole() {
-      // Si Clerk tiene publicMetadata.role y es admin, usarlo.
-      if (user?.publicMetadata?.role === 'admin') {
-        if (mounted) setIsAdmin(true);
-        return;
-      }
-      if (!user) {
-        if (mounted) setIsAdmin(false);
-        return;
-      }
-      // Fallback: consultar la tabla `usuario` por auth_id
       try {
-        const { data: u } = await supabase
-          .from('usuario')
-          .select('role, rol')
-          .eq('auth_id', user.id)
-          .single();
-        type UsuarioRow = { role?: string; rol?: string };
-        const usuario = u as UsuarioRow | null;
-        const role = usuario?.role ?? usuario?.rol;
-        if (mounted) setIsAdmin(role === 'admin');
+        const { data: authData } = await supabase.auth.getUser();
+        const currentUserId = authData?.user?.id;
+
+        if (currentUserId) {
+          const { data: userDb } = await supabase
+            .from("usuarios")
+            .select("role, rol")
+            .eq("id", currentUserId)
+            .single();
+          type UsuarioRow = { role?: string; rol?: string };
+          const usuario = userDb as UsuarioRow | null;
+          const role = (usuario?.role ?? usuario?.rol ?? "").toLowerCase();
+          if (mounted) {
+            setIsAdmin(role === 'admin');
+          }
+        } else {
+          if (mounted) setIsAdmin(false);
+        }
       } catch {
         if (mounted) setIsAdmin(false);
+      } finally {
+        if (mounted) setRoleLoading(false);
       }
     }
     void checkRole();
-    return () => { mounted = false; };
-  }, [user]);
+
+    // Escuchar cambios de sesión
+    const { data: listener } = supabase.auth.onAuthStateChange(() => {
+      void checkRole();
+    });
+
+    return () => {
+      mounted = false;
+      listener.subscription.unsubscribe();
+    };
+  }, []);
 
   const fetchProductos = async () => {
     setLoading(true);
@@ -176,7 +184,7 @@ export default function AdminProductosPage() {
       ? "bg-yellow-100 text-yellow-700"
       : "bg-green-100 text-green-700";
 
-  if (!isLoaded) return <Loader />;
+  if (roleLoading) return <Loader />;
   if (!isAdmin)
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh]">

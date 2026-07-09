@@ -1091,14 +1091,18 @@ export async function sendShippingEmail(
   `;
 
   try {
-    const transporter = createTransporter();
-    const info = await transporter.sendMail({
+    const transporter: Transporter = createTransporter();
+    const mailOptions: SendMailOptions = {
       from: `"Thiart 3D" <${process.env.GMAIL_USER}>`,
       to,
       subject: `🚚 Tu pedido #${pedidoId} está en camino – Thiart 3D`,
       html,
-    });
+    };
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const info = await transporter.sendMail(mailOptions);
     console.log('✅ Email de envío enviado:', (info as { messageId?: string }).messageId);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     return { success: true, data: info };
   } catch (err: unknown) {
     console.error('❌ Error en sendShippingEmail:', err);

@@ -1,15 +1,13 @@
 "use client";
 import { useEffect } from "react";
-import { useUser } from "@clerk/nextjs";
+import { supabase } from "~/lib/supabaseClient";
 
+// Componente vacío — Clerk eliminado. Auth manejado por Supabase.
 export default function SyncUser() {
-  const { isSignedIn } = useUser();
-
   useEffect(() => {
-    if (isSignedIn) {
-      void fetch("/api/sync-user", { method: "POST" });
-    }
-  }, [isSignedIn]);
+    // Sin Clerk: el sync de usuario lo maneja SupabaseAuth directamente
+    void supabase.auth.getSession();
+  }, []);
 
   return null;
 }

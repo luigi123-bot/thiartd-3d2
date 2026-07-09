@@ -336,6 +336,96 @@ export default function AdminPedidosPage() {
           />
         </div>
 
+        {/* ─── FUNNEL VISUAL DE ETAPAS (Req 12) ─── */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[
+            {
+              key: "activo",
+              label: "Pedido Activo",
+              emoji: "📦",
+              estados: ["pendiente_cotizacion", "pendiente_pago"],
+              color: "from-amber-500 to-orange-500",
+              bg: "bg-amber-50",
+              border: "border-amber-200",
+              text: "text-amber-700",
+              dotColor: "bg-amber-500",
+            },
+            {
+              key: "produccion",
+              label: "Producción",
+              emoji: "🔧",
+              estados: ["pagado"],
+              color: "from-blue-500 to-indigo-500",
+              bg: "bg-blue-50",
+              border: "border-blue-200",
+              text: "text-blue-700",
+              dotColor: "bg-blue-500",
+            },
+            {
+              key: "transito",
+              label: "En Tránsito",
+              emoji: "🚚",
+              estados: ["en_transito", "enviado"],
+              color: "from-purple-500 to-violet-500",
+              bg: "bg-purple-50",
+              border: "border-purple-200",
+              text: "text-purple-700",
+              dotColor: "bg-purple-500",
+            },
+            {
+              key: "entregado",
+              label: "Entregados",
+              emoji: "✅",
+              estados: ["entregado", "completado"],
+              color: "from-emerald-500 to-green-500",
+              bg: "bg-emerald-50",
+              border: "border-emerald-200",
+              text: "text-emerald-700",
+              dotColor: "bg-emerald-500",
+            },
+          ].map((stage) => {
+            const count = pedidos.filter((p) => stage.estados.includes(p.estado)).length;
+            const pct = pedidos.length > 0 ? Math.round((count / pedidos.length) * 100) : 0;
+            const isSelected = stage.estados.some((e) => e === filtroEstado) || (filtroEstado === "todos" && stage.key === "activo");
+            return (
+              <motion.button
+                key={stage.key}
+                whileHover={{ y: -4 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => setFiltroEstado(stage.estados[0] ?? "todos")}
+                className={`relative p-6 rounded-[28px] border-2 transition-all text-left overflow-hidden group ${
+                  isSelected
+                    ? `${stage.border} ${stage.bg} shadow-xl shadow-black/5 ring-2 ring-offset-2 ring-${stage.dotColor}`
+                    : "bg-white border-slate-100 hover:border-slate-200 shadow-md"
+                }`}
+              >
+                {/* Gradient bar top */}
+                <div className={`absolute top-0 left-0 w-full h-1 bg-gradient-to-r ${stage.color}`} />
+                
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-2xl">{stage.emoji}</span>
+                  <div className={`${stage.bg} ${stage.text} ${stage.border} border px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest`}>
+                    {pct}%
+                  </div>
+                </div>
+                
+                <div className="text-3xl font-black text-slate-900 mb-1">{count}</div>
+                <div className="text-xs font-black text-slate-500 uppercase tracking-widest">{stage.label}</div>
+                
+                {/* Progress bar */}
+                <div className="mt-4 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${pct}%` }}
+                    transition={{ duration: 1, ease: "easeOut" }}
+                    className={`h-full bg-gradient-to-r ${stage.color} rounded-full`}
+                  />
+                </div>
+              </motion.button>
+            );
+          })}
+        </div>
+
         {/* Main Content Card */}
         <Card className="border-none shadow-2xl rounded-[40px] overflow-hidden bg-white ring-1 ring-slate-100">
           {/* Table Toolbar */}
@@ -346,7 +436,7 @@ export default function AdminPedidosPage() {
                 <span className="text-sm font-black text-slate-400 uppercase tracking-widest">Filtrar por:</span>
               </div>
               <div className="flex gap-2">
-                {["todos", "pendiente_cotizacion", "pendiente_pago", "pagado", "pago_cancelado"].map((estado) => (
+                {["todos", "pendiente_cotizacion", "pendiente_pago", "pagado", "en_transito", "entregado", "pago_cancelado"].map((estado) => (
                   <button
                     key={estado}
                     onClick={() => setFiltroEstado(estado)}
@@ -364,6 +454,7 @@ export default function AdminPedidosPage() {
               Mostrando <span className="text-slate-900">{filteredPedidos.length}</span> resultados
             </div>
           </div>
+
 
           {/* Custom Table */}
           <div className="overflow-x-auto">

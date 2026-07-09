@@ -270,17 +270,17 @@ export default function AdminSidebar() {
       >
         {/* Top Header / Logo */}
         <div className={clsx(
-          "border-b border-[#005f5a] flex items-center h-20 shrink-0 transition-all duration-300",
-          isSidebarExpanded ? "justify-between p-4" : "justify-center p-0"
+          "flex items-center h-16 shrink-0 transition-all duration-300",
+          isSidebarExpanded ? "justify-between px-4 border-b border-[#005f5a]" : "justify-center"
         )}>
           <div className="flex items-center gap-3 overflow-hidden">
-            <div className="relative p-1 bg-white/10 rounded-2xl border border-white/20 shadow-md transition-transform duration-300 hover:scale-105 shrink-0">
+            <div className="relative p-1 bg-white/10 rounded-xl border border-white/20 shadow-md transition-transform duration-300 hover:scale-105 shrink-0">
               <Image
                 src="/logo.png"
                 alt="Logo"
-                width={40}
-                height={40}
-                className="h-10 w-10 rounded-xl object-cover"
+                width={36}
+                height={36}
+                className="h-9 w-9 rounded-lg object-cover"
               />
             </div>
             {isSidebarExpanded && (
@@ -292,7 +292,10 @@ export default function AdminSidebar() {
         </div>
 
         {/* Menu Navigation */}
-        <nav className="flex-1 py-6 px-3 space-y-1.5 overflow-y-auto custom-scrollbar">
+        <nav className={clsx(
+          "flex-1 overflow-y-auto custom-scrollbar",
+          isSidebarExpanded || menuOpen ? "py-4 px-3 space-y-1" : "py-2 px-2 space-y-0.5 flex flex-col items-center"
+        )}>
           {MENU.map(({ href, label, icon: Icon }) => {
             const isActive = pathname === href;
             return (
@@ -303,21 +306,21 @@ export default function AdminSidebar() {
                 className={clsx(
                   "flex items-center font-bold transition-all text-sm group relative",
                   isSidebarExpanded || menuOpen
-                    ? "gap-3 p-3 w-full rounded-2xl" 
-                    : "justify-center w-12 h-12 mx-auto rounded-2xl",
-                  isActive 
-                    ? "bg-white text-[#007973] shadow-lg shadow-black/10 scale-[1.02]" 
-                    : "text-white/80 hover:bg-white/10 hover:text-white"
+                    ? "gap-3 p-3 w-full rounded-xl"
+                    : "justify-center w-10 h-10 rounded-xl",
+                  isActive
+                    ? "bg-white text-[#007973] shadow-md"
+                    : "text-white/70 hover:bg-white/10 hover:text-white"
                 )}
               >
-                <Icon className={clsx("w-5 h-5 shrink-0 transition-transform group-hover:scale-110", isActive ? "text-[#007973]" : "text-white")} />
+                <Icon className={clsx("w-[18px] h-[18px] shrink-0", isActive ? "text-[#007973]" : "text-white")} />
                 {(isSidebarExpanded || menuOpen) && (
                   <span className="transition-opacity duration-200">{label}</span>
                 )}
 
                 {/* Tooltip on Hover when collapsed */}
                 {!isSidebarExpanded && !menuOpen && (
-                  <span className="absolute left-16 scale-0 transition-all rounded bg-slate-900 px-3 py-1.5 text-xs font-black uppercase tracking-wider text-white group-hover:scale-100 shadow-md whitespace-nowrap z-50">
+                  <span className="absolute left-14 scale-0 transition-all rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-black uppercase tracking-wider text-white group-hover:scale-100 shadow-md whitespace-nowrap z-50 pointer-events-none">
                     {label}
                   </span>
                 )}
@@ -327,14 +330,17 @@ export default function AdminSidebar() {
         </nav>
 
         {/* Botón de Notificaciones en Sidebar */}
-        <div className="px-3 py-2 border-t border-[#005f5a] relative">
+        <div className={clsx(
+          "border-t border-[#005f5a] relative",
+          isSidebarExpanded || menuOpen ? "px-3 py-2" : "px-2 py-2 flex justify-center"
+        )}>
           <button
             onClick={handleOpenNotif}
             className={clsx(
-              "flex items-center text-white/80 hover:bg-white/10 hover:text-white transition-all text-sm font-bold",
+              "flex items-center text-white/70 hover:bg-white/10 hover:text-white transition-all text-sm font-bold rounded-xl",
               isSidebarExpanded || menuOpen
-                ? "w-full gap-3 p-3 rounded-2xl"
-                : "justify-center w-12 h-12 mx-auto rounded-2xl"
+                ? "w-full gap-3 p-3"
+                : "w-10 h-10 justify-center"
             )}
             title="Notificaciones"
           >
@@ -396,7 +402,7 @@ export default function AdminSidebar() {
         {/* User profile / Auth block */}
         <div className={clsx(
           "border-t border-[#005f5a] bg-[#006964] shrink-0 transition-all duration-300",
-          isSidebarExpanded || menuOpen ? "p-4" : "p-2 py-4"
+          isSidebarExpanded || menuOpen ? "p-4" : "p-2 py-3 flex flex-col items-center gap-1"
         )}>
           {!usuario ? (
             <Button 

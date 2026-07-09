@@ -92,9 +92,9 @@ export default function CreateProductModal({
     if (idx1 < 0 || idx1 > 3 || idx2 < 0 || idx2 > 3) return;
     const allImages: string[] = [
       imageUrl || form.image_url || "",
-      form.imagenes?.[0] || "",
-      form.imagenes?.[1] || "",
-      form.imagenes?.[2] || ""
+      form.imagenes?.[0] ?? "",
+      form.imagenes?.[1] ?? "",
+      form.imagenes?.[2] ?? ""
     ];
     
     // Intercambiar
@@ -102,10 +102,10 @@ export default function CreateProductModal({
     allImages[idx1] = allImages[idx2] ?? "";
     allImages[idx2] = temp;
     
-    const newCover = allImages[0] || "";
+    const newCover = allImages[0] ?? "";
     setImageUrl(newCover);
     
-    const newSecondaries = [allImages[1] || "", allImages[2] || "", allImages[3] || ""];
+    const newSecondaries = [allImages[1] ?? "", allImages[2] ?? "", allImages[3] ?? ""];
     setForm({
       ...form,
       image_url: newCover,
@@ -638,8 +638,8 @@ export default function CreateProductModal({
                               onKeyDown={(e) => {
                                 if (e.key === 'Enter') {
                                   e.preventDefault();
-                                  const input = document.getElementById('new-question-input') as HTMLInputElement;
-                                  if (input && input.value.trim()) {
+                                  const input = document.getElementById('new-question-input') as HTMLInputElement | null;
+                                  if (input?.value.trim()) {
                                     setQuestions([...questions, input.value.trim()]);
                                     input.value = "";
                                   }
@@ -649,8 +649,8 @@ export default function CreateProductModal({
                             <Button 
                               type="button"
                               onClick={() => {
-                                const input = document.getElementById('new-question-input') as HTMLInputElement;
-                                if (input && input.value.trim()) {
+                                const input = document.getElementById('new-question-input') as HTMLInputElement | null;
+                                if (input?.value.trim()) {
                                   setQuestions([...questions, input.value.trim()]);
                                   input.value = "";
                                 }

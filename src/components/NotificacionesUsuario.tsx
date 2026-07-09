@@ -2,7 +2,6 @@
 import { useEffect, useState } from "react";
 import { FiBell } from "react-icons/fi";
 import { createClient } from "@supabase/supabase-js";
-import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "TU_SUPABASE_URL";
@@ -22,22 +21,32 @@ type Notificacion = {
 };
 
 export default function NotificacionesUsuario() {
-  const { user } = useUser();
+  const [userId, setUserId] = useState<string | null>(null);
   const router = useRouter();
   const [notis, setNotis] = useState<Notificacion[]>([]);
   const [open, setOpen] = useState(false);
   const [showToast, setShowToast] = useState(false);
 
-  // Cargar notificaciones y suscripción realtime
   useEffect(() => {
-    if (!user) return;
+    const getUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      setUserId(data?.user?.id ?? null);
+    };
+    void getUser();
+    const { data: listener } = supabase.auth.onAuthStateChange((_e, session) => {
+      setUserId(session?.user?.id ?? null);
+    });
+    return () => listener.subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!userId) return;
     let isMounted = true;
     async function fetchNotis() {
-      if (!user) return;
       const { data } = await supabase
         .from("notificaciones")
         .select("*")
-        .eq("usuario_id", user.id)
+        .eq("usuario_id", userId)
         .eq("leido", false)
         .order("created_at", { ascending: false });
       if (isMounted) setNotis(data ?? []);
@@ -49,7 +58,7 @@ export default function NotificacionesUsuario() {
       .channel("notificaciones-usuario")
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "notificaciones", filter: `usuario_id=eq.${user?.id}` },
+        { event: "INSERT", schema: "public", table: "notificaciones", filter: `usuario_id=eq.${userId}` },
         (_payload) => {
           void fetchNotis();
           setShowToast(true);
@@ -58,7 +67,7 @@ export default function NotificacionesUsuario() {
       )
       .on(
         "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "notificaciones", filter: `usuario_id=eq.${user?.id}` },
+        { event: "UPDATE", schema: "public", table: "notificaciones", filter: `usuario_id=eq.${userId}` },
         () => {
           void fetchNotis();
         }
@@ -69,7 +78,7 @@ export default function NotificacionesUsuario() {
       isMounted = false;
       void supabase.removeChannel(channel);
     };
-  }, [user]);
+  }, [userId]);
 
   // Marcar como leídas al abrir el panel
   useEffect(() => {

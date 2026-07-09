@@ -5,10 +5,9 @@ import { Button } from "~/components/ui/button";
 import ContactModal from "~/components/ContactModal";
 import ProductosCarrusel from "~/components/ProductosCarrusel";
 import UsuariosAdminModal from "~/components/UsuariosAdminModal";
-import { useUser } from "@clerk/nextjs";
 import { supabase } from "~/lib/supabaseClient";
 import { motion } from "framer-motion";
-import { FiStar, FiArrowRight, FiShield, FiBriefcase, FiUser, FiCheck } from "react-icons/fi";
+import { FiStar, FiArrowRight, FiShield, FiBriefcase, FiUser, FiCheck, FiPackage } from "react-icons/fi";
 import Link from "next/link";
 
 const TopbarTienda = dynamic(() => import("./tienda/componentes/TopbarTienda"), { ssr: false });
@@ -17,42 +16,48 @@ export default function Home() {
 	const [modalOpen, setModalOpen] = useState(false);
 	const [usuariosModalOpen, setUsuariosModalOpen] = useState(false);
 	const [becomeCreatorModalOpen, setBecomeCreatorModalOpen] = useState(false);
-	const { user } = useUser();
 	const [isAdmin, setIsAdmin] = useState(false);
 	const [supaRole, setSupaRole] = useState<string | null>(null);
 
 	useEffect(() => {
 		let mounted = true;
 		async function checkRole() {
-            // Verificar en Clerk primero (redundancia)
-			if (user?.publicMetadata?.role === 'admin') {
-				if (mounted) setIsAdmin(true);
+			const { data: authData } = await supabase.auth.getUser();
+			const currentUserId = authData?.user?.id;
+
+			if (currentUserId) {
+				const { data: userDb } = await supabase
+					.from("usuarios")
+					.select("role")
+					.eq("id", currentUserId)
+					.single() as { data: { role: string } | null };
+
+				if (userDb?.role) {
+					const r: string = userDb.role.toLowerCase();
+					if (mounted) {
+						setSupaRole(r);
+						if (r === 'admin') setIsAdmin(true);
+					}
+				}
+			} else {
+				if (mounted) {
+					setSupaRole(null);
+					setIsAdmin(false);
+				}
 			}
-
-            // Verificar en Supabase para una fuente de verdad única
-            const { data: authData } = await supabase.auth.getUser();
-            const currentUserId = authData?.user?.id;
-
-            if (currentUserId) {
-                const { data: userDb } = await supabase
-                    .from("usuarios")
-                    .select("role")
-                    .eq("id", currentUserId)
-                    .single() as { data: { role: string } | null };
-                
-                if (userDb?.role) {
-                    const r: string = userDb.role.toLowerCase();
-                    setSupaRole(r);
-                    if (r === 'admin') setIsAdmin(true);
-                }
-            } else {
-                setSupaRole(null);
-                setIsAdmin(false);
-            }
 		}
 		void checkRole();
-		return () => { mounted = false; };
-	}, [user]);
+
+		// Escuchar cambios de sesión
+		const { data: listener } = supabase.auth.onAuthStateChange(() => {
+			void checkRole();
+		});
+
+		return () => {
+			mounted = false;
+			listener.subscription.unsubscribe();
+		};
+	}, []);
 
 	return (
 		<main className="min-h-screen bg-slate-50 font-sans selection:bg-[#00a19a]/30">
@@ -131,6 +136,12 @@ export default function Home() {
                 </div>
                 
 
+                {/* Wave separator */}
+                <div className="absolute bottom-0 left-0 w-full overflow-hidden leading-none">
+                  <svg viewBox="0 0 1440 60" xmlns="http://www.w3.org/2000/svg" className="w-full h-10 md:h-16 fill-slate-50">
+                    <path d="M0,30 C360,0 1080,60 1440,30 L1440,60 L0,60 Z" />
+                  </svg>
+                </div>
             </section>
 
 			{/* Categorías */}
@@ -346,13 +357,14 @@ export default function Home() {
 			</section>
 
 			{/* Botones flotantes - responsive */}
-			<Button
-				onClick={() => setModalOpen(true)}
-				className="fixed bottom-6 right-6 md:bottom-10 md:right-10 z-[100] h-14 bg-gradient-to-r from-[#00a19a] to-[#007973] hover:from-[#008f89] hover:to-[#00605c] text-white rounded-full px-6 md:px-8 font-black uppercase tracking-widest shadow-[0_10px_30px_rgba(0,161,154,0.4)] hover:shadow-[0_15px_40px_rgba(0,161,154,0.6)] hover:-translate-y-1 transition-all active:scale-95 text-xs border border-teal-400/30"
+			<Link
+				href="/envios"
+				className="fixed bottom-6 right-6 md:bottom-10 md:right-10 z-[100] h-14 inline-flex items-center bg-gradient-to-r from-[#00a19a] to-[#007973] hover:from-[#008f89] hover:to-[#00605c] text-white rounded-full px-6 md:px-8 font-black uppercase tracking-widest shadow-[0_10px_30px_rgba(0,161,154,0.4)] hover:shadow-[0_15px_40px_rgba(0,161,154,0.6)] hover:-translate-y-1 transition-all active:scale-95 text-xs border border-teal-400/30 gap-2"
 			>
-				<span className="hidden sm:inline">Hablar con Asesor</span>
-				<span className="sm:hidden">Contacto</span>
-			</Button>
+				<FiPackage className="w-4 h-4" />
+				<span className="hidden sm:inline">Rastrear tu Pedido</span>
+				<span className="sm:hidden">Rastrear</span>
+			</Link>
 			<ContactModal open={modalOpen} onOpenChangeAction={setModalOpen} />
 
 			{isAdmin && (

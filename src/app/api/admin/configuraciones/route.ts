@@ -29,14 +29,15 @@ export async function GET() {
     }
 
     // Convertir array de filas a un objeto clave-valor
-    const configObj = (data ?? []).reduce((acc: Record<string, unknown>, row: { clave: string; valor: unknown }) => {
+    const configRows = (data ?? []) as { clave: string; valor: unknown }[];
+    const configObj: Record<string, unknown> = configRows.reduce((acc: Record<string, unknown>, row) => {
       acc[row.clave] = row.valor;
       return acc;
     }, {});
 
     // Retornamos "valor" (para compatibilidad con correo_gerente del dashboard) y "configuraciones"
     return NextResponse.json({ 
-      valor: configObj.correo_gerente ?? "", 
+      valor: (configObj.correo_gerente as string) ?? "", 
       configuraciones: configObj 
     });
   } catch (err) {

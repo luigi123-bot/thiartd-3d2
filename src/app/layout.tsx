@@ -1,10 +1,8 @@
 import type { ReactNode } from "react";
 import { type Metadata } from "next";
-import { ClerkProvider } from "@clerk/nextjs";
 import "../styles/globals.css";
 
 import { ToastProvider } from "~/components/ui/use-toast";
-import SyncUser from "../components/SyncUser";
 import Footer from "~/components/Footer";
 import { UiProvider } from "~/components/providers/UiProvider";
 import { CarritoProvider } from "~/components/providers/CarritoProvider";
@@ -24,22 +22,19 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: ReactNode }>) {
   return (
-    <ClerkProvider>
-      <html lang="en" suppressHydrationWarning>
-        <body className="antialiased font-sans" suppressHydrationWarning>
-          <SyncUser />
-          <ToastProvider>
-            <UiProvider>
-              <CarritoProvider>
-                {children}
-                <Footer />
-                <ClientChatWidgetWrapper />
-              </CarritoProvider>
-            </UiProvider>
-          </ToastProvider>
-        </body>
-      </html>
-    </ClerkProvider>
+    <html lang="en" suppressHydrationWarning>
+      <body className="antialiased font-sans" suppressHydrationWarning>
+        <ToastProvider>
+          <UiProvider>
+            <CarritoProvider>
+              {children}
+              <Footer />
+              <ClientChatWidgetWrapper />
+            </CarritoProvider>
+          </UiProvider>
+        </ToastProvider>
+      </body>
+    </html>
   );
 }
 export const dynamic = "force-dynamic"; // Forzar la regeneración de la página en cada solicitud

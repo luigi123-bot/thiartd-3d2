@@ -12,7 +12,7 @@ import {
   IoMdLogOut,
 } from "react-icons/io";
 import { FiSettings, FiBell, FiStar, FiPackage } from "react-icons/fi";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { supabase } from "~/lib/supabaseClient";
 import { useCarrito } from "~/components/providers/CarritoProvider";
 import SupabaseAuth from "~/components/SupabaseAuth";
@@ -40,6 +40,7 @@ export default function TopbarTienda({ becomeCreatorOpen, setBecomeCreatorOpen }
   const [role, setRole] = useState<string | null>(null);
   const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
   const [authDefaultTab, setAuthDefaultTab] = useState<"login" | "register" | "creador">("login");
+  const [scrolled, setScrolled] = useState(false);
 
   const [notifications, setNotifications] = useState<UserNotification[]>([]);
   const [unread, setUnread] = useState(0);
@@ -48,12 +49,18 @@ export default function TopbarTienda({ becomeCreatorOpen, setBecomeCreatorOpen }
   const notifRef = useRef<HTMLDivElement>(null);
   const isBecomeCreatorModalOpen = typeof becomeCreatorOpen === "boolean" ? becomeCreatorOpen : localBecomeCreatorModalOpen;
   const handleSetBecomeCreatorModalOpen = setBecomeCreatorOpen ?? setLocalBecomeCreatorModalOpen;
+  const pathname = usePathname();
 
   const { carrito } = useCarrito();
   const cartCount = carrito.reduce((acc, item) => acc + (item.cantidad ?? 0), 0);
   const router = useRouter();
 
-  useEffect(() => { setIsMounted(true); }, []);
+  useEffect(() => {
+    setIsMounted(true);
+    const handleScroll = () => setScrolled(window.scrollY > 20);
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   const fetchUserNotifications = useCallback(async (userId: string) => {
     setLoadingNotif(true);
@@ -174,7 +181,11 @@ export default function TopbarTienda({ becomeCreatorOpen, setBecomeCreatorOpen }
 
   return (
     <>
-      <nav className="w-full border-b shadow-sm sticky top-0 z-50 bg-[#00a19a]">
+      <nav className={`w-full sticky top-0 z-50 transition-all duration-300 ${
+        scrolled
+          ? "bg-[#007973]/90 backdrop-blur-xl border-b border-white/10 shadow-lg shadow-black/10"
+          : "bg-[#00a19a] border-b border-transparent"
+      }`}>
         <div className="max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16 lg:h-20">
             <Link href="/" className="flex items-center gap-2 min-w-max">
@@ -185,10 +196,29 @@ export default function TopbarTienda({ becomeCreatorOpen, setBecomeCreatorOpen }
             </Link>
 
             <div className="hidden xl:flex flex-1 items-center justify-center gap-8">
-              <Link href="/" className="text-white hover:text-gray-100 font-bold transition-colors">Inicio</Link>
-              <Link href="/tienda/personalizar" className="text-white hover:text-gray-100 font-bold transition-colors">Personalizar</Link>
-              <Link href="/tienda/productos" className="text-white hover:text-gray-100 font-bold transition-colors">Productos</Link>
-              <Link href="/tienda/sobre-nosotros" className="text-white hover:text-gray-100 font-bold transition-colors">Nosotros</Link>
+              {[
+                { href: "/", label: "Inicio" },
+                { href: "/tienda/personalizar", label: "Personalizar" },
+                { href: "/tienda/productos", label: "Productos" },
+                { href: "/tienda/sobre-nosotros", label: "Nosotros" },
+                { href: "/envios", label: "Rastrear Pedido" },
+              ].map(({ href, label }) => {
+                const isActive = pathname === href;
+                return (
+                  <Link
+                    key={href}
+                    href={href}
+                    className={`relative text-white font-bold transition-colors group ${
+                      isActive ? "text-teal-200" : "hover:text-teal-200"
+                    }`}
+                  >
+                    {label}
+                    <span className={`absolute -bottom-1 left-0 h-0.5 bg-teal-300 rounded-full transition-all duration-300 ${
+                      isActive ? "w-full" : "w-0 group-hover:w-full"
+                    }`} />
+                  </Link>
+                );
+              })}
               
               {/* ACCESOS DIRECTOS POR ROL */}
               {isAdmin && (

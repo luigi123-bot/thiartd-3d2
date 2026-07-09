@@ -158,6 +158,13 @@ export default function TrackingPage() {
   const IconComponent = estadoInfo.icon;
   const contacto = parseDatosContacto(pedido.datos_contacto);
 
+  const steps = [
+    { label: "Pedido Activo", desc: "Registrado e inicializado", icon: CheckCircle as React.ComponentType<{ className?: string }> },
+    { label: "Producción", desc: "Modelando e imprimiendo 3D", icon: Package as React.ComponentType<{ className?: string }> },
+    { label: "Tránsito", desc: "Guía de envío generada", icon: Truck as React.ComponentType<{ className?: string }> },
+    { label: "Entregado", desc: "Entregado con éxito", icon: MapPin as React.ComponentType<{ className?: string }> }
+  ];
+
   return (
     <div className="min-h-screen bg-gray-50 py-4 sm:py-6 md:py-8 px-4">
       <div className="max-w-4xl mx-auto">
@@ -223,12 +230,7 @@ export default function TrackingPage() {
               />
             </div>
 
-            {([
-              { label: "Pedido Activo", desc: "Registrado e inicializado", icon: CheckCircle },
-              { label: "Producción", desc: "Modelando e imprimiendo 3D", icon: Package },
-              { label: "Tránsito", desc: "Guía de envío generada", icon: Truck },
-              { label: "Entregado", desc: "Entregado con éxito", icon: MapPin }
-            ] as { label: string; desc: string; icon: React.ComponentType<{ className?: string }> }[]).map((step, idx) => {
+            {steps.map((step, idx) => {
               const currentStep = getFunnelStep(pedido.estado);
               const isCompleted = idx < currentStep;
               const isActive = idx === currentStep;

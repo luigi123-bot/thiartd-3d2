@@ -163,7 +163,7 @@ export default function ChatWidget({
         } else {
           setMensajes(prev => [...prev, { nombre: "Asistente", email: "bot@thiart3d.com", mensaje: `❌ No pudimos encontrar el pedido #${userText}. Por favor verifica el número.` }]);
         }
-      } catch (_err) {
+      } catch {
         setMensajes(prev => [...prev, { nombre: "Asistente", email: "bot@thiart3d.com", mensaje: "❌ Ocurrió un error al consultar el estado de tu pedido." }]);
       } finally {
         setLoading(false);
@@ -173,11 +173,12 @@ export default function ChatWidget({
       setLoading(true);
       try {
         // 1. Buscar usuario por email en base de datos
-        const { data: userData, error: fetchErr } = await supabase
+        const { data, error: fetchErr } = await supabase
           .from("usuarios")
           .select("id")
           .eq("email", userText)
           .single();
+        const userData = data as { id: string } | null;
 
         if (fetchErr || !userData) {
           setMensajes(prev => [...prev, { nombre: "Asistente", email: "bot@thiart3d.com", mensaje: `❌ No encontramos ninguna cuenta registrada con el correo: ${userText}` }]);
@@ -196,7 +197,7 @@ export default function ChatWidget({
             setMensajes(prev => [...prev, { nombre: "Asistente", email: "bot@thiart3d.com", mensaje: `❌ Error al enviar credenciales: ${errData.error ?? "problema de conexión SMTP"}` }]);
           }
         }
-      } catch (_err) {
+      } catch {
         setMensajes(prev => [...prev, { nombre: "Asistente", email: "bot@thiart3d.com", mensaje: "❌ Ocurrió un error al procesar tu solicitud." }]);
       } finally {
         setLoading(false);

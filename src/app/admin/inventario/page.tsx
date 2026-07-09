@@ -5,7 +5,6 @@ import { Button } from "~/components/ui/button";
 import { createClient } from "@supabase/supabase-js";
 import Loader from "~/components/providers/UiProvider";
 import CreateProductModal from "~/components/CreateProductModal";
-import AjustarInventarioModal from "./AjustarInventarioModal";
 import ConfiguracionModal from "~/components/ConfiguracionModal";
 import { FiSettings, FiEdit2, FiEye, FiStar, FiTrash2 } from "react-icons/fi";
 import { Star, BadgeDollarSign } from "lucide-react";
@@ -48,7 +47,6 @@ export default function AdminInventarioPage() {
 	const [deleteProduct, setDeleteProduct] = useState<Producto | null>(null);
 	const [deleting, setDeleting] = useState(false);
 	const [modalDetalle, setModalDetalle] = useState<Producto | null>(null);
-	const [ajustarProducto, setAjustarProducto] = useState<Producto | null>(null);
 	const [destacando, setDestacando] = useState<string | number | null>(null);
 	const [urlPopupProduct, setUrlPopupProduct] = useState<Producto | null>(null);
 	const [configModalOpen, setConfigModalOpen] = useState(false);
@@ -401,27 +399,8 @@ export default function AdminInventarioPage() {
 							: undefined
 					}
 				/>
-				{/* Modal ajustar inventario */}
-				<AjustarInventarioModal
-					open={!!ajustarProducto}
-					onOpenChange={(v: boolean) => { if (!v) setAjustarProducto(null); }}
-					producto={
-						ajustarProducto
-							? {
-									nombre: ajustarProducto.nombre,
-									stock: ajustarProducto.stock,
-									precio: ajustarProducto.precio,
-							  }
-							: { nombre: "", stock: 0, precio: 0 }
-					}
-					onAjuste={async (_ajuste) => {
-						// Aquí deberías implementar la lógica para ajustar el inventario en la base de datos
-						// y luego refrescar la lista de productos
-						await fetchProductos();
-						setAjustarProducto(null);
-					}}
-					loading={false}
-				/>
+				{/* Modal ajustar inventario — eliminado por requerimiento */}
+
 				{/* Modal eliminar */}
 				<Dialog open={!!deleteProduct} onOpenChange={(v) => { if (!v) setDeleteProduct(null); }}>
 					<DialogContent>
