@@ -37,6 +37,9 @@ export default function ChatWidget({
 
   const chatRef = useRef<HTMLDivElement>(null);
   const openRef = useRef(open);
+  // Track drag to avoid triggering click when dragging
+  const dragStartPos = useRef<{ x: number; y: number } | null>(null);
+  const wasDragged = useRef(false);
 
   useEffect(() => {
     openRef.current = open;
@@ -340,11 +343,30 @@ export default function ChatWidget({
 
       {/* Botón flotante "Rastrear tu pedido" - Versión circular compacta no invasiva */}
       <motion.button
-        onPointerDown={(e) => dragControls.start(e)}
+        onPointerDown={(e) => {
+          dragStartPos.current = { x: e.clientX, y: e.clientY };
+          wasDragged.current = false;
+          dragControls.start(e);
+        }}
+        onPointerUp={(e) => {
+          if (dragStartPos.current) {
+            const dx = e.clientX - dragStartPos.current.x;
+            const dy = e.clientY - dragStartPos.current.y;
+            if (Math.sqrt(dx * dx + dy * dy) > 5) {
+              wasDragged.current = true;
+            }
+          }
+        }}
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
         className="w-14 h-14 bg-black hover:bg-slate-900 text-white rounded-full flex items-center justify-center shadow-xl border border-gray-800 transition-all group relative cursor-pointer"
-        onClick={() => setOpen(!open)}
+        onClick={() => {
+          if (wasDragged.current) {
+            wasDragged.current = false;
+            return;
+          }
+          setOpen(!open);
+        }}
         title="Rastrear tu pedido"
       >
         {open ? <FiX className="text-xl" /> : <FiTruck className="w-6 h-6 text-[#00a19a]" />}

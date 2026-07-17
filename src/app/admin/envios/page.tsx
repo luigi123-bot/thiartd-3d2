@@ -135,7 +135,9 @@ export default function EnviosAdminPage() {
   const [historial, setHistorial] = useState<HistorialEnvio[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
   const [actualizandoTracking, setActualizandoTracking] = useState(false);
+  const [generandoGuia, setGenerandoGuia] = useState(false);
   const { toast } = useToast();
 
   const [formTracking, setFormTracking] = useState<FormTracking>({
@@ -162,6 +164,53 @@ export default function EnviosAdminPage() {
   useEffect(() => {
     void fetchPedidos();
   }, []);
+
+  const generarGuiaAutomatica = async () => {
+    if (!pedidoSeleccionado) return;
+    setGenerandoGuia(true);
+    let errorMessage = "No se pudo generar la guía.";
+    try {
+      const res = await fetch("/api/tracking/generar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pedido_id: pedidoSeleccionado.id }),
+      });
+      if (res.ok) {
+        const data = await res.json() as { numero_tracking: string; empresa_envio: string };
+        setFormTracking(prev => ({
+          ...prev,
+          estado: "en_envio",
+          numero_tracking: data.numero_tracking,
+          empresa_envio: data.empresa_envio,
+        }));
+        toast({
+          title: "✅ Guía Generada",
+          description: `Guía #${data.numero_tracking} generada vía ${data.empresa_envio}. Se notificó al cliente por correo.`,
+        });
+        await fetchPedidos();
+      } else {
+        try {
+          const data = await res.json() as { error?: string };
+          errorMessage = data.error ?? errorMessage;
+        } catch {
+          errorMessage = `Error del servidor (status ${res.status})`;
+        }
+        toast({
+          variant: "destructive",
+          title: "❌ Error",
+          description: errorMessage,
+        });
+      }
+    } catch {
+      toast({
+        variant: "destructive",
+        title: "❌ Error de red",
+        description: "Error al conectar con el servidor.",
+      });
+    } finally {
+      setGenerandoGuia(false);
+    }
+  };
 
   useEffect(() => {
     if (pedidoSeleccionado) {
@@ -258,6 +307,13 @@ export default function EnviosAdminPage() {
     return matchId || matchNombre || matchCiudad;
   });
 
+  const ITEMS_PER_PAGE = 10;
+  const totalPages = Math.ceil(filteredPedidos.length / ITEMS_PER_PAGE);
+  const paginatedPedidos = filteredPedidos.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+
+  // Reset page when search changes
+  useEffect(() => { setCurrentPage(1); }, [searchTerm]);
+
   // Stats
   const enTransito = pedidos.filter(p => p.estado === 'en_transito' || p.estado === 'en_envio').length;
   const entregados = pedidos.filter(p => p.estado === 'entregado').length;
@@ -350,17 +406,17 @@ export default function EnviosAdminPage() {
                 <table className="w-full border-collapse">
                   <thead>
                     <tr className="bg-slate-50/50">
-                      <th className="px-10 py-6 text-left text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Referencia & Cliente</th>
-                      <th className="px-10 py-6 text-left text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Destino</th>
-                      <th className="px-10 py-6 text-left text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Estado Actual</th>
-                      <th className="px-10 py-6 text-center text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Acción</th>
+                      <th className="px-6 py-3 text-left text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Referencia & Cliente</th>
+                      <th className="px-6 py-3 text-left text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Destino</th>
+                      <th className="px-6 py-3 text-left text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Estado Actual</th>
+                      <th className="px-6 py-3 text-center text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Acción</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     <AnimatePresence>
                       {loading ? (
                          <tr><td colSpan={4} className="py-20 text-center text-slate-400">Cargando envíos...</td></tr>
-                      ) : filteredPedidos.map((p, _idx) => {
+                      ) : paginatedPedidos.map((p, _idx) => {
                         const contacto = JSON.parse(p.datos_contacto ?? "{}") as { nombre?: string };
                         const estadoInfo = getEstadoInfo(p.estado);
                         const isSelected = pedidoSeleccionado?.id === p.id;
@@ -374,13 +430,13 @@ export default function EnviosAdminPage() {
                             className={`hover:bg-slate-50/80 transition-all cursor-pointer group ${isSelected ? 'bg-slate-50' : ''}`}
                             onClick={() => setPedidoSeleccionado(p)}
                           >
-                            <td className="px-10 py-8">
-                               <div className="flex items-center gap-5">
-                                <div className={`w-12 h-12 ${isSelected ? 'bg-[#00a19a]' : 'bg-slate-900'} rounded-2xl flex items-center justify-center text-white font-black text-lg shadow-lg group-hover:scale-110 transition-transform`}>
+                            <td className="px-6 py-3">
+                               <div className="flex items-center gap-3">
+                                <div className={`w-9 h-9 ${isSelected ? 'bg-[#00a19a]' : 'bg-slate-900'} rounded-xl flex items-center justify-center text-white font-black text-xs shadow-md group-hover:scale-110 transition-transform shrink-0`}>
                                   #{p.id}
                                 </div>
                                 <div>
-                                  <div className="text-base font-black text-slate-900 tracking-tight leading-none mb-1.5">
+                                  <div className="text-sm font-black text-slate-900 tracking-tight leading-none mb-1">
                                     {contacto.nombre ?? "Sin Nombre"}
                                   </div>
                                   <div className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">
@@ -389,24 +445,24 @@ export default function EnviosAdminPage() {
                                 </div>
                               </div>
                             </td>
-                            <td className="px-10 py-8">
-                              <div className="text-sm font-black text-slate-900 leading-tight mb-1">
+                            <td className="px-6 py-3">
+                              <div className="text-sm font-black text-slate-900 leading-tight mb-0.5">
                                 {p.ciudad_envio ?? "No definido"}
                               </div>
                               <div className="text-[10px] text-slate-400 font-bold uppercase truncate max-w-[200px]">
                                 {p.direccion_envio}
                               </div>
                             </td>
-                            <td className="px-10 py-8">
-                              <span className={`inline-flex items-center px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border ${estadoInfo.bgColor} ${estadoInfo.color} border-current/10`}>
-                                <estadoInfo.icon className="w-3.5 h-3.5 mr-2" />
+                            <td className="px-6 py-3">
+                              <span className={`inline-flex items-center px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border ${estadoInfo.bgColor} ${estadoInfo.color} border-current/10`}>
+                                <estadoInfo.icon className="w-3 h-3 mr-1.5" />
                                 {estadoInfo.label}
                               </span>
                             </td>
-                            <td className="px-10 py-8 text-center">
+                            <td className="px-6 py-3 text-center">
                               <Button
                                 variant="outline"
-                                className={`h-10 w-10 p-0 rounded-xl transition-all ${isSelected ? 'bg-[#00a19a] text-white border-[#00a19a]' : 'border-slate-100 hover:border-slate-900'}`}
+                                className={`h-8 w-8 p-0 rounded-xl transition-all ${isSelected ? 'bg-[#00a19a] text-white border-[#00a19a]' : 'border-slate-100 hover:border-slate-900'}`}
                               >
                                 <ChevronRight className="w-4 h-4" />
                               </Button>
@@ -418,6 +474,33 @@ export default function EnviosAdminPage() {
                   </tbody>
                 </table>
               </div>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="px-10 py-6 border-t border-slate-100 flex items-center justify-between bg-slate-50/20">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                    className="h-10 px-4 rounded-xl text-xs font-bold border-slate-200"
+                  >
+                    Anterior
+                  </Button>
+                  <span className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                    Página {currentPage} de {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage === totalPages}
+                    className="h-10 px-4 rounded-xl text-xs font-bold border-slate-200"
+                  >
+                    Siguiente
+                  </Button>
+                </div>
+              )}
             </Card>
           </div>
 
@@ -459,6 +542,23 @@ export default function EnviosAdminPage() {
                           ))}
                         </select>
                       </div>
+
+                      {/* Botón de autogeneración automatizada Envía */}
+                      <Button
+                        type="button"
+                        onClick={generarGuiaAutomatica}
+                        disabled={generandoGuia}
+                        className="w-full h-12 bg-white/10 hover:bg-white/20 border border-white/20 hover:border-white/30 text-[#00ffd5] rounded-xl font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow transition-all active:scale-95"
+                      >
+                        {generandoGuia ? (
+                          <div className="w-4 h-4 border-2 border-[#00ffd5]/30 border-t-[#00ffd5] rounded-full animate-spin" />
+                        ) : (
+                          <>
+                            <Truck className="w-4 h-4" />
+                            Generar Guía con Envía.com
+                          </>
+                        )}
+                      </Button>
 
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">

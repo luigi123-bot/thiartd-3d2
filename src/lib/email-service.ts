@@ -956,12 +956,13 @@ export interface SendShippingEmailParams {
   empresaEnvio: string;
   ciudadDestino?: string;
   fechaEstimada?: string;
+  pdfGuiaUrl?: string;
 }
 
 export async function sendShippingEmail(
   params: SendShippingEmailParams
 ): Promise<{ success: true; data: SentMessageInfo } | { success: false; error: string }> {
-  const { to, nombreCliente, pedidoId, numeroTracking, empresaEnvio, ciudadDestino, fechaEstimada } = params;
+  const { to, nombreCliente, pedidoId, numeroTracking, empresaEnvio, ciudadDestino, fechaEstimada, pdfGuiaUrl } = params;
 
   const trackingUrl = `https://thiart3d.com/tienda/tracking/${pedidoId}`;
 
@@ -1092,11 +1093,32 @@ export async function sendShippingEmail(
 
   try {
     const transporter: Transporter = createTransporter();
+
+    // Adjuntar PDF de guía si está disponible
+    const attachments: SendMailOptions['attachments'] = [];
+    if (pdfGuiaUrl) {
+      try {
+        const pdfResponse = await fetch(pdfGuiaUrl);
+        if (pdfResponse.ok) {
+          const pdfBuffer = Buffer.from(await pdfResponse.arrayBuffer());
+          attachments.push({
+            filename: `guia-envio-${pedidoId}.pdf`,
+            content: pdfBuffer,
+            contentType: 'application/pdf',
+          });
+          console.log(`📎 PDF de guía adjuntado (${pdfBuffer.length} bytes)`);
+        }
+      } catch (pdfErr) {
+        console.warn('⚠️ No se pudo descargar el PDF de la guía:', pdfErr);
+      }
+    }
+
     const mailOptions: SendMailOptions = {
       from: `"Thiart 3D" <${process.env.GMAIL_USER}>`,
       to,
       subject: `🚚 Tu pedido #${pedidoId} está en camino – Thiart 3D`,
       html,
+      attachments,
     };
 
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment

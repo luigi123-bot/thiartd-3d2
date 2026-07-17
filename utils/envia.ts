@@ -11,18 +11,60 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+const normalizarDepartamento = (depto: string): string => {
+  const d = depto.trim().toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, ""); // Quitar acentos/tildes
+  
+  if (d.includes("valle")) return "VC";
+  if (d.includes("bogota") || d.includes("distrito") || d === "dc") return "DC";
+  if (d.includes("antioquia")) return "AN";
+  if (d.includes("arauca")) return "AR";
+  if (d.includes("atlantico")) return "AT";
+  if (d.includes("bolivar")) return "BL";
+  if (d.includes("boyaca")) return "BY";
+  if (d.includes("caldas")) return "CL";
+  if (d.includes("caqueta")) return "CA";
+  if (d.includes("casanare")) return "CS";
+  if (d.includes("cauca") && !d.includes("valle")) return "CU";
+  if (d.includes("cesar")) return "CE";
+  if (d.includes("choco")) return "CH";
+  if (d.includes("cordoba")) return "CO";
+  if (d.includes("cundinamarca")) return "CN";
+  if (d.includes("guainia")) return "GU";
+  if (d.includes("guaviare")) return "GA";
+  if (d.includes("huila")) return "HU";
+  if (d.includes("guajira")) return "LG";
+  if (d.includes("magdalena")) return "MA";
+  if (d.includes("meta")) return "ME";
+  if (d.includes("narino")) return "NA";
+  if (d.includes("norte de santander") || d.includes("norte santander")) return "NS";
+  if (d.includes("putumayo")) return "PU";
+  if (d.includes("quindio")) return "QU";
+  if (d.includes("risaralda")) return "RI";
+  if (d.includes("san andres") || d.includes("providencia")) return "SA";
+  if (d.includes("santander") && !d.includes("norte")) return "SN";
+  if (d.includes("sucre")) return "SU";
+  if (d.includes("tolima")) return "TO";
+  if (d.includes("vaupes")) return "VA";
+  if (d.includes("vichada")) return "VI";
+  if (d.includes("amazonas")) return "AM";
+  
+  return depto.length === 2 ? depto.toUpperCase() : "DC";
+};
+
 // Origen por defecto (Bodega principal de la tienda)
 const ORIGEN_DEFECTO = {
-  name: process.env.ENVIA_ORIGIN_NAME || "Thiart 3 D",
-  company: process.env.ENVIA_ORIGIN_COMPANY || "Thiart 3D",
-  phone: process.env.ENVIA_ORIGIN_PHONE || "3012906861",
-  email: process.env.ENVIA_ORIGIN_EMAIL || "thiart3d@gmail.com",
-  street: process.env.ENVIA_ORIGIN_STREET_NAME || "Calle 5",
-  number: process.env.ENVIA_ORIGIN_STREET_NUMBER || "24A-152",
-  city: process.env.ENVIA_ORIGIN_CITY || "Cali",
-  state: process.env.ENVIA_ORIGIN_STATE || "Valle del Cauca",
-  country: process.env.ENVIA_ORIGIN_COUNTRY || "CO",
-  postalCode: process.env.ENVIA_ORIGIN_POSTAL_CODE || "760001"
+  name: "Luis Gotopo",
+  company: "Thiart 3D",
+  phone: "3012906861",
+  email: "gotopoluis19@gmail.com",
+  street: "Calle 5",
+  number: "24A-152",
+  city: "Cali",
+  state: "VC",
+  country: "CO",
+  postalCode: "760001",
+  taxId: "9018453128" // NIT Thiart 3D (sin guión)
 };
 
 interface ProductoEnPedido {
@@ -37,6 +79,7 @@ interface DatosContacto {
   nombre?: string;
   email?: string;
   telefono?: string;
+  cedula?: string;
 }
 
 export const crearEnvio = async (data: string) => {
@@ -149,10 +192,12 @@ export const crearEnvioParaPedido = async (pedidoId: number) => {
       number: number,
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       city: pedido.ciudad_envio || "Bogota",
-      state: departamento,
+      state: normalizarDepartamento(departamento),
       country: "CO",
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      postalCode: pedido.codigo_postal_envio || "110111"
+      postalCode: pedido.codigo_postal_envio || "110111",
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      taxId: datosContacto.cedula || "1000000000" // Cédula/NIT de destino requerida en Colombia
     };
 
     const packagesPayload = [
@@ -252,18 +297,22 @@ export const crearEnvioParaPedido = async (pedidoId: number) => {
 
       console.log(`[ENVIA] Guía generada exitosamente. Tracking: ${trackingNumber}, Transportista: ${carrier}`);
 
-      // 4. Actualizar pedido en Supabase
+      // 4. Actualizar pedido en Supabase (omitiendo pdf_guia_url ya que no existe en el cache de Supabase físico)
       const { data: pedidoActualizado, error: updateError } = await supabase
         .from("pedidos")
         .update({
           numero_tracking: trackingNumber,
           empresa_envio: carrier,
-          pdf_guia_url: labelUrl,
           updated_at: new Date().toISOString()
         })
         .eq("id", pedidoId)
         .select()
         .single();
+
+      if (pedidoActualizado) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        pedidoActualizado.pdf_guia_url = labelUrl;
+      }
 
       if (updateError) {
         console.error(`[ENVIA] Error actualizando el pedido #${pedidoId} con el tracking:`, updateError.message);
@@ -288,15 +337,21 @@ export const crearEnvioParaPedido = async (pedidoId: number) => {
       return pedidoActualizado;
     } else {
       console.error("[ENVIA] Respuesta inesperada al generar guía:", responseEnvio.data);
-      return null;
+      throw new Error("Respuesta de API de Envía vacía o inesperada.");
     }
 
   } catch (err: unknown) {
+    let errorMsg = "Error al conectar con la API de Envía.";
     if (axios.isAxiosError(err)) {
-      console.error("[ENVIA] Error en API Envía:", err.response?.data || err.message);
-    } else {
-      console.error("[ENVIA] Excepción en crearEnvioParaPedido:", err);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      const apiErr = err.response?.data;
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      errorMsg = String(apiErr?.error?.message || apiErr?.error?.description || err.message);
+      console.error("[ENVIA] Error en API Envía:", apiErr || err.message);
+    } else if (err instanceof Error) {
+      errorMsg = err.message;
+      console.error("[ENVIA] Excepción en crearEnvioParaPedido:", err.message);
     }
-    return null;
+    throw new Error(errorMsg);
   }
 };

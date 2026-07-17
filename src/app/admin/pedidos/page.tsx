@@ -8,7 +8,7 @@ import { DetallePedidoModal } from "../../../components/DetallePedidoModal";
 import {
   Download, Search, Filter,
   Clock, Package,
-  FileText, Settings2, Mail, TrendingUp, Users, ArrowUpRight, Calendar, CheckCircle2
+  FileText, Settings2, Mail, TrendingUp, Users, ArrowUpRight, Calendar, CheckCircle2, AlertTriangle
 } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter
@@ -114,6 +114,11 @@ export default function AdminPedidosPage() {
   const [generandoReporte, setGenerandoReporte] = useState(false);
   const [managerEmail, setManagerEmail] = useState("");
   const [openConfig, setOpenConfig] = useState(false);
+
+  // Estado para el diálogo de confirmación de pago manual
+  const [confirmarPagoOpen, setConfirmarPagoOpen] = useState(false);
+  const [pedidoAConfirmar, setPedidoAConfirmar] = useState<Pedido | null>(null);
+  const [notaPago, setNotaPago] = useState("");
 
   useEffect(() => {
     setCurrentPage(1);
@@ -552,8 +557,13 @@ export default function AdminPedidosPage() {
                             </Button>
                             {p.estado === 'pendiente_pago' && (
                               <Button
-                                onClick={() => simularPagoAprobado(p.id)}
+                                onClick={() => {
+                                  setPedidoAConfirmar(p);
+                                  setNotaPago("");
+                                  setConfirmarPagoOpen(true);
+                                }}
                                 disabled={procesandoPago === p.id}
+                                title="Aprobar pago manualmente"
                                 className="h-12 w-12 bg-[#00a19a] hover:bg-[#00897B] text-white rounded-xl shadow-lg shadow-[#00a19a]/20 flex items-center justify-center transition-all hover:scale-105 active:scale-95"
                               >
                                 {procesandoPago === p.id ? (
@@ -613,6 +623,92 @@ export default function AdminPedidosPage() {
           )}
         </Card>
       </div>
+
+      {/* ── Diálogo de Confirmación de Pago Manual ── */}
+      <Dialog open={confirmarPagoOpen} onOpenChange={setConfirmarPagoOpen}>
+        <DialogContent className="max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-slate-900">
+              <AlertTriangle className="w-5 h-5 text-amber-500" />
+              Confirmar Aprobación de Pago
+            </DialogTitle>
+          </DialogHeader>
+
+          {pedidoAConfirmar && (
+            <div className="py-2 space-y-4">
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800 font-medium">
+                Estás a punto de marcar el pedido{" "}
+                <span className="font-black">#{pedidoAConfirmar.id}</span> como{" "}
+                <span className="font-black text-emerald-700">PAGADO</span> manualmente.
+                <br />
+                <span className="text-xs text-amber-600 mt-1 block">
+                  Esta acción enviará el correo de confirmación al cliente y generará la guía de envío.
+                </span>
+              </div>
+
+              <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 text-xs space-y-1">
+                <div className="flex justify-between">
+                  <span className="text-slate-500 font-bold">Cliente:</span>
+                  <span className="text-slate-800 font-black">
+                    {(() => {
+                      try {
+                        const c = typeof pedidoAConfirmar.datos_contacto === "string"
+                          ? JSON.parse(pedidoAConfirmar.datos_contacto) as DatosContacto
+                          : pedidoAConfirmar.datos_contacto as unknown as DatosContacto;
+                        return c?.nombre ?? "-";
+                      } catch { return "-"; }
+                    })()}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500 font-bold">Total:</span>
+                  <span className="text-slate-800 font-black">${Number(pedidoAConfirmar.total).toLocaleString('es-CO')}</span>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-black text-slate-600 uppercase tracking-wider">
+                  Nota / Motivo (opcional)
+                </label>
+                <Input
+                  placeholder="Ej: Cliente envió comprobante de transferencia"
+                  value={notaPago}
+                  onChange={(e) => setNotaPago(e.target.value)}
+                  className="rounded-xl border-slate-200 text-sm"
+                />
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setConfirmarPagoOpen(false)}
+              className="rounded-xl border-slate-200 text-slate-600 font-bold"
+            >
+              Cancelar
+            </Button>
+            <Button
+              disabled={procesandoPago === pedidoAConfirmar?.id}
+              onClick={async () => {
+                if (!pedidoAConfirmar) return;
+                setConfirmarPagoOpen(false);
+                await simularPagoAprobado(pedidoAConfirmar.id);
+                setPedidoAConfirmar(null);
+                setNotaPago("");
+              }}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black flex items-center gap-2"
+            >
+              {procesandoPago === pedidoAConfirmar?.id ? (
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (
+                <CheckCircle2 className="w-4 h-4" />
+              )}
+              Sí, aprobar pago
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Modal Detail */}
       <DetallePedidoModal

@@ -7,6 +7,7 @@ import { createClient } from "@supabase/supabase-js";
 import { useToast } from "~/components/ui/use-toast";
 import Link from "next/link";
 import { ArrowLeft, CreditCard, Truck, Shield } from "lucide-react";
+import { DEPARTAMENTOS, MUNICIPIOS_POR_DEPARTAMENTO } from "~/constants/colombia-data";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
@@ -30,6 +31,7 @@ interface DatosCheckout {
   ciudad: string;
   departamento: string;
   codigoPostal: string;
+  cedula: string;
   notas?: string;
 }
 
@@ -45,6 +47,7 @@ export default function CheckoutPage() {
     ciudad: "",
     departamento: "",
     codigoPostal: "",
+    cedula: "",
     notas: ""
   });
   const { toast } = useToast();
@@ -84,12 +87,13 @@ export default function CheckoutPage() {
           ciudad: string | null;
           departamento: string | null;
           codigo_postal: string | null;
+          cedula: string | null;
         }
 
         // Buscar datos adicionales en la tabla usuarios para pre-llenar
         const { data: usuarioDb } = await supabase
           .from("usuarios")
-          .select("telefono, direccion, ciudad, departamento, codigo_postal")
+          .select("telefono, direccion, ciudad, departamento, codigo_postal, cedula")
           .eq("auth_id", data.user.id)
           .single<UsuarioContactoDB>();
 
@@ -100,7 +104,8 @@ export default function CheckoutPage() {
             direccion: usuarioDb.direccion ?? "",
             ciudad: usuarioDb.ciudad ?? "",
             departamento: usuarioDb.departamento ?? "",
-            codigoPostal: usuarioDb.codigo_postal ?? ""
+            codigoPostal: usuarioDb.codigo_postal ?? "",
+            cedula: usuarioDb.cedula ?? ""
           }));
         }
       }
@@ -124,7 +129,7 @@ export default function CheckoutPage() {
   };
 
   const validarFormulario = () => {
-    const camposRequeridos = ['nombre', 'email', 'telefono', 'direccion', 'ciudad', 'departamento', 'codigoPostal'];
+    const camposRequeridos = ['nombre', 'email', 'telefono', 'direccion', 'ciudad', 'departamento', 'codigoPostal', 'cedula'];
     return camposRequeridos.every(campo => datosCheckout[campo as keyof DatosCheckout]);
   };
 
@@ -172,6 +177,7 @@ export default function CheckoutPage() {
           nombre: datosCheckout.nombre,
           email: datosCheckout.email,
           telefono: datosCheckout.telefono,
+          cedula: datosCheckout.cedula,
         },
         datos_envio: {
           direccion: datosCheckout.direccion,
@@ -272,6 +278,19 @@ export default function CheckoutPage() {
       setLoading(false);
     }
   };
+  // Obtener ciudades disponibles basadas en el departamento seleccionado
+  const deptoSeleccionadoObj = DEPARTAMENTOS.find(d => d.nombre === datosCheckout.departamento);
+  const deptoCodigo = deptoSeleccionadoObj?.codigo ?? "";
+  const ciudadesDisponibles = deptoCodigo ? (MUNICIPIOS_POR_DEPARTAMENTO[deptoCodigo] ?? []) : [];
+
+  const handleDepartamentoChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const deptNombre = e.target.value;
+    setDatosCheckout(prev => ({
+      ...prev,
+      departamento: deptNombre,
+      ciudad: "" // Reiniciar ciudad cuando cambia depto
+    }));
+  };
 
   if (carrito.length === 0) {
     return (
@@ -344,6 +363,18 @@ export default function CheckoutPage() {
                     required
                   />
                 </div>
+
+                <div>
+                  <label className="block text-xs sm:text-sm font-medium mb-1">Cédula / NIT (CC) *</label>
+                  <Input
+                    name="cedula"
+                    value={datosCheckout.cedula}
+                    onChange={handleInputChange}
+                    placeholder="Ej: 1000123456"
+                    className="text-sm sm:text-base"
+                    required
+                  />
+                </div>
                 
                 <div className="md:col-span-2">
                   <label className="block text-xs sm:text-sm font-medium mb-1">Dirección *</label>
@@ -358,27 +389,34 @@ export default function CheckoutPage() {
                 </div>
                 
                 <div>
-                  <label className="block text-xs sm:text-sm font-medium mb-1">Ciudad *</label>
-                  <Input
-                    name="ciudad"
-                    value={datosCheckout.ciudad}
-                    onChange={handleInputChange}
-                    placeholder="Bogotá"
-                    className="text-sm sm:text-base"
+                  <label className="block text-xs sm:text-sm font-medium mb-1">Departamento *</label>
+                  <select
+                    value={datosCheckout.departamento}
+                    onChange={handleDepartamentoChange}
+                    className="w-full bg-white border border-gray-300 focus:border-[#00a19a] focus:ring-1 focus:ring-[#00a19a] rounded-md text-sm p-2.5 transition-all text-slate-800"
                     required
-                  />
+                  >
+                    <option value="">Selecciona un departamento</option>
+                    {DEPARTAMENTOS.map(dept => (
+                      <option key={dept.codigo} value={dept.nombre}>{dept.nombre}</option>
+                    ))}
+                  </select>
                 </div>
                 
                 <div>
-                  <label className="block text-xs sm:text-sm font-medium mb-1">Departamento *</label>
-                  <Input
-                    name="departamento"
-                    value={datosCheckout.departamento}
-                    onChange={handleInputChange}
-                    placeholder="Cundinamarca"
-                    className="text-sm sm:text-base"
+                  <label className="block text-xs sm:text-sm font-medium mb-1">Ciudad *</label>
+                  <select
+                    value={datosCheckout.ciudad}
+                    onChange={e => setDatosCheckout(prev => ({ ...prev, ciudad: e.target.value }))}
+                    className="w-full bg-white border border-gray-300 focus:border-[#00a19a] focus:ring-1 focus:ring-[#00a19a] rounded-md text-sm p-2.5 transition-all text-slate-800 disabled:bg-slate-50 disabled:text-slate-400"
+                    disabled={!datosCheckout.departamento}
                     required
-                  />
+                  >
+                    <option value="">Selecciona un municipio</option>
+                    {ciudadesDisponibles.map(ciudad => (
+                      <option key={ciudad} value={ciudad}>{ciudad}</option>
+                    ))}
+                  </select>
                 </div>
                 
                 <div>

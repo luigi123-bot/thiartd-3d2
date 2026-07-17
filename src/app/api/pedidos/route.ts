@@ -18,6 +18,7 @@ interface DatosContacto {
   nombre: string;
   email: string;
   telefono: string;
+  cedula?: string;
 }
 
 interface DatosEnvio {
@@ -137,7 +138,8 @@ export async function POST(req: Request) {
               direccion: datos_envio.direccion,
               ciudad: datos_envio.ciudad,
               departamento: datos_envio.departamento,
-              codigo_postal: datos_envio.codigoPostal
+              codigo_postal: datos_envio.codigoPostal,
+              cedula: datos_contacto.cedula
             })
             .eq("auth_id", cliente_id);
             

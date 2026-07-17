@@ -10,7 +10,8 @@ import {
   FiBell,
   FiMenu,
   FiX,
-  FiLogOut
+  FiLogOut,
+  FiShoppingBag
 } from "react-icons/fi";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { usePathname, useRouter } from "next/navigation";
@@ -327,6 +328,32 @@ export default function AdminSidebar() {
               </Link>
             );
           })}
+
+          {/* Separador y botón Ir a la Tienda */}
+          <div className="pt-2 mt-1 border-t border-white/10">
+            <Link
+              href="/"
+              onClick={() => setMenuOpen(false)}
+              className={clsx(
+                "flex items-center font-bold transition-all text-sm group relative",
+                isSidebarExpanded || menuOpen
+                  ? "gap-3 p-3 w-full rounded-xl"
+                  : "justify-center w-10 h-10 rounded-xl",
+                "text-white/70 hover:bg-white/10 hover:text-white"
+              )}
+            >
+              <FiShoppingBag className="w-[18px] h-[18px] shrink-0 text-white" />
+              {(isSidebarExpanded || menuOpen) && (
+                <span className="transition-opacity duration-200">Ir a la Tienda</span>
+              )}
+              {/* Tooltip cuando está colapsado */}
+              {!isSidebarExpanded && !menuOpen && (
+                <span className="absolute left-14 scale-0 transition-all rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-black uppercase tracking-wider text-white group-hover:scale-100 shadow-md whitespace-nowrap z-50 pointer-events-none">
+                  Ir a la Tienda
+                </span>
+              )}
+            </Link>
+          </div>
         </nav>
 
         {/* Botón de Notificaciones en Sidebar */}

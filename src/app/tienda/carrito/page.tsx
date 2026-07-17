@@ -4,10 +4,11 @@ import { Button } from "~/components/ui/button";
 import { Card } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
 import Link from "next/link";
-import { Trash2, Plus, Minus, ShoppingBag, CreditCard, Package } from "lucide-react";
+import { Trash2, Plus, Minus, ShoppingBag, CreditCard, Package, User, MapPin, FileText } from "lucide-react";
 import NextImage from "next/image";
 import { useToast } from "~/components/ui/use-toast";
 import { createClient } from "@supabase/supabase-js";
+import { DEPARTAMENTOS, MUNICIPIOS_POR_DEPARTAMENTO } from "~/constants/colombia-data";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
@@ -33,7 +34,8 @@ export default function CarritoPage() {
   const [datosContacto, setDatosContacto] = useState({
     nombre: "",
     email: "",
-    telefono: ""
+    telefono: "",
+    cedula: ""
   });
   const [datosEnvio, setDatosEnvio] = useState({
     direccion: "",
@@ -83,29 +85,29 @@ export default function CarritoPage() {
           email: data.user.email ?? ""
         }));
 
-        interface UsuarioContactoDB {
-          telefono: string | null;
-          direccion: string | null;
-          ciudad: string | null;
-          departamento: string | null;
-          codigo_postal: string | null;
-        }
-
         // Buscar datos adicionales en la tabla usuarios para pre-llenar
-        // Usamos try-catch y maybeSingle para no romper la página si las columnas no existen aún
         try {
+          interface UsuarioDBExtra {
+            telefono?: string | null;
+            direccion?: string | null;
+            ciudad?: string | null;
+            departamento?: string | null;
+            codigo_postal?: string | null;
+            cedula?: string | null;
+          }
           const { data: usuarioDb, error: userError } = await supabase
             .from("usuarios")
-            .select("telefono, direccion, ciudad, departamento, codigo_postal")
+            .select("telefono, direccion, ciudad, departamento, codigo_postal, cedula")
             .eq("auth_id", data.user.id)
-            .maybeSingle<UsuarioContactoDB>();
+            .maybeSingle<UsuarioDBExtra>();
 
           if (userError) {
-            console.warn("⚠️ No se pudieron cargar los datos de perfil (columna no encontrada):", userError.message);
+            console.warn("⚠️ No se pudieron cargar los datos de perfil:", userError.message);
           } else if (usuarioDb) {
             setDatosContacto(prev => ({
               ...prev,
-              telefono: usuarioDb.telefono ?? prev.telefono
+              telefono: usuarioDb.telefono ?? prev.telefono,
+              cedula: usuarioDb.cedula ?? prev.cedula
             }));
             setDatosEnvio(prev => ({
               ...prev,
@@ -119,55 +121,9 @@ export default function CarritoPage() {
         } catch (e) {
           console.warn("Error silencioso al cargar datos de perfil:", e);
         }
-      } else {
-        console.log("⚠️ No hay usuario autenticado");
       }
     })();
   }, []);
-  {/* Formulario de datos de contacto y envío */ }
-  <div className="mb-6">
-    <Card className="p-4 sm:p-6">
-      <h2 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4">Datos de contacto y envío</h2>
-      <form className="grid grid-cols-1 md:grid-cols-2 gap-4" autoComplete="off">
-        <div>
-          <label className="block text-sm font-medium mb-1">Nombre completo</label>
-          <Input type="text" value={datosContacto.nombre} onChange={e => setDatosContacto(dc => ({ ...dc, nombre: e.target.value }))} required />
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">Correo electrónico</label>
-          <Input type="email" value={datosContacto.email} onChange={e => setDatosContacto(dc => ({ ...dc, email: e.target.value }))} required />
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">Teléfono</label>
-          <Input type="tel" value={datosContacto.telefono} onChange={e => setDatosContacto(dc => ({ ...dc, telefono: e.target.value }))} required />
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">Dirección</label>
-          <Input type="text" value={datosEnvio.direccion} onChange={e => setDatosEnvio(de => ({ ...de, direccion: e.target.value }))} required />
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">Ciudad</label>
-          <Input type="text" value={datosEnvio.ciudad} onChange={e => setDatosEnvio(de => ({ ...de, ciudad: e.target.value }))} required />
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">Departamento</label>
-          <Input type="text" value={datosEnvio.departamento} onChange={e => setDatosEnvio(de => ({ ...de, departamento: e.target.value }))} required />
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">Código Postal</label>
-          <Input type="text" value={datosEnvio.codigoPostal} onChange={e => setDatosEnvio(de => ({ ...de, codigoPostal: e.target.value }))} required />
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">Teléfono de envío</label>
-          <Input type="tel" value={datosEnvio.telefono} onChange={e => setDatosEnvio(de => ({ ...de, telefono: e.target.value }))} required />
-        </div>
-        <div className="md:col-span-2">
-          <label className="block text-sm font-medium mb-1">Notas para el envío (opcional)</label>
-          <Input type="text" value={datosEnvio.notas} onChange={e => setDatosEnvio(de => ({ ...de, notas: e.target.value }))} />
-        </div>
-      </form>
-    </Card>
-  </div>
 
   // Sincronizar localStorage cuando cambia el carrito (SOLO después de la carga inicial)
   useEffect(() => {
@@ -204,6 +160,20 @@ export default function CarritoPage() {
       window.dispatchEvent(new CustomEvent("cart-updated"));
       return updated;
     });
+  };
+
+  // Obtener ciudades disponibles basadas en el departamento seleccionado
+  const deptoSeleccionadoObj = DEPARTAMENTOS.find(d => d.nombre === datosEnvio.departamento);
+  const deptoCodigo = deptoSeleccionadoObj?.codigo ?? "";
+  const ciudadesDisponibles = deptoCodigo ? (MUNICIPIOS_POR_DEPARTAMENTO[deptoCodigo] ?? []) : [];
+
+  const handleDepartamentoChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const deptNombre = e.target.value;
+    setDatosEnvio(de => ({
+      ...de,
+      departamento: deptNombre,
+      ciudad: "" // Reiniciar ciudad cuando cambia depto
+    }));
   };
 
   // Aplicar cupón
@@ -278,47 +248,155 @@ export default function CarritoPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 md:gap-8">
           {/* Columna principal: productos y formulario */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Formulario de datos de contacto y envío */}
-            <Card className="p-4 sm:p-6">
-              <h2 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4">Datos de contacto y envío</h2>
-              <form className="grid grid-cols-1 md:grid-cols-2 gap-4" autoComplete="off">
+            {/* Formulario de datos de contacto y envío con Estética Premium */}
+            <Card className="border border-slate-100 shadow-xl shadow-slate-100/50 rounded-2xl overflow-hidden bg-white">
+              <div className="bg-slate-50/70 border-b border-slate-100 px-6 py-5">
+                <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                  <User className="w-5 h-5 text-[#00a19a]" />
+                  Información del destinatario y entrega
+                </h2>
+                <p className="text-xs text-slate-500 mt-1">Completa los campos obligatorios para generar tu guía de envío en tiempo real.</p>
+              </div>
+              
+              <div className="p-6 space-y-6">
+                {/* Bloque 1: Datos Personales */}
                 <div>
-                  <label className="block text-sm font-medium mb-1">Nombre completo</label>
-                  <Input type="text" value={datosContacto.nombre} onChange={e => setDatosContacto(dc => ({ ...dc, nombre: e.target.value }))} required />
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5" />
+                    1. Datos de Contacto
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1">Nombre completo *</label>
+                      <Input
+                        type="text"
+                        value={datosContacto.nombre}
+                        onChange={e => setDatosContacto(dc => ({ ...dc, nombre: e.target.value }))}
+                        className="bg-white border-slate-200 focus:border-[#00a19a] focus:ring-1 focus:ring-[#00a19a] rounded-lg text-sm transition-all"
+                        placeholder="Luis Gotopo"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1">Correo electrónico *</label>
+                      <Input
+                        type="email"
+                        value={datosContacto.email}
+                        onChange={e => setDatosContacto(dc => ({ ...dc, email: e.target.value }))}
+                        className="bg-white border-slate-200 focus:border-[#00a19a] focus:ring-1 focus:ring-[#00a19a] rounded-lg text-sm transition-all"
+                        placeholder="tuemail@correo.com"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1">Teléfono móvil *</label>
+                      <Input
+                        type="tel"
+                        value={datosContacto.telefono}
+                        onChange={e => setDatosContacto(dc => ({ ...dc, telefono: e.target.value }))}
+                        className="bg-white border-slate-200 focus:border-[#00a19a] focus:ring-1 focus:ring-[#00a19a] rounded-lg text-sm transition-all"
+                        placeholder="3012906861"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1">Cédula de ciudadanía / NIT *</label>
+                      <Input
+                        type="text"
+                        value={datosContacto.cedula}
+                        onChange={e => setDatosContacto(dc => ({ ...dc, cedula: e.target.value }))}
+                        className="bg-white border-slate-200 focus:border-[#00a19a] focus:ring-1 focus:ring-[#00a19a] rounded-lg text-sm transition-all"
+                        placeholder="Ej: 1000123456"
+                        required
+                      />
+                    </div>
+                  </div>
                 </div>
+
+                <hr className="border-slate-100" />
+
+                {/* Bloque 2: Dirección de Envío */}
                 <div>
-                  <label className="block text-sm font-medium mb-1">Correo electrónico</label>
-                  <Input type="email" value={datosContacto.email} onChange={e => setDatosContacto(dc => ({ ...dc, email: e.target.value }))} required />
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5" />
+                    2. Dirección de Entrega
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="md:col-span-2">
+                      <label className="block text-xs font-semibold text-slate-600 mb-1">Dirección exacta (Debe incluir calle/carrera y número, ej: # 40-70) *</label>
+                      <Input
+                        type="text"
+                        value={datosEnvio.direccion}
+                        onChange={e => setDatosEnvio(de => ({ ...de, direccion: e.target.value }))}
+                        className="bg-white border-slate-200 focus:border-[#00a19a] focus:ring-1 focus:ring-[#00a19a] rounded-lg text-sm transition-all"
+                        placeholder="Calle 123 # 45-67"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1">Departamento *</label>
+                      <select
+                        value={datosEnvio.departamento}
+                        onChange={handleDepartamentoChange}
+                        className="w-full bg-white border border-slate-200 focus:border-[#00a19a] focus:ring-1 focus:ring-[#00a19a] rounded-lg text-sm p-2.5 transition-all text-slate-800"
+                        required
+                      >
+                        <option value="">Selecciona un departamento</option>
+                        {DEPARTAMENTOS.map(dept => (
+                          <option key={dept.codigo} value={dept.nombre}>{dept.nombre}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1">Municipio / Ciudad *</label>
+                      <select
+                        value={datosEnvio.ciudad}
+                        onChange={e => setDatosEnvio(de => ({ ...de, ciudad: e.target.value }))}
+                        className="w-full bg-white border border-slate-200 focus:border-[#00a19a] focus:ring-1 focus:ring-[#00a19a] rounded-lg text-sm p-2.5 transition-all text-slate-800 disabled:bg-slate-50 disabled:text-slate-400"
+                        disabled={!datosEnvio.departamento}
+                        required
+                      >
+                        <option value="">Selecciona un municipio</option>
+                        {ciudadesDisponibles.map(ciudad => (
+                          <option key={ciudad} value={ciudad}>{ciudad}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1">Código Postal *</label>
+                      <Input
+                        type="text"
+                        value={datosEnvio.codigoPostal}
+                        onChange={e => setDatosEnvio(de => ({ ...de, codigoPostal: e.target.value }))}
+                        className="bg-white border-slate-200 focus:border-[#00a19a] focus:ring-1 focus:ring-[#00a19a] rounded-lg text-sm transition-all"
+                        placeholder="760006"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1">Teléfono de entrega alterno *</label>
+                      <Input
+                        type="tel"
+                        value={datosEnvio.telefono}
+                        onChange={e => setDatosEnvio(de => ({ ...de, telefono: e.target.value }))}
+                        className="bg-white border-slate-200 focus:border-[#00a19a] focus:ring-1 focus:ring-[#00a19a] rounded-lg text-sm transition-all"
+                        placeholder="3012906861"
+                        required
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-xs font-semibold text-slate-600 mb-1">Indicaciones especiales (Apto, Conjunto, Casa - Opcional)</label>
+                      <Input
+                        type="text"
+                        value={datosEnvio.notas}
+                        onChange={e => setDatosEnvio(de => ({ ...de, notas: e.target.value }))}
+                        className="bg-white border-slate-200 focus:border-[#00a19a] focus:ring-1 focus:ring-[#00a19a] rounded-lg text-sm transition-all"
+                        placeholder="Ej: Frente al parque principal"
+                      />
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Teléfono</label>
-                  <Input type="tel" value={datosContacto.telefono} onChange={e => setDatosContacto(dc => ({ ...dc, telefono: e.target.value }))} required />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Dirección</label>
-                  <Input type="text" value={datosEnvio.direccion} onChange={e => setDatosEnvio(de => ({ ...de, direccion: e.target.value }))} required />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Ciudad</label>
-                  <Input type="text" value={datosEnvio.ciudad} onChange={e => setDatosEnvio(de => ({ ...de, ciudad: e.target.value }))} required />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Departamento</label>
-                  <Input type="text" value={datosEnvio.departamento} onChange={e => setDatosEnvio(de => ({ ...de, departamento: e.target.value }))} required />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Código Postal</label>
-                  <Input type="text" value={datosEnvio.codigoPostal} onChange={e => setDatosEnvio(de => ({ ...de, codigoPostal: e.target.value }))} required />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Teléfono de envío</label>
-                  <Input type="tel" value={datosEnvio.telefono} onChange={e => setDatosEnvio(de => ({ ...de, telefono: e.target.value }))} required />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium mb-1">Notas para el envío (opcional)</label>
-                  <Input type="text" value={datosEnvio.notas} onChange={e => setDatosEnvio(de => ({ ...de, notas: e.target.value }))} />
-                </div>
-              </form>
+              </div>
             </Card>
 
             {/* Lista de productos */}
@@ -479,15 +557,14 @@ export default function CarritoPage() {
                 {/* Botón de pago directo con Wompi, solo si monto mínimo */}
                 {total >= 1500 && (
                   <Button
-                    className="w-full bg-[#ffb800] hover:bg-[#ffd700] text-black text-sm sm:text-base mt-2"
+                    className="w-full bg-gradient-to-r from-[#00a19a] to-[#00c2ba] hover:from-[#007973] hover:to-[#00a19a] text-white font-bold text-sm sm:text-base py-6 rounded-xl transition-all shadow-md shadow-[#00a19a]/10 hover:shadow-lg hover:shadow-[#00a19a]/20 border-none"
                     size="lg"
-                    variant="outline"
                     onClick={async () => {
                       try {
                         // 1. Crear pedido en la base de datos
                         // Validar datos antes de enviar
-                        if (!datosContacto.nombre || !datosContacto.email || !datosContacto.telefono || !datosEnvio.direccion || !datosEnvio.ciudad || !datosEnvio.departamento || !datosEnvio.codigoPostal || !datosEnvio.telefono) {
-                          toast({ title: "Completa todos los campos requeridos", variant: "destructive" });
+                        if (!datosContacto.nombre || !datosContacto.email || !datosContacto.telefono || !datosContacto.cedula || !datosEnvio.direccion || !datosEnvio.ciudad || !datosEnvio.departamento || !datosEnvio.codigoPostal || !datosEnvio.telefono) {
+                          toast({ title: "Completa todos los campos obligatorios", description: "Todos los campos de contacto y envío marcados con * son requeridos por las empresas de transporte.", variant: "destructive" });
                           return;
                         }
                         const pedidoRes = await fetch("/api/pedidos", {

@@ -184,6 +184,35 @@ export async function POST(req: Request) {
           numero_tracking: pedidoActual.numero_tracking,
           empresa_envio: pedidoActual.empresa_envio ?? undefined,
         };
+
+        // Si el estado es en_envio, también enviar el correo con la información del tracking actual
+        if (estado === "en_envio" || estado === "en_transito") {
+          try {
+            let contacto: { nombre?: string; email?: string } = {};
+            try {
+              if (pedidoActual.datos_contacto) {
+                contacto = JSON.parse(pedidoActual.datos_contacto) as { nombre?: string; email?: string };
+              }
+            } catch { /* ignorar error de parsing */ }
+
+            if (contacto.email) {
+              await sendShippingEmail({
+                to: contacto.email,
+                nombreCliente: contacto.nombre ?? "Cliente",
+                pedidoId: pedido_id,
+                numeroTracking: pedidoActual.numero_tracking,
+                empresaEnvio: pedidoActual.empresa_envio ?? "Transportista",
+                ciudadDestino: pedidoActual.ciudad_envio ?? undefined,
+                fechaEstimada: pedidoActual.fecha_estimada_entrega ?? undefined,
+              });
+              console.log(`[TRACKING] ✉️ Email de envío (manual/actualización) enviado a ${contacto.email} para pedido #${pedido_id}`);
+            } else {
+              console.warn(`[TRACKING] No se encontró email para envío manual en pedido #${pedido_id}`);
+            }
+          } catch (emailErr) {
+            console.error(`[TRACKING] Error enviando email de envío manual:`, emailErr);
+          }
+        }
       }
     }
 
