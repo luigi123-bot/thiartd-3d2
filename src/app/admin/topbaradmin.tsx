@@ -75,6 +75,7 @@ export default function AdminSidebar() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loadingNotif, setLoadingNotif] = useState(false);
   const [unread, setUnread] = useState(0);
+  const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
   const [usuario, setUsuario] = useState<{
     id?: string;
     nombre?: string;
@@ -94,6 +95,7 @@ export default function AdminSidebar() {
     }
   }, []);
 
+
   const handleToggleCollapse = () => {
     const next = !isCollapsed;
     setIsCollapsed(next);
@@ -104,11 +106,14 @@ export default function AdminSidebar() {
   const fetchNotifications = useCallback(async () => {
     setLoadingNotif(true);
     try {
-      const [notifsSys, pedidosPending, mensajesNew] = await Promise.all([
+      const [notifsSys, pedidosPending, mensajesNew, unreadCountRes] = await Promise.all([
         supabase.from("notificaciones").select("*").order("created_at", { ascending: false }).limit(20) as unknown as Promise<{ data: NotifDb[] | null }>,
         supabase.from("pedidos").select("id, created_at").eq("estado", "pendiente_cotizacion").order("created_at", { ascending: false }).limit(5) as unknown as Promise<{ data: PedidoDb[] | null }>,
         supabase.from("mensajes").select("id, asunto, created_at").eq("leido", false).neq("nombre", "Admin").order("created_at", { ascending: false }).limit(5) as unknown as Promise<{ data: MensajeDb[] | null }>,
+        supabase.from("mensajes").select("id", { count: "exact", head: true }).eq("leido", false).neq("nombre", "Admin"),
       ]);
+
+      setUnreadMessagesCount(unreadCountRes.count ?? 0);
 
       const compiled: Notification[] = [];
 
@@ -263,7 +268,7 @@ export default function AdminSidebar() {
         className={clsx(
           "self-stretch bg-[#007973] border-r border-[#005f5a] text-white flex flex-col justify-between transition-all duration-300 z-50 shrink-0",
           // Layout en desktop: sticky para que permanezca visible al hacer scroll pero se estire con el contenido
-          "hidden lg:flex lg:sticky lg:top-0 lg:max-h-screen",
+          "hidden lg:flex lg:fixed lg:left-0 lg:top-0 lg:h-screen",
           isSidebarExpanded ? "lg:w-64" : "lg:w-20",
           // Layout en móvil como drawer
           menuOpen ? "fixed left-0 top-0 h-screen w-64 flex" : "fixed -left-64 lg:left-auto lg:top-auto"
@@ -299,6 +304,8 @@ export default function AdminSidebar() {
         )}>
           {MENU.map(({ href, label, icon: Icon }) => {
             const isActive = pathname === href;
+            const isMensajes = href === "/admin/mensajes";
+            const showBadge = isMensajes && unreadMessagesCount > 0;
             return (
               <Link
                 key={href}
@@ -314,15 +321,31 @@ export default function AdminSidebar() {
                     : "text-white/70 hover:bg-white/10 hover:text-white"
                 )}
               >
-                <Icon className={clsx("w-[18px] h-[18px] shrink-0", isActive ? "text-[#007973]" : "text-white")} />
+                <div className="relative flex items-center justify-center">
+                  <Icon className={clsx("w-[18px] h-[18px] shrink-0", isActive ? "text-[#007973]" : "text-white")} />
+                  {/* Badge en icono cuando está colapsado (estilo WhatsApp) */}
+                  {showBadge && !isSidebarExpanded && !menuOpen && (
+                    <span className="absolute -top-2 -right-2 min-w-[16px] h-[16px] px-1 bg-[#25D366] text-white text-[9px] font-black rounded-full flex items-center justify-center border border-[#007973] shadow-sm animate-pulse">
+                      {unreadMessagesCount > 9 ? "+9" : unreadMessagesCount}
+                    </span>
+                  )}
+                </div>
+
                 {(isSidebarExpanded || menuOpen) && (
                   <span className="transition-opacity duration-200">{label}</span>
+                )}
+
+                {/* Badge en texto cuando está expandido (estilo WhatsApp) */}
+                {showBadge && (isSidebarExpanded || menuOpen) && (
+                  <span className="ml-auto bg-[#25D366] text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-sm">
+                    {unreadMessagesCount > 99 ? "+99" : unreadMessagesCount}
+                  </span>
                 )}
 
                 {/* Tooltip on Hover when collapsed */}
                 {!isSidebarExpanded && !menuOpen && (
                   <span className="absolute left-14 scale-0 transition-all rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-black uppercase tracking-wider text-white group-hover:scale-100 shadow-md whitespace-nowrap z-50 pointer-events-none">
-                    {label}
+                    {label} {showBadge ? `(${unreadMessagesCount})` : ''}
                   </span>
                 )}
               </Link>

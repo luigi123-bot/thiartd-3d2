@@ -1,11 +1,11 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import { ChevronLeft, ChevronRight, ShoppingCart, Eye, Sparkles} from "lucide-react";
 import clsx from "clsx";
-import { createClient } from "@supabase/supabase-js";
+import { supabase } from "~/lib/supabaseClient";
 
 interface Producto {
   id: number;
@@ -22,9 +22,7 @@ interface ProductosCarruselProps {
   soloDestacados?: boolean;
 }
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
-const supabase = createClient(supabaseUrl, supabaseKey);
+
 
 const mockProductos: Producto[] = [
   {
@@ -104,7 +102,7 @@ export default function ProductosCarrusel({ soloDestacados = false }: ProductosC
           usuarios: Array.isArray(p.usuarios) ? p.usuarios[0] : p.usuarios
         })) as Producto[];
 
-        if (!!soloDestacados) {
+        if (soloDestacados) {
           productosFiltrados = productosFiltrados.filter((p: Producto) => p.destacado);
         }
         
@@ -122,17 +120,25 @@ export default function ProductosCarrusel({ soloDestacados = false }: ProductosC
   }, [soloDestacados]);
 
   const [cardsPerView, setCardsPerView] = useState(1);
-  useEffect(() => {
-    function handleResize() {
-      if (window.innerWidth < 640) setCardsPerView(1);
-      else if (window.innerWidth < 1024) setCardsPerView(2);
-      else if (window.innerWidth < 1280) setCardsPerView(3);
-      else setCardsPerView(4);
-    }
-    handleResize();
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
+  const getCardsPerView = useCallback(() => {
+    if (window.innerWidth < 640) return 1;
+    if (window.innerWidth < 1024) return 2;
+    if (window.innerWidth < 1280) return 3;
+    return 4;
   }, []);
+  useEffect(() => {
+    setCardsPerView(getCardsPerView());
+    let debounceTimer: ReturnType<typeof setTimeout>;
+    function handleResize() {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => setCardsPerView(getCardsPerView()), 200);
+    }
+    window.addEventListener("resize", handleResize, { passive: true });
+    return () => {
+      clearTimeout(debounceTimer);
+      window.removeEventListener("resize", handleResize);
+    };
+  }, [getCardsPerView]);
 
   useEffect(() => {
     if (isPaused || productos.length <= cardsPerView) return;
@@ -204,6 +210,8 @@ export default function ProductosCarrusel({ soloDestacados = false }: ProductosC
                   src={prod.image_url ?? "/logo.png"}
                   alt={prod.nombre}
                   fill
+                  priority={idx === 0}
+                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
                   className="object-contain transition-transform duration-700 group-hover/img:scale-110 drop-shadow-xl"
                 />
                 

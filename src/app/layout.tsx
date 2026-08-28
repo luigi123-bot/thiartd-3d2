@@ -3,33 +3,58 @@ import { type Metadata } from "next";
 import "../styles/globals.css";
 
 import { ToastProvider } from "~/components/ui/use-toast";
-import Footer from "~/components/Footer";
 import { UiProvider } from "~/components/providers/UiProvider";
 import { CarritoProvider } from "~/components/providers/CarritoProvider";
-import ClientChatWidgetWrapper from "~/components/ClientChatWidgetWrapper";
 
 export const metadata: Metadata = {
-  title: "Thiart3D",
-  keywords: ["3D", "productos", "arte", "esculturas", "personalizados"],
+  title: {
+    default: "Thiart3D — Impresión 3D Sostenible",
+    template: "%s | Thiart3D",
+  },
+  description:
+    "Descubre productos 3D únicos hechos con botellas recicladas. Arte tridimensional sostenible para empresas y personas con propósito.",
+  keywords: ["3D", "productos", "arte", "esculturas", "personalizados", "reciclado", "sostenible", "Colombia"],
   authors: [{ name: "Thiart3D" }],
   creator: "Thiart3D",
   publisher: "Thiart3D",
-  description: "Descubre productos 3D únicos y personalizados. Arte tridimensional para todos los gustos y espacios.",
-  icons: [{ rel: "icon", url: "./favicon" }],
+  metadataBase: new URL("https://thiart3d.com"),
+  openGraph: {
+    type: "website",
+    locale: "es_CO",
+    url: "https://thiart3d.com",
+    siteName: "Thiart3D",
+    title: "Thiart3D — Impresión 3D Sostenible",
+    description:
+      "Piezas 3D únicas fabricadas con botellas recicladas. Diseño con propósito para marcas y personas.",
+    images: [
+      {
+        url: "/logo.png",
+        width: 1200,
+        height: 630,
+        alt: "Thiart3D Logo",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Thiart3D — Impresión 3D Sostenible",
+    description:
+      "Piezas 3D únicas fabricadas con botellas recicladas. Diseño con propósito.",
+    images: ["/logo.png"],
+  },
+  icons: [{ rel: "icon", url: "/favicon.ico" }],
 };
 
 export default function RootLayout({
   children,
 }: Readonly<{ children: ReactNode }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="es" suppressHydrationWarning>
       <body className="antialiased font-sans" suppressHydrationWarning>
         <ToastProvider>
           <UiProvider>
             <CarritoProvider>
               {children}
-              <Footer />
-              <ClientChatWidgetWrapper />
             </CarritoProvider>
           </UiProvider>
         </ToastProvider>
@@ -37,8 +62,3 @@ export default function RootLayout({
     </html>
   );
 }
-export const dynamic = "force-dynamic"; // Forzar la regeneración de la página en cada solicitud
-export const revalidate = 0; // Desactivar la caché para esta página
-export const fetchCache = "force-no-store"; // Desactivar la caché de Next.js para esta página
-export const preferredRegion = "auto"; // Usar la región más cercana automáticamente
-export const dynamicParams = false; // Desactivar los parámetros dinámicos para esta página

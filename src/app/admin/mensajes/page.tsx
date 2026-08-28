@@ -1,12 +1,13 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { FiSend, FiUser, FiSearch, FiMoreVertical, FiCheck, FiMessageCircle, FiArrowLeft } from "react-icons/fi";
+import { FiSend, FiUser, FiSearch, FiMoreVertical, FiCheck, FiMessageCircle, FiArrowLeft, FiLock } from "react-icons/fi";
 import { MdDoneAll } from "react-icons/md";
 import { createClient } from "@supabase/supabase-js";
 import Loader from "~/components/providers/UiProvider";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "~/components/ui/dialog";
 import { useToast } from "~/components/ui/use-toast";
 import { Badge } from "~/components/ui/badge";
+import { Button } from "~/components/ui/button";
 
 // Configuración de Supabase utilizando variables de entorno
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "TU_SUPABASE_URL";
@@ -366,7 +367,45 @@ export default function AdminMensajesPage() {
 									</div>
 								</div>
 							</div>
-							<div className="flex items-center gap-2">
+							<div className="flex items-center gap-3">
+								<Button
+									onClick={async () => {
+										if (!selectedEmail) return;
+										if (!confirm(`¿Deseas finalizar y cerrar el chat con ${selectedThread?.nombre ?? selectedEmail}?`)) return;
+
+										const { data, error } = await supabase.from("mensajes").insert([
+											{
+												nombre: "Admin",
+												email: selectedEmail,
+												mensaje: "🔒 Esta conversación ha sido finalizada y cerrada por el soporte de Thiart3D. ¡Gracias por comunicarte con nosotros!",
+												respondido: true,
+												leido: true
+											},
+										]).select().single<Mensaje>();
+
+										if (error) {
+											toast({ title: "Error", description: "No se pudo cerrar el chat", variant: "destructive" });
+											return;
+										}
+
+										await supabase
+											.from("mensajes")
+											.update({ respondido: true, leido: true })
+											.eq("email", selectedEmail);
+
+										if (data) {
+											setMensajes((prev) => [...prev, data]);
+										}
+
+										toast({ title: "Chat Cerrado", description: "La conversación ha sido finalizada y se cerrará en la vista del cliente." });
+									}}
+									variant="outline"
+									className="border-red-200 bg-red-50 hover:bg-red-100 text-red-700 font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition-all h-9 px-3"
+								>
+									<FiLock className="w-3.5 h-3.5" />
+									<span className="hidden sm:inline">Cerrar Chat</span>
+								</Button>
+
 								<button className="p-2.5 rounded-full hover:bg-gray-100 text-gray-400 transition-colors">
 									<FiMoreVertical />
 								</button>

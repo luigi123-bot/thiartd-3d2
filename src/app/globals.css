@@ -60,6 +60,11 @@
 .animate-slide-in-right { animation: slide-in-right 0.3s ease-out; }
 .animate-slide-in-left { animation: slide-in-left 0.3s ease-out; }
 
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 /* Semantic color utility shortcuts (optional) */
 .bg-primary { background-color: var(--color-primary); }
 .text-primary { color: var(--color-primary); }

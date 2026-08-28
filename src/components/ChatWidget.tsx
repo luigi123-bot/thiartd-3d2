@@ -59,10 +59,53 @@ export default function ChatWidget({
     }
   }, [open, mensajes.length]);
 
-  // Suscripción Realtime para chat en vivo
+  // 1. Cargar persistencia de apertura inicial
   useEffect(() => {
-    if (!clienteEmail || botState !== "live_chat") return;
-    
+    if (typeof window !== "undefined") {
+      const savedOpen = localStorage.getItem("thiart_chat_open");
+      if (savedOpen === "true") {
+        setOpen(true);
+      }
+    }
+  }, []);
+
+  // 2. Cargar historial previo y suscripción Realtime
+  useEffect(() => {
+    if (!clienteEmail) return;
+
+    let mounted = true;
+    async function loadHistory() {
+      const { data } = await supabase
+        .from("mensajes")
+        .select("*")
+        .eq("email", clienteEmail)
+        .order("creado_en", { ascending: true });
+
+      if (mounted && data && data.length > 0) {
+        const msgs = data as Mensaje[];
+        setMensajes(msgs);
+
+        const lastMsg = msgs[msgs.length - 1];
+        const isClosed = lastMsg?.mensaje.includes("🔒");
+
+        if (isClosed) {
+          localStorage.setItem("thiart_chat_open", "false");
+          setOpen(false);
+          setBotState("idle");
+        } else {
+          // Conversación activa: mantener chat abierto mientras no se cierre en admin
+          setBotState("live_chat");
+          const savedOpen = localStorage.getItem("thiart_chat_open");
+          if (savedOpen !== "false") {
+            setOpen(true);
+            localStorage.setItem("thiart_chat_open", "true");
+          }
+        }
+      }
+    }
+
+    void loadHistory();
+
     const safeEmail = clienteEmail.replace(/[^a-zA-Z0-9]/g, '');
     const channelId = `chat-client-${safeEmail}`;
     
@@ -78,6 +121,20 @@ export default function ChatWidget({
               if (prev.some(m => m.id === newMessage.id)) return prev;
               return [...prev, newMessage];
             });
+
+            // Si el admin envía mensaje de cierre
+            if (newMessage.mensaje.includes("🔒")) {
+              localStorage.setItem("thiart_chat_open", "false");
+              setTimeout(() => {
+                setOpen(false);
+                setBotState("idle");
+              }, 3000);
+            } else {
+              // Conversación en curso: mantener abierto
+              localStorage.setItem("thiart_chat_open", "true");
+              setOpen(true);
+            }
+
             if (newMessage.nombre === "Admin" && !openRef.current) {
               setHasNew(prev => prev + 1);
             }
@@ -87,9 +144,10 @@ export default function ChatWidget({
       .subscribe();
 
     return () => {
+      mounted = false;
       void supabase.removeChannel(channel);
     };
-  }, [clienteEmail, botState]);
+  }, [clienteEmail]);
 
   useEffect(() => {
     if (open) {
@@ -137,6 +195,17 @@ export default function ChatWidget({
 
     // Agregar mensaje del usuario a la pantalla
     setMensajes(prev => [...prev, { nombre: clienteNombre, email: clienteEmail, mensaje: userText }]);
+
+    // Detectar comando para salir al menú principal
+    const lower = userText.toLowerCase().trim();
+    if (["salir", "menu", "menú", "cancelar", "volver", "atras", "atrás", "exit"].includes(lower)) {
+      setMensajes(prev => [
+        ...prev,
+        { nombre: "Asistente", email: "bot@thiart3d.com", mensaje: "¡Listo! Has vuelto al menú principal. ¿Cómo te puedo ayudar?" }
+      ]);
+      setBotState("idle");
+      return;
+    }
 
     if (botState === "waiting_for_order_id") {
       setLoading(true);
@@ -208,16 +277,32 @@ export default function ChatWidget({
       }
     } else if (botState === "live_chat") {
       // Flujo de chat en vivo con base de datos de mensajes
-      await supabase
+      const { data: insertedMsg } = await supabase
         .from("mensajes")
-        .insert([{ nombre: clienteNombre, email: clienteEmail, mensaje: userText, respondido: false, leido: false }]);
+        .insert([{ nombre: clienteNombre, email: clienteEmail, mensaje: userText, respondido: false, leido: false }])
+        .select("id")
+        .single();
       
+      const newMsgId = (insertedMsg as { id?: number } | null)?.id;
+
       await supabase.from("notificaciones").insert([{
         usuario_id: null,
         tipo: "mensaje",
         mensaje: `Nuevo de ${clienteNombre}: ${userText.slice(0, 30)}...`,
         leido: false,
       }]);
+
+      // Programar alerta por correo si pasan más de 2 minutos sin respuesta
+      void fetch("/api/mensajes/notify-delayed", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messageId: newMsgId,
+          clienteNombre,
+          clienteEmail,
+          mensaje: userText,
+        }),
+      }).catch(err => console.error("Error programando alerta de correo:", err));
     }
   };
 
@@ -252,7 +337,13 @@ export default function ChatWidget({
                   </div>
                 </div>
               </div>
-              <button onClick={() => setOpen(false)} className="p-2 hover:bg-white/10 rounded-xl transition-colors">
+              <button
+                onClick={() => {
+                  setOpen(false);
+                  localStorage.setItem("thiart_chat_open", "false");
+                }}
+                className="p-2 hover:bg-white/10 rounded-xl transition-colors"
+              >
                 <FiX className="text-xl" />
               </button>
             </div>
@@ -283,6 +374,26 @@ export default function ChatWidget({
                     <div className="w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
                     Buscando información...
                   </div>
+                </div>
+              )}
+
+              {/* Botón rápido para volver al menú cuando está en un flujo */}
+              {botState !== "idle" && !loading && (
+                <div className="pt-2 flex justify-center">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMensajes(prev => [
+                        ...prev,
+                        { nombre: clienteNombre, email: clienteEmail, mensaje: "salir" },
+                        { nombre: "Asistente", email: "bot@thiart3d.com", mensaje: "¡Listo! Has vuelto al menú principal. ¿Cómo te puedo ayudar?" }
+                      ]);
+                      setBotState("idle");
+                    }}
+                    className="py-1.5 px-4 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-full text-[11px] font-bold tracking-wide transition-all active:scale-95 shadow-sm flex items-center gap-1.5"
+                  >
+                    ⬅️ Volver al menú principal
+                  </button>
                 </div>
               )}
 
@@ -319,10 +430,10 @@ export default function ChatWidget({
                   botState === "idle" 
                     ? "Selecciona una opción de arriba..." 
                     : botState === "waiting_for_order_id"
-                    ? "Escribe el ID del pedido..."
+                    ? "Escribe el ID (o 'salir')..."
                     : botState === "waiting_for_email"
-                    ? "Escribe tu correo..."
-                    : "Escribe tu mensaje..."
+                    ? "Escribe tu correo (o 'salir')..."
+                    : "Escribe tu mensaje (o 'salir')..."
                 }
                 disabled={botState === "idle" || loading}
                 className="flex-1 px-4 py-3 bg-gray-100 border-none rounded-2xl text-sm outline-none focus:ring-2 focus:ring-black/5 transition-all text-black disabled:opacity-50"
@@ -365,7 +476,9 @@ export default function ChatWidget({
             wasDragged.current = false;
             return;
           }
-          setOpen(!open);
+          const next = !open;
+          setOpen(next);
+          localStorage.setItem("thiart_chat_open", String(next));
         }}
         title="Rastrear tu pedido"
       >

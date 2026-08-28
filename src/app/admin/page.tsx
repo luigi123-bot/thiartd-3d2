@@ -373,28 +373,32 @@ export default function AdminDashboardPage() {
               <Package className="w-5 h-5 text-amber-500" />
               Productos por Categoría
             </h3>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie 
-                    data={productosPorCategoria} 
-                    dataKey="value" 
-                    nameKey="categoria" 
-                    cx="50%" 
-                    cy="50%" 
-                    innerRadius={60} 
-                    outerRadius={100} 
-                    paddingAngle={5}
-                  >
-                    {productosPorCategoria.map((entry, idx) => (
-                      <Cell key={`cell-${idx}`} fill={COLORS[idx % COLORS.length]} stroke="none" />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                  <Legend iconType="circle" />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
+            {productosPorCategoria.length > 0 ? (
+              <div className="h-[260px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={productosPorCategoria}
+                      dataKey="value"
+                      nameKey="categoria"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={100}
+                      paddingAngle={5}
+                    >
+                      {productosPorCategoria.map((entry, idx) => (
+                        <Cell key={`cell-${idx}`} fill={COLORS[idx % COLORS.length]} stroke="none" />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                    <Legend iconType="circle" />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <p className="text-sm text-slate-400 text-center py-6">Sin datos de categorías aún.</p>
+            )}
           </Card>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">

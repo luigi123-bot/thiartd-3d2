@@ -1,7 +1,13 @@
 "use client";
-import ChatWidget from "./ChatWidget";
+import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { supabase } from "~/lib/supabaseClient";
+
+// Lazy-load the heavy ChatWidget bundle (~16KB) only when needed
+const ChatWidget = dynamic(() => import("./ChatWidget"), {
+  ssr: false,
+  loading: () => null,
+});
 
 export default function ClientChatWidgetWrapper() {
   const [guestId, setGuestId] = useState<string>("");

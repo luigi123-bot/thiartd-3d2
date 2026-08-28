@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Card } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
@@ -16,7 +16,7 @@ interface EstadoPago {
   pdf_guia_url?: string;
 }
 
-export default function PagoExitosoPage() {
+function PagoExitosoContent() {
   const searchParams = useSearchParams();
   const [pedidoId, setPedidoId] = useState<string | null>(null);
   const [estadoPago, setEstadoPago] = useState<EstadoPago | null>(null);
@@ -366,5 +366,17 @@ export default function PagoExitosoPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function PagoExitosoPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Loader2 className="w-12 h-12 text-[#00a19a] animate-spin" />
+      </div>
+    }>
+      <PagoExitosoContent />
+    </Suspense>
   );
 }

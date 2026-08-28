@@ -8,7 +8,7 @@ import { DetallePedidoModal } from "../../../components/DetallePedidoModal";
 import {
   Download, Search, Filter,
   Clock, Package,
-  FileText, Settings2, Mail, TrendingUp, Users, ArrowUpRight, Calendar, CheckCircle2, AlertTriangle
+  FileText, Settings2, Mail, ArrowUpRight, Calendar, CheckCircle2, AlertTriangle
 } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter
@@ -228,9 +228,6 @@ export default function AdminPedidosPage() {
   const paginatedPedidos = filteredPedidos.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
   // Calcular estadísticas
-  const totalIngresos = pedidos
-    .filter(p => p.estado === 'pagado')
-    .reduce((acc, p) => acc + Number(p.total), 0);
 
   const pendientesPago = pedidos.filter(p => p.estado === 'pendiente_pago').length;
   const totalPedidos = pedidos.length;
@@ -310,14 +307,7 @@ export default function AdminPedidosPage() {
         </div>
 
         {/* Dashboard Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <StatCard
-            title="Ingresos Totales"
-            value={`$${totalIngresos.toLocaleString('es-CO')}`}
-            icon={TrendingUp as React.ComponentType<IconProps>}
-            color="emerald"
-            detail="Ventas aprobadas"
-          />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           <StatCard
             title="Total Pedidos"
             value={totalPedidos}
@@ -331,13 +321,6 @@ export default function AdminPedidosPage() {
             icon={Clock as React.ComponentType<IconProps>}
             color="amber"
             detail="Esperando pago"
-          />
-          <StatCard
-            title="Tasa de Conversión"
-            value={`${totalPedidos > 0 ? ((pagadosCount / totalPedidos) * 100).toFixed(1) : 0}%`}
-            icon={Users as React.ComponentType<IconProps>}
-            color="slate"
-            detail="Pedidos vs Pagados"
           />
         </div>
 

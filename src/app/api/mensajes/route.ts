@@ -37,6 +37,24 @@ export async function POST(req: Request) {
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
+
+    // Programar alerta por correo si pasan más de 2 minutos sin respuesta
+    try {
+      const url = new URL("/api/mensajes/notify-delayed", req.url).toString();
+      void fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messageId: data?.id,
+          clienteNombre: nombre,
+          clienteEmail: email,
+          mensaje,
+        }),
+      }).catch(err => console.error("Error programando alerta:", err));
+    } catch {
+      // Ignorar errores de URL en entornos aislados
+    }
+
     return NextResponse.json({ mensaje: data });
   } catch {
     return NextResponse.json({ error: "Error inesperado al enviar mensaje." }, { status: 500 });

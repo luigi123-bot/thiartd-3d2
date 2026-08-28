@@ -3,11 +3,10 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardTitle, CardDescription } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
-import { ShoppingCart, X, Filter, Sparkles, Package, Tag, BadgeDollarSign, Heart, Plus } from "lucide-react";
+import { ShoppingCart, X, Filter, Sparkles, Package, Tag, BadgeDollarSign, Heart } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import CreateProductModal from "~/components/CreateProductModal";
 import { type AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
 
 const categorias = [
@@ -67,7 +66,6 @@ function ProductosTiendaPageInner() {
     destacados: false,
   });
   const [loading, setLoading] = useState(true);
-  const [modalOpen, setModalOpen] = useState(false);
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
   const router = useRouter();
   const { carrito, addToCarrito } = useCarrito();
@@ -165,7 +163,7 @@ function ProductosTiendaPageInner() {
             </div>
 
             <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto mt-2 lg:mt-0">
-               <div className="relative group flex-1 md:w-64">
+               <div className="relative group flex-1 md:w-80">
                 <Input
                   type="text"
                   placeholder="Buscar..."
@@ -175,13 +173,6 @@ function ProductosTiendaPageInner() {
                 />
                 <Filter className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 group-focus-within:text-[#00a19a] transition-colors" />
               </div>
-              <Button
-                onClick={() => setModalOpen(true)}
-                className="bg-slate-950 hover:bg-slate-800 text-white h-12 px-6 rounded-2xl font-black transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                Vender
-              </Button>
             </div>
           </motion.div>
         </div>
@@ -319,8 +310,6 @@ function ProductosTiendaPageInner() {
           </span>
         )}
       </motion.button>
-
-      <CreateProductModal open={modalOpen} onOpenChangeAction={setModalOpen} onProductCreatedAction={fetchProductos} />
     </div>
   );
 }

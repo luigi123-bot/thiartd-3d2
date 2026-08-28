@@ -1131,3 +1131,113 @@ export async function sendShippingEmail(
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
 }
+
+interface UnansweredMessageAlertParams {
+  to: string;
+  clienteNombre: string;
+  clienteEmail: string;
+  mensaje: string;
+  creadoEn?: string;
+  adminChatUrl?: string;
+}
+
+export async function sendUnansweredMessageAlertEmail({
+  to,
+  clienteNombre,
+  clienteEmail,
+  mensaje,
+  creadoEn,
+  adminChatUrl = "https://thiart3d.com/admin/mensajes",
+}: UnansweredMessageAlertParams): Promise<{ success: boolean; error?: string }> {
+  try {
+    const transporter = createTransporter();
+
+    const hora = creadoEn ? new Date(creadoEn).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" }) : "Hace unos momentos";
+
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Mensaje sin responder</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #1e293b;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f8fafc; padding: 40px 16px;">
+    <tr>
+      <td align="center">
+        <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 580px; background-color: #ffffff; border-radius: 24px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05); overflow: hidden; border: 1px solid #e2e8f0;">
+          <!-- HEADER -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #007973 0%, #004d49 100%); padding: 32px; text-align: center;">
+              <div style="display: inline-block; background: rgba(255, 255, 255, 0.15); border-radius: 16px; padding: 10px 20px; margin-bottom: 12px;">
+                <span style="color: #ffffff; font-weight: 900; font-size: 11px; letter-spacing: 2px; text-transform: uppercase;">⚠️ ATENCIÓN AL CLIENTE</span>
+              </div>
+              <h1 style="color: #ffffff; font-size: 22px; font-weight: 900; margin: 0; letter-spacing: -0.5px;">Mensaje sin responder (+2 min)</h1>
+            </td>
+          </tr>
+
+          <!-- BODY -->
+          <tr>
+            <td style="padding: 36px 32px;">
+              <p style="font-size: 15px; line-height: 1.6; color: #475569; margin: 0 0 24px 0;">
+                Un cliente ha enviado un mensaje por el chat y han transcurrido <strong>más de 2 minutos</strong> sin que reciba respuesta del equipo.
+              </p>
+
+              <!-- CARD INFO -->
+              <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f1f5f9; border-radius: 16px; margin-bottom: 24px; border: 1px solid #e2e8f0;">
+                <tr>
+                  <td style="padding: 20px;">
+                    <p style="margin: 0 0 8px 0; font-size: 13px; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Detalles del Cliente</p>
+                    <p style="margin: 0 0 4px 0; font-size: 16px; font-weight: 800; color: #0f172a;">👤 ${clienteNombre}</p>
+                    <p style="margin: 0 0 12px 0; font-size: 14px; color: #007973; font-weight: 600;">📧 ${clienteEmail}</p>
+                    <p style="margin: 0 0 4px 0; font-size: 12px; color: #94a3b8;">🕒 Hora de envío: <strong>${hora}</strong></p>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- MENSAJE -->
+              <div style="background-color: #ecfdf5; border-left: 4px solid #10b981; border-radius: 8px; padding: 18px; margin-bottom: 32px;">
+                <p style="margin: 0 0 6px 0; font-size: 12px; font-weight: 800; color: #065f46; text-transform: uppercase; letter-spacing: 1px;">Mensaje recibido:</p>
+                <p style="margin: 0; font-size: 15px; color: #047857; font-style: italic; line-height: 1.5;">"${mensaje}"</p>
+              </div>
+
+              <!-- CTA BUTTON -->
+              <div style="text-align: center; margin-bottom: 12px;">
+                <a href="${adminChatUrl}" style="background: #007973; color: #ffffff; padding: 16px 36px; border-radius: 14px; text-decoration: none; font-weight: 800; font-size: 14px; display: inline-block; box-shadow: 0 10px 20px rgba(0, 121, 115, 0.3); text-transform: uppercase; letter-spacing: 1px;">
+                  💬 Responder en el Panel Admin
+                </a>
+              </div>
+            </td>
+          </tr>
+
+          <!-- FOOTER -->
+          <tr>
+            <td style="background-color: #f8fafc; border-top: 1px solid #e2e8f0; padding: 20px; text-align: center;">
+              <p style="margin: 0; font-size: 11px; color: #94a3b8;">
+                Thiart 3D · Sistema de Notificaciones en Tiempo Real
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `;
+
+    const mailOptions: SendMailOptions = {
+      from: `"Thiart 3D Chat" <${process.env.GMAIL_USER}>`,
+      to,
+      subject: `🔔 Mensaje sin responder de ${clienteNombre} en el chat - Thiart 3D`,
+      html,
+    };
+
+    const info = await transporter.sendMail(mailOptions) as { messageId?: string };
+    console.log('✅ Alerta de mensaje sin responder enviada al administrador:', info.messageId);
+    return { success: true };
+  } catch (err) {
+    console.error('❌ Error enviando alerta de mensaje sin responder:', err);
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
