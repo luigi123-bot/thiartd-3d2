@@ -1,11 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Card } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { createClient } from "@supabase/supabase-js";
-import { useToast } from "~/components/ui/use-toast";
 import { 
   Package, 
   Truck, 
@@ -19,10 +18,20 @@ import {
   History,
   Send,
   Calendar as CalendarIcon,
-  Filter
+  Filter,
+  Printer,
+  CalendarPlus,
+  RefreshCw,
+  Eye,
+  Building2,
+  Phone,
+  User,
+  ShieldCheck
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-
+import { toast } from "sonner";
+import { DetallePedidoModal } from "~/components/DetallePedidoModal";
+import RecoleccionesModal from "~/components/RecoleccionesModal";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
@@ -33,649 +42,588 @@ interface Pedido {
   cliente_id: string;
   estado: string;
   total: number;
-  datos_contacto: string;
+  subtotal?: number;
+  costo_envio?: number;
+  tipo_entrega?: "envio" | "recoleccion";
+  es_pod?: boolean;
+  productos: string;
+  datos_contacto?: string;
+  direccion_envio?: string;
+  ciudad_envio?: string;
+  departamento_envio?: string;
+  codigo_postal_envio?: string;
+  telefono_envio?: string;
+  notas_envio?: string;
+  payment_id?: string;
+  payment_method?: string;
   numero_tracking?: string;
   empresa_envio?: string;
+  pdf_guia_url?: string;
+  guia_detalles?: string;
   fecha_estimada_entrega?: string;
   created_at: string;
-  ciudad_envio?: string;
-  direccion_envio?: string;
 }
 
-interface HistorialEnvio {
-  id: number;
-  estado: string;
-  descripcion?: string;
-  ubicacion?: string;
-  fecha: string;
-}
-
-interface TrackingApiResponse {
-  historial: HistorialEnvio[];
-}
-
-interface ActualizarTrackingResponse {
-  success?: boolean;
-  tracking_generado?: {
-    numero_tracking?: string;
-    empresa_envio?: string;
-  } | null;
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type IconType = React.ComponentType<any>;
-
-interface EstadoInfo {
-  value: string;
-  label: string;
-  icon: IconType;
-  color: string;
-  bgColor: string;
-}
-
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-const estadosEnvio: EstadoInfo[] = [
-  { value: "pagado", label: "Pagado", icon: CheckCircle, color: "text-emerald-600", bgColor: "bg-emerald-50" },
-  { value: "en_preparacion", label: "En preparación", icon: Package, color: "text-blue-600", bgColor: "bg-blue-50" },
-  { value: "en_envio", label: "En envío", icon: Truck, color: "text-purple-600", bgColor: "bg-purple-50" },
-  { value: "en_transito", label: "En tránsito", icon: MapPin, color: "text-orange-600", bgColor: "bg-orange-50" },
-  { value: "entregado", label: "Entregado", icon: CheckCircle, color: "text-emerald-600", bgColor: "bg-emerald-50" },
-  { value: "problema_entrega", label: "Problema entrega", icon: Clock, color: "text-red-600", bgColor: "bg-red-50" },
-];
-/* eslint-enable @typescript-eslint/no-unsafe-assignment */
-
-interface FormTracking {
-  estado: string;
-  descripcion: string;
-  ubicacion: string;
-  numero_tracking: string;
-  empresa_envio: string;
-  fecha_estimada_entrega: string;
-}
-
-type StatColor = "brand" | "amber" | "emerald" | "slate";
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function StatCard({ title, value, icon: Icon, color, detail }: { title: string, value: string | number, icon: React.ComponentType<any>, color: StatColor, detail: string }) {
-  const colors: Record<StatColor, string> = {
-    brand: "bg-[#00a19a] text-white shadow-[#00a19a]/20",
-    amber: "bg-amber-500 text-white shadow-amber-500/20",
-    emerald: "bg-emerald-600 text-white shadow-emerald-600/20",
-    slate: "bg-slate-900 text-white shadow-slate-900/20",
-  };
-
-  return (
-    <motion.div
-      whileHover={{ y: -5 }}
-      className="bg-white rounded-[32px] p-8 border border-slate-100 shadow-xl flex flex-col justify-between h-full group transition-all"
-    >
-      <div className="flex justify-between items-start mb-6">
-        <div className={`w-14 h-14 ${colors[color]} rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform`}>
-          <Icon className="w-7 h-7" />
-        </div>
-        <div className="bg-slate-50 px-3 py-1 rounded-full text-[10px] font-black text-slate-400 uppercase tracking-widest border border-slate-100">
-          Envío
-        </div>
-      </div>
-      <div>
-        <h3 className="text-slate-500 text-sm font-bold uppercase tracking-widest mb-1">{title}</h3>
-        <p className="text-4xl font-black text-slate-900 tracking-tighter mb-4">{value}</p>
-        <p className="text-xs font-medium text-slate-400 flex items-center gap-1.5">
-          <ArrowUpRight className="w-4 h-4 text-emerald-500" />
-          {detail}
-        </p>
-      </div>
-    </motion.div>
-  );
+interface Recogida {
+  id?: number;
+  carrier: string;
+  confirmation_number: string;
+  pickup_date: string;
+  pickup_time_from: string;
+  pickup_time_to: string;
+  origin_address: string;
+  origin_city: string;
+  total_packages: number;
+  total_weight: number;
+  instructions?: string;
+  status: string;
+  created_at?: string;
 }
 
 export default function EnviosAdminPage() {
+  const [activeTab, setActiveTab] = useState<"envios" | "recogidas">("envios");
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
-  const [pedidoSeleccionado, setPedidoSeleccionado] = useState<Pedido | null>(null);
-  const [historial, setHistorial] = useState<HistorialEnvio[]>([]);
+  const [recogidas, setRecogidas] = useState<Recogida[]>([]);
+  const [pedidoDetalle, setPedidoDetalle] = useState<Pedido | null>(null);
+  const [modalRecoleccionesOpen, setModalRecoleccionesOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [actualizandoTracking, setActualizandoTracking] = useState(false);
-  const [generandoGuia, setGenerandoGuia] = useState(false);
-  const { toast } = useToast();
+  const [generandoGuiaId, setGenerandoGuiaId] = useState<number | null>(null);
 
-  const [formTracking, setFormTracking] = useState<FormTracking>({
-    estado: "",
-    descripcion: "",
-    ubicacion: "",
-    numero_tracking: "",
-    empresa_envio: "",
-    fecha_estimada_entrega: ""
+  // Formulario de Programación de Recogida
+  const [formRecogida, setFormRecogida] = useState({
+    carrier: "coordinadora",
+    pickupDate: new Date(Date.now() + 86400000).toISOString().split("T")[0]!, // Mañana por defecto
+    pickupTimeFrom: "09:00",
+    pickupTimeTo: "17:00",
+    totalPackages: 1,
+    totalWeight: 1.0,
+    instructions: "Taller Thiart 3D (Calle 5 #24A-152, Cali). Favor timbrar.",
   });
+  const [programandoRecogida, setProgramandoRecogida] = useState(false);
 
-  const fetchPedidos = async () => {
+  const fetchPedidos = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("pedidos")
       .select("*")
-      .neq("estado", "pendiente_pago")
       .order("created_at", { ascending: false });
-    
-    setPedidos((data ?? []) as Pedido[]);
+
+    if (error) {
+      console.error("Error fetching pedidos:", error);
+    } else if (data) {
+      setPedidos(data as Pedido[]);
+    }
     setLoading(false);
-  };
+  }, []);
+
+  const fetchRecogidas = useCallback(async () => {
+    try {
+      const res = await fetch("/api/envios/recogidas");
+      const data = (await res.json()) as { success?: boolean; recogidas?: Recogida[] };
+      if (data.success && data.recogidas) {
+        setRecogidas(data.recogidas);
+      }
+    } catch (e) {
+      console.error("Error fetching recogidas:", e);
+    }
+  }, []);
 
   useEffect(() => {
     void fetchPedidos();
-  }, []);
+    void fetchRecogidas();
+  }, [fetchPedidos, fetchRecogidas]);
 
-  const generarGuiaAutomatica = async () => {
-    if (!pedidoSeleccionado) return;
-    setGenerandoGuia(true);
-    let errorMessage = "No se pudo generar la guía.";
+  const handleGenerarGuia = async (pedidoId: number) => {
+    setGenerandoGuiaId(pedidoId);
     try {
       const res = await fetch("/api/tracking/generar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pedido_id: pedidoSeleccionado.id }),
+        body: JSON.stringify({ pedido_id: pedidoId }),
       });
-      if (res.ok) {
-        const data = await res.json() as { numero_tracking: string; empresa_envio: string };
-        setFormTracking(prev => ({
-          ...prev,
-          estado: "en_envio",
-          numero_tracking: data.numero_tracking,
-          empresa_envio: data.empresa_envio,
-        }));
-        toast({
-          title: "✅ Guía Generada",
-          description: `Guía #${data.numero_tracking} generada vía ${data.empresa_envio}. Se notificó al cliente por correo.`,
-        });
+      const data = (await res.json()) as { success?: boolean; numero_tracking?: string; error?: string };
+
+      if (data.success) {
+        toast.success(`Guía generada con éxito: #${data.numero_tracking ?? ""}`);
         await fetchPedidos();
       } else {
-        try {
-          const data = await res.json() as { error?: string };
-          errorMessage = data.error ?? errorMessage;
-        } catch {
-          errorMessage = `Error del servidor (status ${res.status})`;
-        }
-        toast({
-          variant: "destructive",
-          title: "❌ Error",
-          description: errorMessage,
-        });
+        toast.error(data.error ?? "No se pudo generar la guía");
       }
     } catch {
-      toast({
-        variant: "destructive",
-        title: "❌ Error de red",
-        description: "Error al conectar con el servidor.",
-      });
+      toast.error("Error al conectar con el servidor");
     } finally {
-      setGenerandoGuia(false);
+      setGenerandoGuiaId(null);
     }
   };
 
-  useEffect(() => {
-    if (pedidoSeleccionado) {
-      const fetchHistorial = async () => {
-        const response = await fetch(`/api/tracking?pedido_id=${pedidoSeleccionado.id}`);
-        const data = await response.json() as TrackingApiResponse;
-        setHistorial(data.historial ?? []);
-      };
-
-      void fetchHistorial();
-
-      const fechaEntrega = pedidoSeleccionado.fecha_estimada_entrega 
-        ? new Date(pedidoSeleccionado.fecha_estimada_entrega).toISOString().split('T')[0]
-        : "";
-        
-      setFormTracking({
-        estado: pedidoSeleccionado.estado,
-        descripcion: "",
-        ubicacion: "",
-        numero_tracking: pedidoSeleccionado.numero_tracking ?? "",
-        empresa_envio: pedidoSeleccionado.empresa_envio ?? "",
-        fecha_estimada_entrega: fechaEntrega ?? ""
-      });
-    }
-  }, [pedidoSeleccionado]);
-
-  const actualizarTracking = async () => {
-    if (!pedidoSeleccionado) return;
-    setActualizandoTracking(true);
-
+  const handleProgramarRecogida = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setProgramandoRecogida(true);
     try {
-      const response = await fetch("/api/tracking", {
+      const res = await fetch("/api/envios/recogidas", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          pedido_id: pedidoSeleccionado.id,
-          ...formTracking
-        })
+        body: JSON.stringify(formRecogida),
       });
+      const data = (await res.json()) as { success?: boolean; mensaje?: string; error?: string };
 
-      if (response.ok) {
-        const responseData = await response.json() as ActualizarTrackingResponse;
-
-        // Auto-rellenar campos con el tracking generado por Envía (si aplica)
-        if (responseData.tracking_generado?.numero_tracking) {
-          const tg = responseData.tracking_generado;
-          setFormTracking(prev => ({
-            ...prev,
-            numero_tracking: tg.numero_tracking ?? prev.numero_tracking,
-            empresa_envio: tg.empresa_envio ?? prev.empresa_envio,
-          }));
-          toast({
-            title: "✅ Guía generada automáticamente",
-            description: `Nº ${tg.numero_tracking ?? ''} vía ${tg.empresa_envio ?? ''} — Se notificó al cliente por email.`
-          });
-        } else {
-          toast({
-            title: "Tracking actualizado",
-            description: "El estado del envío ha sido actualizado correctamente"
-          });
-        }
-
-        const { data } = await supabase
-          .from("pedidos")
-          .select("*")
-          .eq("id", pedidoSeleccionado.id)
-          .single<Pedido>();
-
-        if (data) {
-          setPedidoSeleccionado(data);
-          setPedidos(prev => prev.map(p => p.id === data.id ? data : p));
-        }
-
-        const historialResponse = await fetch(`/api/tracking?pedido_id=${pedidoSeleccionado.id}`);
-        const historialData = await historialResponse.json() as TrackingApiResponse;
-        setHistorial(historialData.historial ?? []);
+      if (data.success) {
+        toast.success(data.mensaje ?? "Recogida programada con la transportadora");
+        await fetchRecogidas();
+      } else {
+        toast.error(data.error ?? "Error al programar recogida");
       }
-    } catch (error) {
-      console.error(error);
+    } catch {
+      toast.error("Error de conexión");
     } finally {
-      setActualizandoTracking(false);
+      setProgramandoRecogida(false);
     }
   };
 
-  const getEstadoInfo = (estado: string): EstadoInfo => {
-    return estadosEnvio.find(e => e.value === estado) ?? estadosEnvio[0]!;
-  };
-
-  const filteredPedidos = pedidos.filter(p => {
-    const contacto = JSON.parse(p.datos_contacto ?? "{}") as { nombre?: string, email?: string };
-    const matchId = p.id.toString().includes(searchTerm);
-    const matchNombre = contacto.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false;
-    const matchCiudad = p.ciudad_envio?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false;
-    return matchId || matchNombre || matchCiudad;
+  const enviosFiltrados = pedidos.filter((p) => {
+    if (p.tipo_entrega === "recoleccion") return false; // Solo envíos a domicilio
+    if (!searchTerm) return true;
+    const str = `${p.id} ${p.numero_tracking ?? ""} ${p.ciudad_envio ?? ""} ${p.empresa_envio ?? ""}`.toLowerCase();
+    return str.includes(searchTerm.toLowerCase());
   });
 
-  const ITEMS_PER_PAGE = 10;
-  const totalPages = Math.ceil(filteredPedidos.length / ITEMS_PER_PAGE);
-  const paginatedPedidos = filteredPedidos.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
-
-  // Reset page when search changes
-  useEffect(() => { setCurrentPage(1); }, [searchTerm]);
-
-  // Stats
-  const enTransito = pedidos.filter(p => p.estado === 'en_transito' || p.estado === 'en_envio').length;
-  const entregados = pedidos.filter(p => p.estado === 'entregado').length;
-  const problemas = pedidos.filter(p => p.estado === 'problema_entrega').length;
+  const totalConGuia = enviosFiltrados.filter((p) => Boolean(p.numero_tracking)).length;
+  const totalPendientesGuia = enviosFiltrados.filter((p) => !p.numero_tracking).length;
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] p-4 md:p-10 font-sans">
-      <div className="max-w-[1920px] mx-auto space-y-10">
+    <div className="min-h-screen bg-[#F8FAFC] p-4 md:p-8 font-sans">
+      <div className="max-w-7xl mx-auto space-y-6">
 
-        {/* Header Section */}
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
-          <div className="space-y-2">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center text-white shadow-xl">
-                <Truck className="w-6 h-6" />
-              </div>
-              <h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase">Gestión de Envíos</h1>
-            </div>
-            <p className="text-slate-500 font-medium">Logística y seguimiento en tiempo real</p>
+        {/* ── Top Bar / Header ── */}
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+          <div>
+            <h1 className="text-3xl font-black text-slate-900 tracking-tight">Gestor de Envíos & Recogidas</h1>
+            <p className="text-xs font-semibold text-slate-400 mt-1">
+              Control de guías logísticas con Envía, transportadoras nacionales y programación de recolecciones
+            </p>
           </div>
 
-          <div className="flex items-center gap-4 w-full lg:w-auto">
-            <div className="relative flex-1 lg:w-80">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Buscar pedido, cliente o ciudad..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full h-14 pl-12 pr-4 bg-white border border-slate-200 rounded-2xl focus:ring-2 focus:ring-[#00a19a] outline-none shadow-sm transition-all text-sm font-bold"
-              />
-            </div>
-            <Button className="h-14 px-8 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 shadow-xl">
-              <Download className="w-5 h-5 mr-3" />
-              Reporte
+          {/* Selector de Pestañas y Botón Modal Recolecciones */}
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              onClick={() => setModalRecoleccionesOpen(true)}
+              className="bg-[#1877f2] hover:bg-[#1565c0] text-white font-bold text-xs h-10 px-4 rounded-2xl shadow-md flex items-center gap-2"
+            >
+              <CalendarPlus className="w-4 h-4" />
+              <span>Solicitar Recolección</span>
             </Button>
-          </div>
-        </div>
 
-        {/* Dashboard Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {/* eslint-disable @typescript-eslint/no-unsafe-assignment */}
-          <StatCard
-            title="Total Activos"
-            value={pedidos.length}
-            icon={Package}
-            color="brand"
-            detail="Envíos gestionados"
-          />
-          <StatCard
-            title="En Tránsito"
-            value={enTransito}
-            icon={Truck}
-            color="emerald"
-            detail="Hacia destino"
-          />
-          <StatCard
-            title="Entregados"
-            value={entregados}
-            icon={CheckCircle}
-            color="slate"
-            detail="Exitosos"
-          />
-          <StatCard
-            title="Novedades"
-            value={problemas}
-            icon={Clock}
-            color="amber"
-            detail="Requieren atención"
-          />
-          {/* eslint-enable @typescript-eslint/no-unsafe-assignment */}
-        </div>
+            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-2xl">
+              <button
+                onClick={() => setActiveTab("envios")}
+                className={`px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1.5 ${
+                  activeTab === "envios"
+                    ? "bg-slate-900 text-white shadow-md"
+                    : "text-slate-500 hover:text-slate-900"
+                }`}
+              >
+                <Truck className="w-3.5 h-3.5" />
+                <span>Envíos</span>
+                <span className="w-5 h-5 rounded-full bg-white/20 text-[10px] flex items-center justify-center">
+                  {enviosFiltrados.length}
+                </span>
+              </button>
 
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-          
-          {/* Main List */}
-          <div className="xl:col-span-2 space-y-6">
-            <Card className="border-none shadow-2xl rounded-[40px] overflow-hidden bg-white ring-1 ring-slate-100">
-               <div className="px-10 py-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/30">
-                <div className="flex items-center gap-3">
-                  <Filter className="w-5 h-5 text-slate-400" />
-                  <span className="text-sm font-black text-slate-400 uppercase tracking-widest">Envíos Pendientes de Seguimiento</span>
-                </div>
-                <div className="text-sm text-slate-400 font-bold">
-                  {filteredPedidos.length} Pedidos
-                </div>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse">
-                  <thead>
-                    <tr className="bg-slate-50/50">
-                      <th className="px-6 py-3 text-left text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Referencia & Cliente</th>
-                      <th className="px-6 py-3 text-left text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Destino</th>
-                      <th className="px-6 py-3 text-left text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Estado Actual</th>
-                      <th className="px-6 py-3 text-center text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Acción</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    <AnimatePresence>
-                      {loading ? (
-                         <tr><td colSpan={4} className="py-20 text-center text-slate-400">Cargando envíos...</td></tr>
-                      ) : paginatedPedidos.map((p, _idx) => {
-                        const contacto = JSON.parse(p.datos_contacto ?? "{}") as { nombre?: string };
-                        const estadoInfo = getEstadoInfo(p.estado);
-                        const isSelected = pedidoSeleccionado?.id === p.id;
-
-                        return (
-                          <motion.tr
-                            key={p.id}
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: _idx * 0.03 }}
-                            className={`hover:bg-slate-50/80 transition-all cursor-pointer group ${isSelected ? 'bg-slate-50' : ''}`}
-                            onClick={() => setPedidoSeleccionado(p)}
-                          >
-                            <td className="px-6 py-3">
-                               <div className="flex items-center gap-3">
-                                <div className={`w-9 h-9 ${isSelected ? 'bg-[#00a19a]' : 'bg-slate-900'} rounded-xl flex items-center justify-center text-white font-black text-xs shadow-md group-hover:scale-110 transition-transform shrink-0`}>
-                                  #{p.id}
-                                </div>
-                                <div>
-                                  <div className="text-sm font-black text-slate-900 tracking-tight leading-none mb-1">
-                                    {contacto.nombre ?? "Sin Nombre"}
-                                  </div>
-                                  <div className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">
-                                    Tracking: {p.numero_tracking ?? "Sin asignar"}
-                                  </div>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="px-6 py-3">
-                              <div className="text-sm font-black text-slate-900 leading-tight mb-0.5">
-                                {p.ciudad_envio ?? "No definido"}
-                              </div>
-                              <div className="text-[10px] text-slate-400 font-bold uppercase truncate max-w-[200px]">
-                                {p.direccion_envio}
-                              </div>
-                            </td>
-                            <td className="px-6 py-3">
-                              <span className={`inline-flex items-center px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border ${estadoInfo.bgColor} ${estadoInfo.color} border-current/10`}>
-                                <estadoInfo.icon className="w-3 h-3 mr-1.5" />
-                                {estadoInfo.label}
-                              </span>
-                            </td>
-                            <td className="px-6 py-3 text-center">
-                              <Button
-                                variant="outline"
-                                className={`h-8 w-8 p-0 rounded-xl transition-all ${isSelected ? 'bg-[#00a19a] text-white border-[#00a19a]' : 'border-slate-100 hover:border-slate-900'}`}
-                              >
-                                <ChevronRight className="w-4 h-4" />
-                              </Button>
-                            </td>
-                          </motion.tr>
-                        );
-                      })}
-                    </AnimatePresence>
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="px-10 py-6 border-t border-slate-100 flex items-center justify-between bg-slate-50/20">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                    disabled={currentPage === 1}
-                    className="h-10 px-4 rounded-xl text-xs font-bold border-slate-200"
-                  >
-                    Anterior
-                  </Button>
-                  <span className="text-xs font-black text-slate-400 uppercase tracking-widest">
-                    Página {currentPage} de {totalPages}
+              <button
+                onClick={() => setActiveTab("recogidas")}
+                className={`px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1.5 ${
+                  activeTab === "recogidas"
+                    ? "bg-slate-900 text-white shadow-md"
+                    : "text-slate-500 hover:text-slate-900"
+                }`}
+              >
+                <History className="w-3.5 h-3.5" />
+                <span>Historial</span>
+                {recogidas.length > 0 && (
+                  <span className="w-5 h-5 rounded-full bg-teal-500 text-white text-[10px] flex items-center justify-center">
+                    {recogidas.length}
                   </span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                    disabled={currentPage === totalPages}
-                    className="h-10 px-4 rounded-xl text-xs font-bold border-slate-200"
-                  >
-                    Siguiente
-                  </Button>
-                </div>
-              )}
-            </Card>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* ── KPIs Rápidos ── */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-teal-50 text-[#00a19a] flex items-center justify-center">
+              <Truck className="w-6 h-6" />
+            </div>
+            <div>
+              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Envíos a Domicilio</span>
+              <p className="text-2xl font-black text-slate-900">{enviosFiltrados.length}</p>
+            </div>
           </div>
 
-          {/* Side Panel: Detail & Update */}
-          <div className="space-y-6">
-            <AnimatePresence mode="wait">
-              {pedidoSeleccionado ? (
-                <motion.div
-                  key={pedidoSeleccionado.id}
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 20 }}
-                  className="space-y-6"
-                >
-                  {/* Update Form */}
-                  <Card className="border-none shadow-2xl rounded-[40px] p-8 bg-slate-900 text-white overflow-hidden relative">
-                    <div className="absolute top-0 right-0 p-8 opacity-10">
-                      <Truck size={120} />
-                    </div>
-                    
-                    <h3 className="text-2xl font-black uppercase tracking-tighter mb-8 flex items-center gap-3">
-                      <Send className="text-[#00a19a]" />
-                      Actualizar Envío #{pedidoSeleccionado.id}
-                    </h3>
+          <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+              <CheckCircle className="w-6 h-6" />
+            </div>
+            <div>
+              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Guías Generadas</span>
+              <p className="text-2xl font-black text-slate-900">{totalConGuia}</p>
+            </div>
+          </div>
 
-                    <div className="space-y-6 relative z-10">
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Estado Logístico</label>
-                        <select
-                          className="w-full h-12 px-4 bg-white/10 border border-white/20 rounded-xl text-white outline-none focus:ring-2 focus:ring-[#00a19a] font-bold"
-                          value={formTracking.estado}
-                          onChange={(e) => setFormTracking({...formTracking, estado: e.target.value})}
-                          aria-label="Estado del envío"
-                        >
-                          {estadosEnvio.map((estado) => (
-                            <option key={estado.value} value={estado.value} className="text-slate-900 font-bold">
-                              {estado.label}
-                            </option>
-                          ))}
-                        </select>
+          <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center">
+              <Clock className="w-6 h-6" />
+            </div>
+            <div>
+              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Pendientes por Generar</span>
+              <p className="text-2xl font-black text-slate-900">{totalPendientesGuia}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* ── CONTENIDO: PESTAÑA 1: ENVÍOS & GUÍAS ── */}
+        {activeTab === "envios" && (
+          <div className="space-y-4">
+            {/* Barra de búsqueda */}
+            <div className="flex items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+              <div className="relative flex-1 sm:max-w-md">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Buscar por ID de pedido, número de guía o ciudad..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full h-10 pl-10 pr-4 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:bg-white outline-none focus:ring-2 focus:ring-[#00a19a]"
+                />
+              </div>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void fetchPedidos()}
+                className="h-10 px-3 rounded-xl border-slate-200 text-slate-600 flex items-center gap-1.5"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+                <span>Refrescar</span>
+              </Button>
+            </div>
+
+            {/* Lista de Órdenes para Envío */}
+            <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden divide-y divide-slate-100">
+              {enviosFiltrados.length === 0 ? (
+                <div className="p-12 text-center text-slate-400">
+                  <p className="text-sm font-bold">No hay envíos registrados</p>
+                </div>
+              ) : (
+                enviosFiltrados.map((p) => {
+                  let contacto: { nombre?: string; email?: string; telefono?: string } = {};
+                  try {
+                    contacto = typeof p.datos_contacto === "string" ? JSON.parse(p.datos_contacto) : p.datos_contacto || {};
+                  } catch {
+                    // ignore
+                  }
+
+                  const tieneGuia = Boolean(p.numero_tracking);
+
+                  return (
+                    <div key={p.id} className="p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 hover:bg-slate-50/60 transition-colors">
+                      {/* Info Pedido & Cliente */}
+                      <div className="space-y-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-black text-[#00a19a] bg-teal-50 px-2.5 py-0.5 rounded-md border border-teal-100">
+                            #{p.id}
+                          </span>
+                          <span className="text-xs font-black text-slate-900 truncate">
+                            {contacto.nombre || "Cliente"}
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-bold">
+                            {new Date(p.created_at).toLocaleDateString("es-CO")}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-500 font-medium flex items-center gap-1">
+                          <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                          <span>{p.direccion_envio || "Dirección no especificada"} — <strong>{p.ciudad_envio || "Ciudad"}</strong></span>
+                        </p>
                       </div>
 
-                      {/* Botón de autogeneración automatizada Envía */}
-                      <Button
-                        type="button"
-                        onClick={generarGuiaAutomatica}
-                        disabled={generandoGuia}
-                        className="w-full h-12 bg-white/10 hover:bg-white/20 border border-white/20 hover:border-white/30 text-[#00ffd5] rounded-xl font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow transition-all active:scale-95"
-                      >
-                        {generandoGuia ? (
-                          <div className="w-4 h-4 border-2 border-[#00ffd5]/30 border-t-[#00ffd5] rounded-full animate-spin" />
-                        ) : (
-                          <>
-                            <Truck className="w-4 h-4" />
-                            Generar Guía con Envía.com
-                          </>
-                        )}
-                      </Button>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">N° Tracking</label>
-                          <Input
-                            className="h-12 bg-white/10 border-white/20 text-white placeholder:text-white/30 rounded-xl font-bold"
-                            value={formTracking.numero_tracking}
-                            onChange={(e) => setFormTracking({...formTracking, numero_tracking: e.target.value})}
-                            placeholder="Ej: TK-12345"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Empresa</label>
-                          <Input
-                            className="h-12 bg-white/10 border-white/20 text-white placeholder:text-white/30 rounded-xl font-bold"
-                            value={formTracking.empresa_envio}
-                            onChange={(e) => setFormTracking({...formTracking, empresa_envio: e.target.value})}
-                            placeholder="Ej: Servientrega"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Ubicación Actual</label>
-                        <div className="relative">
-                          <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                          <Input
-                            className="h-12 pl-12 bg-white/10 border-white/20 text-white placeholder:text-white/30 rounded-xl font-bold"
-                            value={formTracking.ubicacion}
-                            onChange={(e) => setFormTracking({...formTracking, ubicacion: e.target.value})}
-                            placeholder="Ciudad o Centro"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Entrega Estimada</label>
-                        <div className="relative">
-                          <CalendarIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                          <Input
-                            type="date"
-                            className="h-12 pl-12 bg-white/10 border-white/20 text-white rounded-xl font-bold [color-scheme:dark]"
-                            value={formTracking.fecha_estimada_entrega}
-                            onChange={(e) => setFormTracking({...formTracking, fecha_estimada_entrega: e.target.value})}
-                          />
-                        </div>
-                      </div>
-
-                      <Button 
-                        onClick={actualizarTracking}
-                        disabled={actualizandoTracking}
-                        className="w-full h-14 bg-[#00a19a] hover:bg-[#00897B] text-white rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-[#00a19a]/20 group transition-all"
-                      >
-                        {actualizandoTracking ? (
-                          <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        ) : (
-                          <div className="flex items-center gap-2">
-                            Actualizar Tracking
-                            <ArrowUpRight className="w-5 h-5 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
+                      {/* Estado de la Guía */}
+                      <div className="flex items-center gap-3">
+                        {tieneGuia ? (
+                          <div className="text-left md:text-right">
+                            <span className="text-[10px] font-black uppercase text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
+                              Guía Oficial
+                            </span>
+                            <p className="text-xs font-black text-slate-900 mt-0.5">
+                              #{p.numero_tracking}{" "}
+                              <span className="text-[10px] font-bold text-slate-400 uppercase">({p.empresa_envio || "Envía"})</span>
+                            </p>
                           </div>
+                        ) : (
+                          <span className="text-xs font-bold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-100">
+                            ⏳ Pendiente por generar guía
+                          </span>
                         )}
-                      </Button>
+                      </div>
+
+                      {/* Botones de acción */}
+                      <div className="flex items-center gap-2">
+                        {/* Botón Ver Ficha Completa */}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setPedidoDetalle(p)}
+                          className="h-9 px-3 rounded-xl border-slate-200 text-slate-700 hover:bg-white text-xs font-bold flex items-center gap-1.5"
+                        >
+                          <Eye className="w-3.5 h-3.5 text-[#00a19a]" />
+                          <span>Ver Ficha</span>
+                        </Button>
+
+                        {/* Botón Imprimir PDF si tiene */}
+                        {p.pdf_guia_url && (
+                          <Button
+                            asChild
+                            size="sm"
+                            className="h-9 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-sm"
+                          >
+                            <a href={p.pdf_guia_url} target="_blank" rel="noopener noreferrer">
+                              <Printer className="w-3.5 h-3.5 mr-1" /> Imprimir
+                            </a>
+                          </Button>
+                        )}
+
+                        {/* Botón Generar Guía Manual */}
+                        {!tieneGuia && (
+                          <Button
+                            size="sm"
+                            disabled={generandoGuiaId === p.id}
+                            onClick={() => handleGenerarGuia(p.id)}
+                            className="h-9 px-3 rounded-xl bg-[#00a19a] hover:bg-[#007973] text-white text-xs font-black uppercase tracking-wider shadow-md"
+                          >
+                            {generandoGuiaId === p.id ? "Generando..." : "🚀 Generar Guía"}
+                          </Button>
+                        )}
+                      </div>
                     </div>
-                  </Card>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        )}
 
-                  {/* History Timeline */}
-                  <Card className="border-none shadow-2xl rounded-[40px] p-8 bg-white ring-1 ring-slate-100">
-                    <h3 className="text-xl font-black uppercase tracking-tighter mb-8 flex items-center gap-3 text-slate-900">
-                      <History className="text-slate-400" />
-                      Historial de Eventos
-                    </h3>
+        {/* ── CONTENIDO: PESTAÑA 2: PROGRAMAR RECOGIDA (PICKUP) ── */}
+        {activeTab === "recogidas" && (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            
+            {/* Formulario de Recogida */}
+            <div className="lg:col-span-5 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-5">
+              <div className="flex items-center gap-2.5 pb-4 border-b border-slate-100">
+                <div className="w-10 h-10 rounded-2xl bg-teal-50 text-[#00a19a] flex items-center justify-center">
+                  <CalendarPlus className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900 tracking-tight">Solicitar Recogida</h3>
+                  <p className="text-xs text-slate-400 font-medium">Conexión directa con la API de la transportadora</p>
+                </div>
+              </div>
 
-                    <div className="space-y-6">
-                      {historial.length === 0 ? (
-                        <div className="text-center py-10">
-                          <Package className="w-12 h-12 text-slate-100 mx-auto mb-4" />
-                          <p className="text-slate-400 font-bold text-sm">Sin eventos registrados aún</p>
+              <form onSubmit={handleProgramarRecogida} className="space-y-4 text-xs">
+                {/* Transportadora */}
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Transportadora Logística</label>
+                  <select
+                    value={formRecogida.carrier}
+                    onChange={(e) => setFormRecogida({ ...formRecogida, carrier: e.target.value })}
+                    className="w-full h-11 bg-slate-50 border border-slate-200 rounded-xl px-3 font-bold text-slate-800 outline-none focus:ring-2 focus:ring-[#00a19a]"
+                  >
+                    <option value="coordinadora">Coordinadora Mercantil</option>
+                    <option value="servientrega">Servientrega</option>
+                    <option value="envia">Envía</option>
+                    <option value="tcc">TCC</option>
+                    <option value="interrapidisimo">Interrapidísimo</option>
+                  </select>
+                </div>
+
+                {/* Fecha de Recogida */}
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Fecha de Recolección en Taller</label>
+                  <Input
+                    type="date"
+                    value={formRecogida.pickupDate}
+                    onChange={(e) => setFormRecogida({ ...formRecogida, pickupDate: e.target.value })}
+                    className="h-11 rounded-xl bg-slate-50 border-slate-200 font-bold"
+                    required
+                  />
+                </div>
+
+                {/* Rango de Horas */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">Hora Desde</label>
+                    <Input
+                      type="time"
+                      value={formRecogida.pickupTimeFrom}
+                      onChange={(e) => setFormRecogida({ ...formRecogida, pickupTimeFrom: e.target.value })}
+                      className="h-11 rounded-xl bg-slate-50 border-slate-200 font-bold"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">Hora Hasta</label>
+                    <Input
+                      type="time"
+                      value={formRecogida.pickupTimeTo}
+                      onChange={(e) => setFormRecogida({ ...formRecogida, pickupTimeTo: e.target.value })}
+                      className="h-11 rounded-xl bg-slate-50 border-slate-200 font-bold"
+                      required
+                    />
+                  </div>
+                </div>
+
+                {/* Paquetes y Peso */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">Total Paquetes</label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={formRecogida.totalPackages}
+                      onChange={(e) => setFormRecogida({ ...formRecogida, totalPackages: parseInt(e.target.value) || 1 })}
+                      className="h-11 rounded-xl bg-slate-50 border-slate-200 font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">Peso Total (Kg)</label>
+                    <Input
+                      type="number"
+                      step="0.1"
+                      min={0.5}
+                      value={formRecogida.totalWeight}
+                      onChange={(e) => setFormRecogida({ ...formRecogida, totalWeight: parseFloat(e.target.value) || 1.0 })}
+                      className="h-11 rounded-xl bg-slate-50 border-slate-200 font-bold"
+                    />
+                  </div>
+                </div>
+
+                {/* Dirección de Origen (Fija) */}
+                <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200/60 space-y-1">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">Punto de Recogida (Taller)</span>
+                  <p className="font-black text-slate-900">Thiart 3D — Calle 5 #24A-152, Cali</p>
+                  <p className="text-slate-500 font-medium">Tel: 3012906861 • Contacto: Luis Gotopo</p>
+                </div>
+
+                {/* Instrucciones */}
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Notas / Instrucciones para el Conductor</label>
+                  <Input
+                    type="text"
+                    value={formRecogida.instructions}
+                    onChange={(e) => setFormRecogida({ ...formRecogida, instructions: e.target.value })}
+                    className="h-11 rounded-xl bg-slate-50 border-slate-200 font-medium"
+                    placeholder="Ej: Timbrar en portería o taller segundo piso"
+                  />
+                </div>
+
+                <Button
+                  type="submit"
+                  disabled={programandoRecogida}
+                  className="w-full h-12 bg-[#00a19a] hover:bg-[#007973] text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow-lg shadow-[#00a19a]/20 active:scale-95 transition-all"
+                >
+                  {programandoRecogida ? "Solicitando a la Transportadora..." : "📅 Confirmar y Programar Recogida"}
+                </Button>
+              </form>
+            </div>
+
+            {/* Historial de Recogidas Programadas */}
+            <div className="lg:col-span-7 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-4">
+              <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <History className="w-5 h-5 text-slate-400" />
+                  <h3 className="text-base font-black text-slate-900 tracking-tight">Recogidas Programadas</h3>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => void fetchRecogidas()}
+                  className="h-8 px-2 text-xs font-bold text-slate-500 hover:text-slate-900"
+                >
+                  <RefreshCw className="w-3.5 h-3.5 mr-1" /> Actualizar
+                </Button>
+              </div>
+
+              <div className="space-y-3 max-h-[600px] overflow-y-auto">
+                {recogidas.length === 0 ? (
+                  <div className="py-12 text-center space-y-2 text-slate-400">
+                    <CalendarIcon className="w-8 h-8 mx-auto text-slate-300" />
+                    <p className="text-xs font-bold">No hay recogidas programadas</p>
+                    <p className="text-[11px]">Usa el formulario lateral para solicitar tu primera recolección de paquetes.</p>
+                  </div>
+                ) : (
+                  recogidas.map((r, i) => (
+                    <div key={i} className="p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-black text-slate-900 uppercase">
+                            {r.carrier}
+                          </span>
+                          <span className="text-[10px] font-black text-[#00a19a] bg-teal-50 px-2 py-0.5 rounded-md border border-teal-100">
+                            #{r.confirmation_number}
+                          </span>
                         </div>
-                      ) : (
-                        <div className="relative pl-6 space-y-8 before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-[2px] before:bg-slate-100">
-                          {historial.map((item) => {
-                            const info = getEstadoInfo(item.estado);
-                            return (
-                              <div key={item.id} className="relative">
-                                <div className={`absolute -left-[27px] top-1.5 w-4 h-4 rounded-full border-4 border-white shadow-md ${info.color.replace('text', 'bg')}`} />
-                                <div className="space-y-1">
-                                  <div className="flex justify-between items-start">
-                                    <span className={`text-[10px] font-black uppercase tracking-widest ${info.color}`}>{info.label}</span>
-                                    <span className="text-[10px] font-bold text-slate-400">{new Date(item.fecha).toLocaleDateString()}</span>
-                                  </div>
-                                  <p className="text-sm font-black text-slate-900">{item.ubicacion ?? 'Ubicación no especificada'}</p>
-                                  {item.descripcion && <p className="text-xs text-slate-500 font-medium">{item.descripcion}</p>}
-                                </div>
-                              </div>
-                            );
-                          })}
+                        <span className="text-[10px] font-black uppercase text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-md">
+                          {r.status || "Programada"}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+                        <div>
+                          <span className="text-[9px] font-bold text-slate-400 block uppercase">Fecha Recogida</span>
+                          <span className="font-bold text-slate-800">{r.pickup_date}</span>
                         </div>
+                        <div>
+                          <span className="text-[9px] font-bold text-slate-400 block uppercase">Horario</span>
+                          <span className="font-bold text-slate-800">{r.pickup_time_from} - {r.pickup_time_to}</span>
+                        </div>
+                        <div>
+                          <span className="text-[9px] font-bold text-slate-400 block uppercase">Bultos / Peso</span>
+                          <span className="font-bold text-slate-800">{r.total_packages} pqtes ({r.total_weight} kg)</span>
+                        </div>
+                      </div>
+
+                      {r.instructions && (
+                        <p className="text-[11px] text-slate-500 font-medium italic border-t border-slate-200/60 pt-1.5">
+                          &ldquo;{r.instructions}&rdquo;
+                        </p>
                       )}
                     </div>
-                  </Card>
+                  ))
+                )}
+              </div>
+            </div>
 
-                </motion.div>
-              ) : (
-                <div className="h-full flex flex-col items-center justify-center p-20 text-center space-y-6 opacity-40">
-                  <div className="w-24 h-24 bg-slate-100 rounded-[32px] flex items-center justify-center text-slate-300">
-                    <Package size={48} />
-                  </div>
-                  <div className="space-y-2">
-                    <h4 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Selecciona un envío</h4>
-                    <p className="text-sm font-bold text-slate-400">Para ver el detalle completo y actualizar su estado logístico</p>
-                  </div>
-                </div>
-              )}
-            </AnimatePresence>
           </div>
-        </div>
+        )}
+
       </div>
+
+      {/* Modal Ficha Completa de Pedido & Guía */}
+      <DetallePedidoModal
+        pedido={pedidoDetalle}
+        onClose={() => setPedidoDetalle(null)}
+        onAprobarPago={() => {}}
+        procesandoPago={null}
+        onGuiaGenerada={fetchPedidos}
+      />
+
+      {/* Modal Idéntico de Recolecciones estilo Envía */}
+      <RecoleccionesModal
+        open={modalRecoleccionesOpen}
+        onOpenChange={setModalRecoleccionesOpen}
+        pedidosList={pedidos}
+        onRecogidaExitosa={fetchRecogidas}
+      />
     </div>
   );
 }

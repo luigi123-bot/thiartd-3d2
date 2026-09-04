@@ -400,18 +400,18 @@ export default function CarritoPage() {
             </Card>
 
             {/* Lista de productos */}
-            <Card className="p-3 sm:p-4 md:p-6 overflow-hidden">
+            <Card className="p-4 sm:p-6 rounded-3xl border border-slate-100 shadow-sm bg-white overflow-hidden">
               <div className="space-y-4 sm:space-y-6">
                 {carrito.map((item) => (
-                  <div key={item.id} className="flex flex-col xs:flex-row items-start xs:items-center gap-3 sm:gap-4 border-b pb-4 sm:pb-6 last:border-b-0 last:pb-0">
+                  <div key={item.id} className="flex flex-col sm:flex-row items-start sm:items-center gap-4 border-b border-slate-100 pb-5 last:border-b-0 last:pb-0">
                     {/* Imagen del producto */}
-                    <div className="w-16 h-16 sm:w-20 sm:h-20 bg-white rounded-xl overflow-hidden border border-slate-100 flex-shrink-0 relative shadow-sm">
+                    <div className="w-20 h-20 bg-slate-50 rounded-2xl overflow-hidden border border-slate-100 flex-shrink-0 relative shadow-sm p-1.5 flex items-center justify-center">
                       {item.imagen ? (
                         <NextImage
                           src={item.imagen}
                           alt={item.nombre}
                           fill
-                          className="object-contain p-1.5 transition-transform hover:scale-110"
+                          className="object-contain p-1 transition-transform hover:scale-105"
                         />
                       ) : (
                         <div className="w-full h-full bg-slate-50 flex items-center justify-center text-slate-300">
@@ -419,52 +419,53 @@ export default function CarritoPage() {
                         </div>
                       )}
                     </div>
-                    {/* ...resto de la lista de productos... */}
+
                     {/* Información del producto */}
-                    <div className="flex-1 min-w-0 w-full xs:w-auto">
-                      <h3 className="font-semibold text-base sm:text-lg truncate">{item.nombre}</h3>
-                      <p className="text-xs sm:text-sm text-gray-600">{item.categoria}</p>
-                      <p className="text-base sm:text-lg font-bold text-[#00a19a]">${item.precio.toFixed(0)}</p>
-                      {item.destacado && (
-                        <span className="inline-block bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded-full mt-1">
-                          Destacado
-                        </span>
-                      )}
+                    <div className="flex-1 min-w-0 w-full sm:w-auto space-y-1">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-[#00a19a] bg-teal-50 px-2 py-0.5 rounded-md">
+                        {item.categoria}
+                      </span>
+                      <h3 className="font-black text-base sm:text-lg text-slate-900 truncate leading-tight">{item.nombre}</h3>
+                      <p className="text-xs text-slate-400 font-semibold">
+                        ${Number(item.precio).toLocaleString("es-CO")} COP c/u
+                      </p>
                     </div>
-                    {/* Controles de cantidad y acciones - Responsive */}
-                    <div className="flex items-center justify-between xs:justify-end w-full xs:w-auto gap-3">
+
+                    {/* Controles de cantidad y acciones */}
+                    <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto gap-4">
                       {/* Controles de cantidad */}
-                      <div className="flex items-center gap-2 sm:gap-3">
-                        <Button
-                          variant="outline"
-                          size="sm"
+                      <div className="flex items-center border border-slate-200 rounded-xl bg-slate-50">
+                        <button
+                          type="button"
                           onClick={() => actualizarCantidad(item.id, item.cantidad - 1)}
-                          className="w-7 h-7 sm:w-8 sm:h-8 p-0"
+                          className="w-8 h-8 flex items-center justify-center text-slate-600 hover:bg-slate-200 rounded-l-xl transition-colors"
                         >
-                          <Minus className="w-3 h-3 sm:w-4 sm:h-4" />
-                        </Button>
-                        <span className="w-6 sm:w-8 text-center font-medium text-sm sm:text-base">{item.cantidad}</span>
-                        <Button
-                          variant="outline"
-                          size="sm"
+                          <Minus className="w-3.5 h-3.5" />
+                        </button>
+                        <span className="w-8 text-center font-black text-sm text-slate-900">{item.cantidad}</span>
+                        <button
+                          type="button"
                           onClick={() => actualizarCantidad(item.id, item.cantidad + 1)}
                           disabled={item.cantidad >= item.stock}
-                          className="w-7 h-7 sm:w-8 sm:h-8 p-0"
+                          className="w-8 h-8 flex items-center justify-center text-slate-600 hover:bg-slate-200 rounded-r-xl transition-colors disabled:opacity-40"
                         >
-                          <Plus className="w-3 h-3 sm:w-4 sm:h-4" />
-                        </Button>
+                          <Plus className="w-3.5 h-3.5" />
+                        </button>
                       </div>
+
                       {/* Subtotal y eliminar */}
-                      <div className="text-right">
-                        <p className="font-bold text-base sm:text-lg">${(item.precio * item.cantidad).toFixed(0)}</p>
-                        <Button
-                          variant="ghost"
-                          size="sm"
+                      <div className="text-right min-w-[90px]">
+                        <p className="font-black text-base text-slate-900">
+                          ${(item.precio * item.cantidad).toLocaleString("es-CO")}
+                        </p>
+                        <button
+                          type="button"
                           onClick={() => eliminarProducto(item.id)}
-                          className="text-red-600 hover:text-red-800 mt-1 p-1"
+                          className="text-xs font-bold text-slate-400 hover:text-rose-500 transition-colors inline-flex items-center gap-1 mt-0.5"
                         >
-                          <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
-                        </Button>
+                          <Trash2 className="w-3 h-3" />
+                          <span>Quitar</span>
+                        </button>
                       </div>
                     </div>
                   </div>

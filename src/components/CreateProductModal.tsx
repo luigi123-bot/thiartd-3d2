@@ -7,7 +7,7 @@ import { Textarea } from "~/components/ui/textarea";
 import { ProductImageUpload, ProductModel3DUpload, ProductVideoUpload } from "~/components/FileUploadWidget";
 import Image from "next/image";
 import { FiX } from "react-icons/fi";
-import { Package } from "lucide-react";
+import { Package, Star, ArrowLeft, ArrowRight, Trash2, Box, Video, Image as ImageIcon, Plus, Link as LinkIcon, Check } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 const categorias = [
@@ -34,6 +34,7 @@ interface Product {
   destacado: boolean;
   image_url?: string;
   imagenes?: string[];
+  producto_imagenes?: { image_url: string; orden?: number; es_portada?: boolean }[];
   model_url?: string;
   video_url?: string;
   user_id?: string;
@@ -69,10 +70,16 @@ export default function CreateProductModal({
     user_id: "",
   });
   const [loading, setLoading] = useState(false);
-  const [imageUrl, setImageUrl] = useState<string>("");
+  const [galleryImages, setGalleryImages] = useState<string[]>([]);
   const [modelUrl, setModelUrl] = useState<string>("");
+  const [customModelInput, setCustomModelInput] = useState<string>("");
+  const [showModelUrlInput, setShowModelUrlInput] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string>("");
+  const [customVideoInput, setCustomVideoInput] = useState<string>("");
+  const [showVideoUrlInput, setShowVideoUrlInput] = useState(false);
   const [videoPreview, setVideoPreview] = useState<string | null>(null);
+  const [customImageUrl, setCustomImageUrl] = useState<string>("");
+  const [showImageUrlInput, setShowImageUrlInput] = useState(false);
   const [questions, setQuestions] = useState<string[]>([]);
   
   interface Creator {
@@ -87,30 +94,50 @@ export default function CreateProductModal({
   const totalSteps = 5;
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Intercambiar orden de imágenes
-  const swapImages = (idx1: number, idx2: number) => {
-    if (idx1 < 0 || idx1 > 3 || idx2 < 0 || idx2 > 3) return;
-    const allImages: string[] = [
-      imageUrl || form.image_url || "",
-      form.imagenes?.[0] ?? "",
-      form.imagenes?.[1] ?? "",
-      form.imagenes?.[2] ?? ""
-    ];
-    
-    // Intercambiar
-    const temp = allImages[idx1] ?? "";
-    allImages[idx1] = allImages[idx2] ?? "";
-    allImages[idx2] = temp;
-    
-    const newCover = allImages[0] ?? "";
-    setImageUrl(newCover);
-    
-    const newSecondaries = [allImages[1] ?? "", allImages[2] ?? "", allImages[3] ?? ""];
-    setForm({
-      ...form,
-      image_url: newCover,
-      imagenes: newSecondaries
-    });
+  // Gestión y reordenamiento de imágenes de la galería
+  const updateImagesState = (newImages: string[]) => {
+    const cleanList = newImages.filter((img) => Boolean(img && img.trim() !== ""));
+    setGalleryImages(cleanList);
+    const cover = cleanList[0] ?? "";
+    const secondaries = cleanList.slice(1);
+    setForm((prev) => ({
+      ...prev,
+      image_url: cover,
+      imagenes: secondaries,
+    }));
+  };
+
+  const addImageToGallery = (url: string) => {
+    if (!url || url.trim() === "") return;
+    const current = [...galleryImages];
+    if (current.includes(url.trim())) return;
+    if (current.length >= 6) {
+      alert("Puedes agregar un máximo de 6 imágenes.");
+      return;
+    }
+    updateImagesState([...current, url.trim()]);
+    setCustomImageUrl("");
+    setShowImageUrlInput(false);
+  };
+
+  const removeImage = (idx: number) => {
+    const nextList = galleryImages.filter((_, i) => i !== idx);
+    updateImagesState(nextList);
+  };
+
+  const moveImage = (fromIdx: number, toIdx: number) => {
+    if (toIdx < 0 || toIdx >= galleryImages.length || fromIdx === toIdx) return;
+    const nextList = [...galleryImages];
+    const item = nextList[fromIdx];
+    if (!item) return;
+    nextList.splice(fromIdx, 1);
+    nextList.splice(toIdx, 0, item);
+    updateImagesState(nextList);
+  };
+
+  const makeCover = (idx: number) => {
+    if (idx === 0 || idx >= galleryImages.length) return;
+    moveImage(idx, 0);
   };
 
   // Sincronizar form con product si existe
@@ -129,6 +156,25 @@ export default function CreateProductModal({
       }
       setQuestions(parsedQuestions);
 
+      // Reconstruir lista completa de imágenes ordenadas
+      const initialGallery: string[] = [];
+      if (product.image_url) initialGallery.push(product.image_url);
+      if (Array.isArray(product.imagenes)) {
+        for (const img of product.imagenes) {
+          if (img && !initialGallery.includes(img)) initialGallery.push(img);
+        }
+      }
+      if (Array.isArray(product.producto_imagenes)) {
+        const sortedSec = [...product.producto_imagenes]
+          .sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0))
+          .map((p) => p.image_url);
+        for (const img of sortedSec) {
+          if (img && !initialGallery.includes(img)) initialGallery.push(img);
+        }
+      }
+
+      setGalleryImages(initialGallery);
+
       setForm({
         nombre: product.nombre ?? "",
         precio: product.precio ?? 0,
@@ -138,20 +184,22 @@ export default function CreateProductModal({
         stock: product.stock ?? 0,
         detalles: product.detalles ?? "",
         destacado: product.destacado ?? false,
-        image_url: product.image_url ?? "",
-        imagenes: product.imagenes ?? [],
+        image_url: initialGallery[0] ?? "",
+        imagenes: initialGallery.slice(1),
         model_url: product.model_url ?? "",
         video_url: product.video_url ?? "",
         user_id: product.user_id ?? product.usuario_id ?? "",
       });
-      setImageUrl(product.image_url ?? "");
       setModelUrl(product.model_url ?? "");
+      setCustomModelInput(product.model_url ?? "");
       setVideoUrl(product.video_url ?? "");
+      setCustomVideoInput(product.video_url ?? "");
       if (product.video_url) {
         setVideoPreview(product.video_url);
       }
     } else {
       setQuestions([]);
+      setGalleryImages([]);
       setForm({
         nombre: "",
         precio: 0,
@@ -167,10 +215,15 @@ export default function CreateProductModal({
         video_url: "",
         user_id: "",
       });
-      setImageUrl("");
       setModelUrl("");
+      setCustomModelInput("");
+      setShowModelUrlInput(false);
       setVideoUrl("");
+      setCustomVideoInput("");
+      setShowVideoUrlInput(false);
       setVideoPreview(null);
+      setCustomImageUrl("");
+      setShowImageUrlInput(false);
     }
     setStep(0); // Reset a paso 1 al abrir
   }, [product, open]);
@@ -208,12 +261,16 @@ export default function CreateProductModal({
     setLoading(true);
 
     try {
-      const finalVideoUrl = videoUrl || form.video_url;
+      const finalVideoUrl = videoUrl || customVideoInput || form.video_url;
+      const finalModelUrl = modelUrl || customModelInput || form.model_url;
+      const finalCoverImage = galleryImages[0] ?? form.image_url ?? "";
+      const finalSecondaryImages = galleryImages.slice(1);
 
       const formData = {
         ...form,
-        image_url: imageUrl || form.image_url,
-        model_url: modelUrl || form.model_url,
+        image_url: finalCoverImage,
+        imagenes: finalSecondaryImages,
+        model_url: finalModelUrl,
         video_url: finalVideoUrl,
         detalles: JSON.stringify(questions),
       };
@@ -302,7 +359,7 @@ export default function CreateProductModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChangeAction}>
-      <DialogContent className="p-0 bg-transparent border-none shadow-none sm:max-w-xl max-w-[95vw] w-full gap-0 overflow-visible">
+      <DialogContent className="p-0 bg-transparent border-none shadow-none sm:max-w-2xl max-w-[95vw] w-full gap-0 overflow-visible">
         <div className="w-full bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] relative border border-slate-200 animate-in fade-in zoom-in duration-300">
           {/* Header Section */}
           <div className="px-6 py-5 border-b border-slate-100 bg-white sticky top-0 z-50 shrink-0">
@@ -327,7 +384,7 @@ export default function CreateProductModal({
                       {step === 0 ? "Información Básica" : 
                        step === 1 ? "Clasificación" : 
                        step === 2 ? "Valores" : 
-                       step === 3 ? "Multimedia" :
+                       step === 3 ? "Multimedia y 3D" :
                        "Preguntas Adicionales"
                       }
                     </span>
@@ -514,108 +571,357 @@ export default function CreateProductModal({
                     </div>
                   )}
 
-                  {/* Step 4: Multimedia */}
+                  {/* Step 4: Multimedia y 3D (Requerimiento 11) */}
                   {step === 3 && (
-                    <div className="space-y-10 pb-4">
-                       <div className="space-y-4">
-                          <label className="text-xs font-black text-slate-700 uppercase tracking-[0.2em] ml-2">Galería (Hasta 4 imágenes)</label>
-                          <div className="grid grid-cols-2 gap-4">
-                             {[0, 1, 2, 3].map((idx) => {
-                               const currentUrl = idx === 0 ? imageUrl : (form.imagenes?.[idx - 1] ?? "");
-                               return (
-                                 <div key={idx} className="relative aspect-square">
-                                   {currentUrl ? (
-                                     <div className="relative group rounded-2xl overflow-hidden h-full border-2 border-slate-200 shadow-sm">
-                                        <Image src={currentUrl} alt={`Preview ${idx}`} fill className="object-cover" />
-                                        <div className="absolute inset-0 bg-slate-900/75 opacity-0 group-hover:opacity-100 transition-all flex flex-col items-center justify-between p-2">
-                                          <span className="text-[9px] font-black uppercase tracking-widest text-white bg-slate-800/80 px-2 py-0.5 rounded">
-                                            {idx === 0 ? "Portada" : `Imagen ${idx + 1}`}
-                                          </span>
-                                          
-                                          <Button variant="destructive" size="sm" className="h-8 px-3 text-xs font-bold" onClick={() => {
-                                            if (idx === 0) {
-                                              setImageUrl("");
-                                              setForm({ ...form, image_url: "" });
-                                            } else {
-                                              const newImgs = [...(form.imagenes ?? [])];
-                                              newImgs[idx - 1] = "";
-                                              setForm({...form, imagenes: newImgs});
-                                            }
-                                          }}>Quitar</Button>
-
-                                          {/* Botones de ordenamiento */}
-                                          <div className="flex items-center gap-3 bg-black/60 rounded-full px-2 py-0.5">
-                                            <button
-                                              type="button"
-                                              disabled={idx === 0}
-                                              onClick={() => swapImages(idx, idx - 1)}
-                                              className="text-white hover:text-teal-400 disabled:opacity-20 disabled:hover:text-white font-bold px-1 transition-colors"
-                                              title="Mover a la izquierda"
-                                            >
-                                              &larr;
-                                            </button>
-                                            <span className="text-[9px] font-black text-white">{idx + 1}</span>
-                                            <button
-                                              type="button"
-                                              disabled={idx === 3}
-                                              onClick={() => swapImages(idx, idx + 1)}
-                                              className="text-white hover:text-teal-400 disabled:opacity-20 disabled:hover:text-white font-bold px-1 transition-colors"
-                                              title="Mover a la derecha"
-                                            >
-                                              &rarr;
-                                            </button>
-                                          </div>
-                                        </div>
-                                     </div>
-                                   ) : (
-                                     <ProductImageUpload 
-                                       productId={product?.id?.toString() ?? "new"} 
-                                       onUploadComplete={(url) => {
-                                         if (idx === 0) {
-                                           setImageUrl(url);
-                                           setForm({ ...form, image_url: url });
-                                         } else {
-                                           const newImgs = [...(form.imagenes ?? [])];
-                                           newImgs[idx - 1] = url;
-                                           setForm({ ...form, imagenes: newImgs });
-                                         }
-                                       }} 
-                                     />
-                                   )}
-                                 </div>
-                               );
-                             })}
+                    <div className="space-y-8 pb-4">
+                      {/* --- GALERÍA DE IMÁGENES Y ORDEN DE PRESENTACIÓN --- */}
+                      <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-5">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <ImageIcon className="w-4 h-4 text-[#00a19a]" />
+                              <label className="text-sm font-black text-slate-900 uppercase tracking-wider">
+                                Galería y Orden de Presentación
+                              </label>
+                            </div>
+                            <p className="text-xs text-slate-500 mt-0.5">
+                              La <span className="font-bold text-teal-700">primera imagen (Posición #1)</span> es la portada principal de la obra en la tienda.
+                            </p>
                           </div>
-                       </div>
-
-                       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                          <div className="space-y-4">
-                            <label className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] ml-2">Modelo 3D (GLB)</label>
-                            {modelUrl ? (
-                              <div className="p-4 bg-teal-50 rounded-xl border border-teal-100 flex items-center justify-between">
-                                 <span className="text-[10px] font-black text-teal-600 uppercase">Modelo Listo</span>
-                                 <Button variant="ghost" size="icon" onClick={() => {setModelUrl(""); setForm({...form, model_url: ""})}} className="text-red-400 hover:text-red-500"><FiX /></Button>
-                              </div>
-                            ) : (
-                              <ProductModel3DUpload productId={product?.id?.toString() ?? "new"} onUploadComplete={(url) => {setModelUrl(url); setForm({...form, model_url: url})}} />
-                            )}
-                          </div>
-
-                          <div className="space-y-4">
-                            <label className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] ml-2">Video Presentación</label>
-                            {videoPreview ? (
-                              <div className="relative group rounded-xl overflow-hidden h-24 border border-slate-200">
-                                 <video src={videoPreview} className="w-full h-full object-cover" />
-                                 <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                                    <Button variant="destructive" size="icon" onClick={() => {setVideoPreview(null); setVideoUrl(""); setForm({...form, video_url: ""})}}><FiX /></Button>
-                                 </div>
-                              </div>
-                            ) : (
-                              <ProductVideoUpload productId={product?.id?.toString() ?? "new"} onUploadComplete={(url) => {setVideoUrl(url); setVideoPreview(url); setForm({...form, video_url: url})}} />
-                            )}
-                          </div>
+                          <span className="text-xs font-bold text-[#00a19a] bg-teal-50 px-3 py-1 rounded-full border border-teal-100 w-fit">
+                            {galleryImages.length} de 6 imágenes
+                          </span>
                         </div>
-                     </div>
+
+                        {/* Cuadrícula de fotos cargadas con controles de orden */}
+                        {galleryImages.length > 0 && (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {galleryImages.map((url, idx) => {
+                              const isCover = idx === 0;
+                              return (
+                                <div 
+                                  key={`${url}-${idx}`} 
+                                  className={`relative rounded-2xl overflow-hidden border-2 transition-all group bg-slate-900 ${
+                                    isCover 
+                                      ? "border-[#00a19a] shadow-lg shadow-teal-500/10 ring-2 ring-teal-500/30" 
+                                      : "border-slate-200 hover:border-slate-300"
+                                  }`}
+                                >
+                                  {/* Preview de la imagen */}
+                                  <div className="relative aspect-[4/3] w-full bg-slate-100">
+                                    <Image 
+                                      src={url} 
+                                      alt={`Imagen ${idx + 1}`} 
+                                      fill 
+                                      className="object-cover" 
+                                    />
+                                    {/* Badge Superior */}
+                                    <div className="absolute top-2 left-2 z-10">
+                                      {isCover ? (
+                                        <span className="inline-flex items-center gap-1 bg-gradient-to-r from-emerald-600 to-[#00a19a] text-white text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full shadow-md">
+                                          <Star className="w-3 h-3 fill-current" /> Portada Principal
+                                        </span>
+                                      ) : (
+                                        <span className="inline-flex items-center bg-black/70 backdrop-blur-md text-white text-[10px] font-bold px-2 py-0.5 rounded-full border border-white/20">
+                                          Posición #{idx + 1}
+                                        </span>
+                                      )}
+                                    </div>
+
+                                    {/* Botón eliminar directo */}
+                                    <button
+                                      type="button"
+                                      onClick={() => removeImage(idx)}
+                                      className="absolute top-2 right-2 z-10 w-7 h-7 rounded-full bg-black/70 hover:bg-red-600 text-white flex items-center justify-center transition-colors shadow-md"
+                                      title="Quitar imagen"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+
+                                  {/* Barra de control de orden */}
+                                  <div className="p-2.5 bg-slate-900 flex items-center justify-between gap-1 text-white">
+                                    <div className="flex items-center gap-1">
+                                      <button
+                                        type="button"
+                                        disabled={idx === 0}
+                                        onClick={() => moveImage(idx, idx - 1)}
+                                        className="h-7 px-2 bg-white/10 hover:bg-white/20 disabled:opacity-30 disabled:hover:bg-white/10 rounded-lg text-xs font-bold transition-all flex items-center gap-1"
+                                        title="Mover hacia la izquierda"
+                                      >
+                                        <ArrowLeft className="w-3 h-3" /> Mover
+                                      </button>
+                                      <button
+                                        type="button"
+                                        disabled={idx === galleryImages.length - 1}
+                                        onClick={() => moveImage(idx, idx + 1)}
+                                        className="h-7 px-2 bg-white/10 hover:bg-white/20 disabled:opacity-30 disabled:hover:bg-white/10 rounded-lg text-xs font-bold transition-all flex items-center gap-1"
+                                        title="Mover hacia la derecha"
+                                      >
+                                        <ArrowRight className="w-3 h-3" />
+                                      </button>
+                                    </div>
+
+                                    {!isCover && (
+                                      <button
+                                        type="button"
+                                        onClick={() => makeCover(idx)}
+                                        className="h-7 px-2.5 bg-teal-500/20 hover:bg-teal-500 text-teal-300 hover:text-white rounded-lg text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1 border border-teal-500/30"
+                                        title="Fijar como portada principal"
+                                      >
+                                        <Star className="w-2.5 h-2.5" /> Hacer Portada
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {/* Zona de subida o inserción de nueva imagen */}
+                        {galleryImages.length < 6 && (
+                          <div className="space-y-3 pt-2">
+                            <div className="p-4 bg-slate-50 rounded-2xl border border-dashed border-slate-300 space-y-3">
+                              <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+                                <div>
+                                  <p className="text-xs font-bold text-slate-700">Subir nueva foto a la galería</p>
+                                  <p className="text-[11px] text-slate-400">Archivos JPG, PNG o WEBP (máx. 5MB).</p>
+                                </div>
+                                <div className="w-full sm:w-auto">
+                                  <ProductImageUpload 
+                                    productId={product?.id?.toString() ?? "new"} 
+                                    onUploadComplete={(url) => addImageToGallery(url)} 
+                                  />
+                                </div>
+                              </div>
+
+                              {/* Opción de agregar vía URL */}
+                              <div className="border-t border-slate-200/60 pt-3 flex items-center justify-between">
+                                {!showImageUrlInput ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowImageUrlInput(true)}
+                                    className="text-xs font-bold text-[#00a19a] hover:text-[#007973] flex items-center gap-1.5 transition-colors"
+                                  >
+                                    <LinkIcon className="w-3.5 h-3.5" /> O pegar enlace de imagen directo
+                                  </button>
+                                ) : (
+                                  <div className="flex gap-2 w-full">
+                                    <Input
+                                      placeholder="https://ejemplo.com/mi-obra.jpg"
+                                      value={customImageUrl}
+                                      onChange={(e) => setCustomImageUrl(e.target.value)}
+                                      className="h-9 text-xs bg-white"
+                                    />
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      onClick={() => addImageToGallery(customImageUrl)}
+                                      disabled={!customImageUrl.trim()}
+                                      className="bg-[#00a19a] hover:bg-[#007973] text-white h-9 px-3 text-xs font-bold shrink-0"
+                                    >
+                                      <Plus className="w-3.5 h-3.5 mr-1" /> Añadir
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => { setShowImageUrlInput(false); setCustomImageUrl(""); }}
+                                      className="h-9 px-2 text-slate-400 hover:text-slate-600"
+                                    >
+                                      <FiX className="w-4 h-4" />
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* --- MODELO 3D Y VIDEO DE PRESENTACIÓN --- */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* 1. Modelo 3D */}
+                        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4 flex flex-col justify-between">
+                          <div>
+                            <div className="flex items-center gap-2 mb-1">
+                              <Box className="w-4 h-4 text-indigo-600" />
+                              <label className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                                Modelo 3D Interactivo
+                              </label>
+                            </div>
+                            <p className="text-xs text-slate-500 leading-relaxed">
+                              Sube un archivo <span className="font-semibold text-slate-700">.GLB, .GLTF o .STL</span> para que los compradores puedan rotar y visualizar la pieza en 3D.
+                            </p>
+                          </div>
+
+                          {modelUrl ? (
+                            <div className="p-4 bg-teal-50 rounded-2xl border border-teal-100 flex items-center justify-between">
+                              <div className="flex items-center gap-3 overflow-hidden">
+                                <div className="w-9 h-9 rounded-xl bg-[#00a19a] text-white flex items-center justify-center shrink-0">
+                                  <Box className="w-5 h-5" />
+                                </div>
+                                <div className="truncate">
+                                  <p className="text-xs font-black text-teal-900 uppercase tracking-wider">Modelo 3D Cargado</p>
+                                  <a 
+                                    href={modelUrl} 
+                                    target="_blank" 
+                                    rel="noreferrer" 
+                                    className="text-[11px] text-teal-700 font-medium hover:underline truncate block"
+                                  >
+                                    Ver archivo 3D
+                                  </a>
+                                </div>
+                              </div>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                onClick={() => {
+                                  setModelUrl("");
+                                  setCustomModelInput("");
+                                  setForm({ ...form, model_url: "" });
+                                }} 
+                                className="text-red-400 hover:text-red-600 rounded-full hover:bg-red-50 shrink-0"
+                                title="Eliminar modelo 3D"
+                              >
+                                <FiX className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <div className="space-y-3">
+                              <ProductModel3DUpload 
+                                productId={product?.id?.toString() ?? "new"} 
+                                onUploadComplete={(url) => {
+                                  setModelUrl(url);
+                                  setForm({ ...form, model_url: url });
+                                }} 
+                              />
+                              {!showModelUrlInput ? (
+                                <button
+                                  type="button"
+                                  onClick={() => setShowModelUrlInput(true)}
+                                  className="text-xs font-bold text-slate-500 hover:text-[#00a19a] flex items-center gap-1.5 transition-colors"
+                                >
+                                  <LinkIcon className="w-3.5 h-3.5" /> O ingresar URL directa (.glb / .gltf)
+                                </button>
+                              ) : (
+                                <div className="flex gap-2">
+                                  <Input
+                                    placeholder="https://ejemplo.com/modelo.glb"
+                                    value={customModelInput}
+                                    onChange={(e) => setCustomModelInput(e.target.value)}
+                                    className="h-9 text-xs bg-white"
+                                  />
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    onClick={() => {
+                                      if (customModelInput.trim()) {
+                                        setModelUrl(customModelInput.trim());
+                                        setForm({ ...form, model_url: customModelInput.trim() });
+                                        setShowModelUrlInput(false);
+                                      }
+                                    }}
+                                    disabled={!customModelInput.trim()}
+                                    className="bg-[#00a19a] hover:bg-[#007973] text-white h-9 px-3 text-xs font-bold shrink-0"
+                                  >
+                                    <Check className="w-3.5 h-3.5 mr-1" /> Usar
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* 2. Video de Presentación */}
+                        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4 flex flex-col justify-between">
+                          <div>
+                            <div className="flex items-center gap-2 mb-1">
+                              <Video className="w-4 h-4 text-rose-600" />
+                              <label className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                                Video de Presentación
+                              </label>
+                            </div>
+                            <p className="text-xs text-slate-500 leading-relaxed">
+                              Sube un archivo de video MP4/WebM o ingresa un enlace (YouTube, Vimeo o video directo).
+                            </p>
+                          </div>
+
+                          {videoUrl || videoPreview ? (
+                            <div className="relative group rounded-2xl overflow-hidden border border-slate-200 bg-black aspect-video flex items-center justify-center">
+                              {videoPreview && !videoPreview.includes("youtube") && !videoPreview.includes("youtu.be") ? (
+                                <video src={videoPreview} controls className="w-full h-full object-contain" />
+                              ) : (
+                                <div className="p-4 text-center text-white space-y-2">
+                                  <Video className="w-8 h-8 text-rose-500 mx-auto" />
+                                  <p className="text-xs font-bold truncate max-w-[200px]">{videoUrl || videoPreview}</p>
+                                </div>
+                              )}
+                              <Button 
+                                variant="destructive" 
+                                size="icon" 
+                                onClick={() => {
+                                  setVideoPreview(null);
+                                  setVideoUrl("");
+                                  setCustomVideoInput("");
+                                  setForm({ ...form, video_url: "" });
+                                }}
+                                className="absolute top-2 right-2 z-10 w-8 h-8 rounded-full shadow-lg"
+                                title="Eliminar video"
+                              >
+                                <FiX className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <div className="space-y-3">
+                              <ProductVideoUpload 
+                                productId={product?.id?.toString() ?? "new"} 
+                                onUploadComplete={(url) => {
+                                  setVideoUrl(url);
+                                  setVideoPreview(url);
+                                  setForm({ ...form, video_url: url });
+                                }} 
+                              />
+                              {!showVideoUrlInput ? (
+                                <button
+                                  type="button"
+                                  onClick={() => setShowVideoUrlInput(true)}
+                                  className="text-xs font-bold text-slate-500 hover:text-rose-600 flex items-center gap-1.5 transition-colors"
+                                >
+                                  <LinkIcon className="w-3.5 h-3.5" /> O ingresar enlace de YouTube / MP4
+                                </button>
+                              ) : (
+                                <div className="flex gap-2">
+                                  <Input
+                                    placeholder="https://youtube.com/watch?v=..."
+                                    value={customVideoInput}
+                                    onChange={(e) => setCustomVideoInput(e.target.value)}
+                                    className="h-9 text-xs bg-white"
+                                  />
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    onClick={() => {
+                                      if (customVideoInput.trim()) {
+                                        setVideoUrl(customVideoInput.trim());
+                                        setVideoPreview(customVideoInput.trim());
+                                        setForm({ ...form, video_url: customVideoInput.trim() });
+                                        setShowVideoUrlInput(false);
+                                      }
+                                    }}
+                                    disabled={!customVideoInput.trim()}
+                                    className="bg-rose-600 hover:bg-rose-700 text-white h-9 px-3 text-xs font-bold shrink-0"
+                                  >
+                                    <Check className="w-3.5 h-3.5 mr-1" /> Usar
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   )}
 
                   {/* Step 5: Preguntas Adicionales */}
@@ -625,6 +931,7 @@ export default function CreateProductModal({
                           <div className="space-y-3">
                             <label className="text-xs font-black text-slate-700 uppercase tracking-[0.2em] ml-1">Preguntas de Personalización</label>
                             <p className="text-xs text-slate-500">
+
                               Agrega preguntas que el comprador deberá responder al realizar el pedido de este producto (ej. grabado de nombre, especificaciones de color, etc.).
                             </p>
                           </div>

@@ -1,16 +1,14 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { getSupabaseServer } from "~/lib/supabaseServer";
 
 // Configuración de Supabase
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 /**
  * Endpoint de API para obtener la lista de roles disponibles.
  * Esta API es crítica porque provee los identificadores (ids) que se guardan en el perfil del usuario.
  */
 export async function GET() {
+  const supabase = getSupabaseServer();
   try {
     // Intentar buscar en tablas comunes de roles (esquema flexible)
     const tables = ["roles", "role"];

@@ -1,13 +1,9 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { getSupabaseServer } from "~/lib/supabaseServer";
 import crypto from "crypto";
 import { enviarEmailConfirmacion } from "./emailConfirmacion";
 import type { SentMessageInfo } from "nodemailer";
 import { crearEnvioParaPedido } from "../../../../../utils/envia";
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 interface WompiWebhookData {
   event: string;
@@ -164,6 +160,8 @@ async function procesarTransaccionActualizada(
   transaction: WompiWebhookData["data"]["transaction"],
   pedidoId: number
 ): Promise<void> {
+  const supabase = getSupabaseServer();
+
   // Mapear status de Wompi a estado de la BD
   const estadoMap: Record<string, string> = {
     APPROVED: "pagado",
@@ -214,12 +212,9 @@ async function procesarTransaccionActualizada(
   if (transaction.status === "APPROVED" && pedidoActualizado) {
     await enviarEmailConfirmacionCompleto(pedidoActualizado, transaction);
 
-    // Generar guía de envío automática con Envía
-    try {
-      await crearEnvioParaPedido(pedidoId);
-    } catch (enviaError) {
-      console.error("❌ [ENVIA] Error generando envío automático:", enviaError);
-    }
+    // NOTA: Creación automática de envíos desactivada por política operativa.
+    // Los envíos se gestionan de forma manual o programada por el administrador desde el panel de Envíos.
+    console.log(`ℹ️ [ENVIA] Creación automática de guía al pagar DESACTIVADA para pedido #${pedidoId}. El envío se generará de forma manual o programada.`);
     
     // Limpiar el carrito en la base de datos ya que la compra fue exitosa
     if (pedidoActualizado.cliente_id) {

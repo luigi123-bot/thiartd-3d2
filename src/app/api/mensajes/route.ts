@@ -1,11 +1,9 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { getSupabaseAnon } from "~/lib/supabaseServer";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 export async function POST(req: Request) {
+  const supabase = getSupabaseAnon();
   try {
     const maybeBody: unknown = await req.json();
     if (
@@ -62,6 +60,7 @@ export async function POST(req: Request) {
 }
 
 export async function GET() {
+  const supabase = getSupabaseAnon();
   const { data: mensajes, error } = await supabase.from("mensajes").select("*").order("creado_en", { ascending: false });
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

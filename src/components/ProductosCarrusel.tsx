@@ -1,9 +1,9 @@
 "use client";
-import { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { motion } from "framer-motion";
-import { ChevronLeft, ChevronRight, ShoppingCart, Eye, Sparkles} from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { ChevronLeft, ChevronRight, Eye, Sparkles } from "lucide-react";
 import clsx from "clsx";
 import { supabase } from "~/lib/supabaseClient";
 
@@ -15,14 +15,14 @@ interface Producto {
   precio: number;
   destacado?: boolean;
   image_url?: string;
+  video_url?: string;
+  producto_imagenes?: { image_url: string }[];
   usuarios?: { nombre: string } | null;
 }
 
 interface ProductosCarruselProps {
   soloDestacados?: boolean;
 }
-
-
 
 const mockProductos: Producto[] = [
   {
@@ -77,7 +77,7 @@ export default function ProductosCarrusel({ soloDestacados = false }: ProductosC
       try {
         const { data } = await supabase
           .from("productos")
-          .select("id, nombre, descripcion, categoria, precio, destacado, image_url, usuarios:user_id(nombre)");
+          .select("id, nombre, descripcion, categoria, precio, destacado, image_url, video_url, usuarios:user_id(nombre), producto_imagenes(*)");
 
         interface RawProducto {
           id: number;
@@ -87,6 +87,8 @@ export default function ProductosCarrusel({ soloDestacados = false }: ProductosC
           precio: number;
           destacado: boolean | null;
           image_url: string | null;
+          video_url?: string | null;
+          producto_imagenes?: { image_url: string }[];
           usuarios: { nombre: string } | { nombre: string }[] | null;
         }
 
@@ -99,6 +101,8 @@ export default function ProductosCarrusel({ soloDestacados = false }: ProductosC
           precio: p.precio,
           destacado: p.destacado ?? false,
           image_url: p.image_url ?? undefined,
+          video_url: p.video_url ?? undefined,
+          producto_imagenes: p.producto_imagenes ?? [],
           usuarios: Array.isArray(p.usuarios) ? p.usuarios[0] : p.usuarios
         })) as Producto[];
 
@@ -120,42 +124,49 @@ export default function ProductosCarrusel({ soloDestacados = false }: ProductosC
   }, [soloDestacados]);
 
   const [cardsPerView, setCardsPerView] = useState(1);
-  const getCardsPerView = useCallback(() => {
-    if (window.innerWidth < 640) return 1;
-    if (window.innerWidth < 1024) return 2;
-    if (window.innerWidth < 1280) return 3;
-    return 4;
-  }, []);
+
+  // ResizeObserver — no fuerza reflow a diferencia de leer offsetWidth/innerWidth
   useEffect(() => {
-    setCardsPerView(getCardsPerView());
+    const container = scrollRef.current;
+    if (!container) return;
+
     let debounceTimer: ReturnType<typeof setTimeout>;
-    function handleResize() {
+    const observer = new ResizeObserver((entries) => {
       clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => setCardsPerView(getCardsPerView()), 200);
-    }
-    window.addEventListener("resize", handleResize, { passive: true });
+      debounceTimer = setTimeout(() => {
+        const width = entries[0]?.contentRect.width ?? container.offsetWidth;
+        if (width < 640) setCardsPerView(1);
+        else if (width < 1024) setCardsPerView(2);
+        else if (width < 1280) setCardsPerView(3);
+        else setCardsPerView(4);
+      }, 150);
+    });
+
+    observer.observe(container);
     return () => {
       clearTimeout(debounceTimer);
-      window.removeEventListener("resize", handleResize);
+      observer.disconnect();
     };
-  }, [getCardsPerView]);
+  }, []);
 
   useEffect(() => {
     if (isPaused || productos.length <= cardsPerView) return;
     const interval = setInterval(() => {
       setCurrent((prev) => (prev + 1) % (productos.length - cardsPerView + 1));
-    }, 4000);
+    }, 5000);
     return () => clearInterval(interval);
   }, [isPaused, productos.length, cardsPerView]);
 
   useEffect(() => {
-    if (scrollRef.current) {
-      const cardWidth = scrollRef.current.offsetWidth / cardsPerView;
-      scrollRef.current.scrollTo({
-        left: current * cardWidth,
-        behavior: "smooth",
-      });
-    }
+    const el = scrollRef.current;
+    if (!el) return;
+    // Usar requestAnimationFrame para agrupar la lectura de offsetWidth
+    // con la escritura de scrollTo, evitando layout thrashing
+    const raf = requestAnimationFrame(() => {
+      const cardWidth = el.offsetWidth / cardsPerView;
+      el.scrollTo({ left: current * cardWidth, behavior: "smooth" });
+    });
+    return () => cancelAnimationFrame(raf);
   }, [current, cardsPerView]);
 
   if (loading) return (
@@ -166,7 +177,7 @@ export default function ProductosCarrusel({ soloDestacados = false }: ProductosC
 
   return (
     <section className="relative w-full max-w-[1400px] mx-auto py-10 px-4 sm:px-8 overflow-hidden group">
-      {/* Botones de navegación minimalistas */}
+      {/* Botones de navegación del carrusel */}
       <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 flex justify-between px-2 z-20 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300">
         <button
           onClick={() => setCurrent(c => Math.max(0, c - 1))}
@@ -192,91 +203,17 @@ export default function ProductosCarrusel({ soloDestacados = false }: ProductosC
         onMouseLeave={() => setIsPaused(false)}
       >
         {productos.map((prod, idx) => (
-          <motion.div
+          <CarruselCardItem
             key={prod.id}
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: idx * 0.1 }}
-            className={clsx(
-              "flex-shrink-0 relative bg-white border border-slate-50 rounded-[2.5rem] p-5 shadow-[0_4px_25px_rgba(0,0,0,0.02)] hover:shadow-[0_25px_50px_rgba(0,161,154,0.12)] transition-all duration-700 group flex flex-col",
-              cardsPerView === 1 ? "w-full" : 
-              cardsPerView === 2 ? "w-[calc(50%-12px)]" :
-              cardsPerView === 3 ? "w-[calc(33.33%-16px)]" : "w-[calc(25%-18px)]"
-            )}
-          >
-            {/* Image Wrap with Gradient Background */}
-            <div className="relative aspect-square rounded-[2rem] overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100 mb-6 group/img p-8">
-               <Image
-                  src={prod.image_url ?? "/logo.png"}
-                  alt={prod.nombre}
-                  fill
-                  priority={idx === 0}
-                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
-                  className="object-contain transition-transform duration-700 group-hover/img:scale-110 drop-shadow-xl"
-                />
-                
-                {prod.destacado && (
-                  <div className="absolute top-4 left-4">
-                    <span className="bg-black/80 backdrop-blur-md text-white text-[9px] font-black uppercase tracking-[0.15em] px-3.5 py-1.5 rounded-full shadow-xl flex items-center gap-1.5">
-                      <Sparkles className="w-3 h-3 text-teal-400" />
-                      Elite
-                    </span>
-                  </div>
-                )}
-
-                <div className="absolute inset-0 bg-white/40 opacity-0 group-hover/img:opacity-100 transition-opacity duration-300 flex items-center justify-center gap-3">
-                  <motion.button 
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
-                    onClick={() => router.push(`/tienda/productos/${prod.id}`)}
-                    className="w-11 h-11 bg-white rounded-2xl flex items-center justify-center text-[#00a19a] shadow-xl border border-white/50"
-                  >
-                    <Eye className="w-5 h-5" />
-                  </motion.button>
-                  <motion.button 
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
-                    className="w-11 h-11 bg-[#00a19a] rounded-2xl flex items-center justify-center text-white shadow-xl"
-                  >
-                    <ShoppingCart className="w-5 h-5" />
-                  </motion.button>
-                </div>
-            </div>
-
-            {/* Content Details */}
-            <div className="space-y-3 flex-1 flex flex-col">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-black text-[#00a19a] uppercase tracking-widest px-2.5 py-1 bg-teal-50 rounded-lg">
-                  {prod.categoria}
-                </span>
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">Thiart Original</span>
-              </div>
-              
-              <h3 className="text-lg font-black text-slate-900 line-clamp-1 group-hover:text-[#00a19a] transition-colors leading-tight">
-                {prod.nombre}
-              </h3>
-              
-              <p className="text-[11px] text-slate-500 line-clamp-2 leading-relaxed font-medium mb-4">
-                {prod.descripcion}
-              </p>
-
-              <div className="mt-auto pt-4 flex items-center justify-between border-t border-slate-50">
-                <div className="flex items-baseline gap-1.5">
-                  <span className="text-xs font-bold text-teal-600">$</span>
-                  <span className="text-2xl font-black text-slate-900 tracking-tighter">{prod.precio.toLocaleString()}</span>
-                  <span className="text-[9px] font-black text-slate-400 ml-0.5">COP</span>
-                </div>
-                <div className="flex gap-1.5">
-                  <div className="w-1.5 h-1.5 rounded-full bg-teal-500 shadow-[0_0_8px_rgba(20,184,166,0.6)]" />
-                  <div className="w-1.5 h-1.5 rounded-full bg-slate-100" />
-                </div>
-              </div>
-            </div>
-          </motion.div>
+            prod={prod}
+            idx={idx}
+            cardsPerView={cardsPerView}
+            router={router}
+          />
         ))}
       </div>
       
-      {/* Indicadores de progreso minimalistas */}
+      {/* Indicadores de progreso */}
       <div className="flex justify-center gap-2 mt-12 pb-2">
         {Array.from({ length: Math.max(0, productos.length - cardsPerView + 1) }).map((_, i) => (
           <button
@@ -290,5 +227,193 @@ export default function ProductosCarrusel({ soloDestacados = false }: ProductosC
         ))}
       </div>
     </section>
+  );
+}
+
+function CarruselCardItem({
+  prod,
+  idx,
+  cardsPerView,
+  router,
+}: {
+  prod: Producto;
+  idx: number;
+  cardsPerView: number;
+  router: ReturnType<typeof useRouter>;
+}) {
+  const [activeMediaIndex, setActiveMediaIndex] = useState(0);
+
+  const mediaList: { type: "image" | "video"; url: string }[] = [];
+  if (prod.image_url) mediaList.push({ type: "image", url: prod.image_url });
+  if (prod.producto_imagenes && prod.producto_imagenes.length > 0) {
+    prod.producto_imagenes.forEach((img) => {
+      if (img.image_url && img.image_url !== prod.image_url) {
+        mediaList.push({ type: "image", url: img.image_url });
+      }
+    });
+  }
+  if (prod.video_url) mediaList.push({ type: "video", url: prod.video_url });
+
+  const activeMedia = mediaList[activeMediaIndex] ?? mediaList[0];
+
+  const handlePrevMedia = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setActiveMediaIndex((p) => (p > 0 ? p - 1 : mediaList.length - 1));
+  };
+
+  const handleNextMedia = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setActiveMediaIndex((p) => (p + 1) % mediaList.length);
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ delay: idx * 0.05 }}
+      className={clsx(
+        "flex-shrink-0 relative bg-white border border-slate-50 rounded-[2.5rem] p-5 shadow-[0_4px_25px_rgba(0,0,0,0.02)] hover:shadow-[0_25px_50px_rgba(0,161,154,0.12)] transition-all duration-700 group flex flex-col",
+        cardsPerView === 1 ? "w-full" : 
+        cardsPerView === 2 ? "w-[calc(50%-12px)]" :
+        cardsPerView === 3 ? "w-[calc(33.33%-16px)]" : "w-[calc(25%-18px)]"
+      )}
+    >
+      {/* Image / Video Showcase with In-Card Slider */}
+      <div className="relative aspect-square rounded-[2rem] overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100 mb-6 group/img p-4 flex items-center justify-center">
+        <AnimatePresence mode="wait">
+          {activeMedia?.type === "image" ? (
+            <motion.div
+              key={activeMedia.url}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="relative w-full h-full"
+            >
+              <Image
+                src={activeMedia.url}
+                alt={prod.nombre}
+                fill
+                priority={idx === 0}
+                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                className="object-contain transition-transform duration-700 group-hover/img:scale-105 drop-shadow-xl p-2"
+              />
+            </motion.div>
+          ) : activeMedia?.type === "video" ? (
+            <motion.div
+              key={activeMedia.url}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="relative w-full h-full bg-black rounded-2xl overflow-hidden flex items-center justify-center"
+            >
+              <video
+                src={activeMedia.url}
+                autoPlay
+                muted
+                loop
+                playsInline
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute bottom-2 left-2 bg-black/80 backdrop-blur-md px-2 py-0.5 rounded-md text-[8px] font-black text-teal-300 uppercase tracking-widest flex items-center gap-1">
+                <span>▶</span> Video
+              </div>
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
+        
+        {prod.destacado && (
+          <div className="absolute top-4 left-4 z-10">
+            <span className="bg-black/80 backdrop-blur-md text-white text-[9px] font-black uppercase tracking-[0.15em] px-3.5 py-1.5 rounded-full shadow-xl flex items-center gap-1.5">
+              <Sparkles className="w-3 h-3 text-teal-400" />
+              Destacado
+            </span>
+          </div>
+        )}
+
+        {/* In-Card Media Controls */}
+        {mediaList.length > 1 && (
+          <>
+            <button
+              type="button"
+              onClick={handlePrevMedia}
+              className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 bg-white/90 hover:bg-white text-slate-800 rounded-full shadow-lg flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity z-20 hover:scale-110 active:scale-95"
+            >
+              ‹
+            </button>
+            <button
+              type="button"
+              onClick={handleNextMedia}
+              className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 bg-white/90 hover:bg-white text-slate-800 rounded-full shadow-lg flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity z-20 hover:scale-110 active:scale-95"
+            >
+              ›
+            </button>
+
+            <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1 z-20">
+              {mediaList.map((m, mIdx) => (
+                <button
+                  key={mIdx}
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setActiveMediaIndex(mIdx);
+                  }}
+                  className={`h-1.5 rounded-full transition-all duration-300 ${
+                    activeMediaIndex === mIdx
+                      ? "w-4 bg-[#00a19a]"
+                      : "w-1.5 bg-slate-300/80 hover:bg-slate-400"
+                  }`}
+                />
+              ))}
+            </div>
+          </>
+        )}
+
+        <div className="absolute inset-0 bg-slate-900/10 opacity-0 group-hover/img:opacity-100 transition-opacity duration-300 flex items-center justify-center gap-3 pointer-events-none">
+          <motion.button 
+            whileHover={{ scale: 1.08 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => router.push(`/tienda/productos/${prod.id}`)}
+            className="h-10 px-4 bg-white rounded-xl flex items-center gap-2 text-slate-900 shadow-xl font-black text-xs uppercase pointer-events-auto"
+          >
+            <Eye className="w-4 h-4 text-[#00a19a]" />
+            Ver Opciones
+          </motion.button>
+        </div>
+      </div>
+
+      {/* Content Details */}
+      <div 
+        onClick={() => router.push(`/tienda/productos/${prod.id}`)} 
+        className="space-y-3 flex-1 flex flex-col cursor-pointer"
+      >
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] font-black text-[#00a19a] uppercase tracking-widest px-2.5 py-1 bg-teal-50 rounded-lg">
+            {prod.categoria}
+          </span>
+          <span className="text-[10px] text-emerald-700 font-bold uppercase tracking-tight bg-emerald-50 px-2 py-0.5 rounded-md">
+            Recogida Gratis
+          </span>
+        </div>
+        
+        <h3 className="text-base font-black text-slate-900 line-clamp-1 group-hover:text-[#00a19a] transition-colors leading-tight">
+          {prod.nombre}
+        </h3>
+        
+        <p className="text-[11px] text-slate-500 line-clamp-2 leading-relaxed font-medium mb-3">
+          {prod.descripcion}
+        </p>
+
+        <div className="mt-auto pt-3 flex items-center justify-between border-t border-slate-100">
+          <div className="flex items-baseline gap-1">
+            <span className="text-2xl font-black text-slate-900 tracking-tight">${prod.precio.toLocaleString("es-CO")}</span>
+            <span className="text-[9px] font-black text-slate-400">COP</span>
+          </div>
+          <div className="text-[10px] font-black text-[#00a19a] group-hover:translate-x-1 transition-transform">
+            Ver detalle →
+          </div>
+        </div>
+      </div>
+    </motion.div>
   );
 }

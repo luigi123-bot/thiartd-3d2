@@ -1,9 +1,6 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { getSupabaseAnon } from "~/lib/supabaseServer";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 interface PersonalizacionRequestBody {
   usuario_id?: string;
@@ -40,6 +37,7 @@ interface PersonalizacionInserted {
 }
 
 export async function POST(req: Request) {
+  const supabase = getSupabaseAnon();
   try {
     const body = (await req.json()) as PersonalizacionRequestBody;
     const { usuario_id, nombre, email, tamano, material, color, acabado, presupuesto, plazo, descripcion, referencia_url, estado, titulo } = body;
@@ -80,6 +78,7 @@ export async function POST(req: Request) {
 }
 
 export async function GET() {
+  const supabase = getSupabaseAnon();
   const { data, error } = await supabase.from("personalizaciones").select("*").order("created_at", { ascending: false });
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

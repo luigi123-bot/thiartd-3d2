@@ -1,12 +1,9 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { getSupabaseServer } from "~/lib/supabaseServer";
 import { NotificationService } from "~/lib/notificationService";
 import { crearEnvioParaPedido } from "../../../../utils/envia";
 import { sendShippingEmail } from "~/lib/email-service";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 interface TrackingRequestBody {
   pedido_id: number;
@@ -29,6 +26,7 @@ interface HistorialEnvio {
 }
 
 export async function POST(req: Request) {
+  const supabase = getSupabaseServer();
   try {
     const body = await req.json() as TrackingRequestBody;
     const { 
@@ -228,6 +226,7 @@ export async function POST(req: Request) {
 }
 
 export async function GET(req: Request) {
+  const supabase = getSupabaseServer();
   try {
     const url = new URL(req.url);
     const pedidoId = url.searchParams.get("pedido_id");

@@ -1,15 +1,13 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { getSupabaseAnon } from "~/lib/supabaseServer";
 import { sendUnansweredMessageAlertEmail } from "~/lib/email-service";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Set para rastrear mensajes para los que ya se programó o envió alerta
 const notifiedMessages = new Set<string | number>();
 
 export async function POST(req: Request) {
+  const supabase = getSupabaseAnon();
   try {
     const body = await req.json() as {
       messageId?: number | string;
@@ -89,6 +87,7 @@ export async function POST(req: Request) {
 
 // Endpoint GET para chequeo manual o cron de mensajes sin responder > 2 min
 export async function GET() {
+  const supabase = getSupabaseAnon();
   try {
     const twoMinutesAgo = new Date(Date.now() - 120000).toISOString();
     const adminEmail = process.env.ADMIN_EMAIL ?? process.env.GMAIL_USER ?? "thiart3d@gmail.com";

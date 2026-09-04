@@ -1,10 +1,7 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { getSupabaseServer } from "~/lib/supabaseServer";
 
 // Configuración de Supabase
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 /**
  * Endpoint de API para la gestión del catálogo de productos (obras artísticas).
@@ -16,6 +13,7 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
  * Incluye el nombre del artista (relación con la tabla usuarios) y las imágenes secundarias.
  */
 export async function GET() {
+  const supabase = getSupabaseServer();
   const { data: productos, error } = await supabase
     .from("productos")
     .select(`
@@ -38,6 +36,7 @@ export async function GET() {
  * Soporta la inserción del producto principal y la carga masiva de imágenes secundarias.
  */
 export async function POST(req: Request) {
+  const supabase = getSupabaseServer();
   try {
     // Definición de la estructura esperada en el cuerpo de la petición
     type ProductoBody = {

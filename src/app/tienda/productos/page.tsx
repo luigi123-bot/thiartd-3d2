@@ -345,14 +345,16 @@ function FilterCheckbox({ label, checked, onChange }: { label: string; checked: 
   );
 }
 
-// Sub-componente para la Card de Producto (Diseño Minimal Compacto)
+// Sub-componente para la Card de Producto con Carrusel Interactivo de Imágenes y Videos
 function ProductCardModern({ producto, idx, router, addToCarrito, carrito }: {
-  producto: Product;
+  producto: Product & { video_url?: string };
   idx: number;
   router: AppRouterInstance;
   addToCarrito: (item: CarritoItem) => Promise<boolean>;
   carrito: CarritoItem[];
 }) {
+  const [activeMediaIndex, setActiveMediaIndex] = useState(0);
+
   const data = {
     id: producto.id,
     nombre: producto.nombre ?? producto.name ?? "Producto Sin Nombre",
@@ -361,6 +363,34 @@ function ProductCardModern({ producto, idx, router, addToCarrito, carrito }: {
     creador: producto.usuarios?.nombre ?? "Thiart",
     desc: producto.descripcion ?? producto.description ?? "Sin descripción",
     destacado: producto.destacado ?? producto.featured ?? false,
+  };
+
+  // Recopilar todos los medios disponibles (imágenes principales, secundarias y videos)
+  const mediaList: { type: "image" | "video"; url: string }[] = [];
+  if (producto.image_url) {
+    mediaList.push({ type: "image", url: producto.image_url });
+  }
+  if (producto.producto_imagenes && producto.producto_imagenes.length > 0) {
+    producto.producto_imagenes.forEach((img) => {
+      if (img.image_url && img.image_url !== producto.image_url) {
+        mediaList.push({ type: "image", url: img.image_url });
+      }
+    });
+  }
+  if (producto.video_url) {
+    mediaList.push({ type: "video", url: producto.video_url });
+  }
+
+  const activeMedia = mediaList[activeMediaIndex] ?? mediaList[0];
+
+  const handlePrevMedia = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setActiveMediaIndex((prev) => (prev > 0 ? prev - 1 : mediaList.length - 1));
+  };
+
+  const handleNextMedia = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setActiveMediaIndex((prev) => (prev + 1) % mediaList.length);
   };
 
   const enCarrito = carrito.find((p) => String(p.id) === String(producto.id));
@@ -380,41 +410,118 @@ function ProductCardModern({ producto, idx, router, addToCarrito, carrito }: {
         onClick={() => router.push(`/tienda/productos/${producto.id}`)}
         className="group cursor-pointer relative h-full bg-white border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-[#00a19a]/10 rounded-[2rem] overflow-hidden transition-all duration-500 flex flex-col"
       >
-        {/* Visual Showcase (Shorter) */}
-        <div className="h-32 sm:h-36 md:h-40 relative bg-slate-50/50 overflow-hidden flex items-center justify-center p-3">
-          {producto.image_url ? (
-            <div className="relative w-full h-full transform transition-transform duration-700 group-hover:scale-105">
-              <Image
-                src={producto.image_url}
-                alt={data.nombre}
-                fill
-                className="object-contain drop-shadow-[0_10px_15px_rgba(0,0,0,0.1)]"
-                sizes="(max-width: 768px) 50vw, 25vw"
-                priority={idx < 6}
-              />
-            </div>
-          ) : (
-            <Package className="w-8 h-8 text-slate-200 stroke-[1]" />
+        {/* Visual Showcase con Carrusel Interactivo de Medios */}
+        <div className="h-44 sm:h-48 md:h-52 relative bg-slate-50/70 overflow-hidden flex items-center justify-center p-2 group/media">
+          <AnimatePresence mode="wait">
+            {activeMedia?.type === "image" ? (
+              <motion.div
+                key={activeMedia.url}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="relative w-full h-full transform transition-transform duration-500 group-hover:scale-105"
+              >
+                <Image
+                  src={activeMedia.url}
+                  alt={data.nombre}
+                  fill
+                  className="object-contain drop-shadow-[0_10px_15px_rgba(0,0,0,0.08)]"
+                  sizes="(max-width: 768px) 50vw, 25vw"
+                  priority={idx < 6}
+                />
+              </motion.div>
+            ) : activeMedia?.type === "video" ? (
+              <motion.div
+                key={activeMedia.url}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="relative w-full h-full bg-slate-950 rounded-xl overflow-hidden flex items-center justify-center"
+              >
+                <video
+                  src={activeMedia.url}
+                  autoPlay
+                  muted
+                  loop
+                  playsInline
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute bottom-2 left-2 bg-black/80 backdrop-blur-md px-2 py-0.5 rounded-md text-[8px] font-black text-teal-300 uppercase tracking-widest flex items-center gap-1">
+                  <span>▶</span> Video
+                </div>
+              </motion.div>
+            ) : (
+              <Package className="w-8 h-8 text-slate-200 stroke-[1]" />
+            )}
+          </AnimatePresence>
+
+          {/* Flechas de Navegación Rápida en la Card */}
+          {mediaList.length > 1 && (
+            <>
+              <button
+                type="button"
+                onClick={handlePrevMedia}
+                className="absolute left-2 top-1/2 -translate-y-1/2 w-7 h-7 bg-white/90 hover:bg-white text-slate-800 rounded-full shadow-md flex items-center justify-center opacity-0 group-hover/media:opacity-100 transition-opacity z-20 hover:scale-110 active:scale-95"
+                title="Foto anterior"
+              >
+                ‹
+              </button>
+              <button
+                type="button"
+                onClick={handleNextMedia}
+                className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 bg-white/90 hover:bg-white text-slate-800 rounded-full shadow-md flex items-center justify-center opacity-0 group-hover/media:opacity-100 transition-opacity z-20 hover:scale-110 active:scale-95"
+                title="Siguiente foto"
+              >
+                ›
+              </button>
+
+              {/* Indicadores de Puntos / Segmentos estilo Mercado Libre */}
+              <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1 z-20 pointer-events-auto">
+                {mediaList.map((m, mIdx) => (
+                  <button
+                    key={mIdx}
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setActiveMediaIndex(mIdx);
+                    }}
+                    className={`h-1.5 rounded-full transition-all duration-300 ${
+                      activeMediaIndex === mIdx
+                        ? "w-4 bg-[#00a19a] shadow-sm"
+                        : "w-1.5 bg-slate-300/80 hover:bg-slate-400"
+                    }`}
+                  />
+                ))}
+              </div>
+            </>
           )}
 
           {/* Discreet Badge */}
           {data.destacado && (
-            <div className="absolute top-3 left-3">
-               <span className="bg-black text-white text-[6px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-full shadow-lg">Premium</span>
+            <div className="absolute top-2.5 left-2.5 z-10">
+               <span className="bg-black/80 backdrop-blur-md text-white text-[7px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full shadow-lg">Premium</span>
             </div>
           )}
 
-          <div className="absolute top-3 right-3 z-20">
-             <button className="w-7 h-7 rounded-lg bg-white/80 backdrop-blur-md flex items-center justify-center text-slate-300 hover:text-red-500 transition-all border border-slate-100">
-                <Heart className="w-3 h-3 fill-current" />
+          <div className="absolute top-2.5 right-2.5 z-20">
+             <button 
+               type="button"
+               onClick={(e) => {
+                 e.stopPropagation();
+                 toast.success("Guardado en favoritos");
+               }}
+               className="w-7 h-7 rounded-xl bg-white/90 backdrop-blur-md flex items-center justify-center text-slate-400 hover:text-rose-500 transition-all border border-slate-100 shadow-sm"
+             >
+                <Heart className="w-3.5 h-3.5 fill-current" />
              </button>
           </div>
         </div>
 
-        {/* Info Hub (More Compact) */}
-        <CardContent className="px-3.5 py-3 flex flex-col flex-1 bg-white">
-          <div className="mb-1.5">
-            <span className="text-[#00a19a] font-black text-[6px] uppercase tracking-[0.2em] mb-0.5 block opacity-60">
+        {/* Info Hub */}
+        <CardContent className="px-4 py-3 flex flex-col flex-1 bg-white">
+          <div className="mb-1">
+            <span className="text-[#00a19a] font-black text-[8px] uppercase tracking-[0.2em] mb-0.5 block opacity-80">
               {data.categoria}
             </span>
             <CardTitle className="text-xs font-black text-slate-900 leading-tight line-clamp-1 uppercase tracking-tighter">
@@ -422,32 +529,31 @@ function ProductCardModern({ producto, idx, router, addToCarrito, carrito }: {
             </CardTitle>
           </div>
           
-          <CardDescription className="text-slate-400 text-[9px] mb-3 line-clamp-1 h-3 leading-none font-medium italic overflow-hidden">
+          <CardDescription className="text-slate-400 text-[10px] mb-3 line-clamp-1 h-3.5 leading-none font-medium italic overflow-hidden">
             {data.desc}
           </CardDescription>
 
-          <div className="mt-auto flex items-center justify-between pt-2.5 border-t border-slate-50">
+          <div className="mt-auto flex items-center justify-between pt-2.5 border-t border-slate-100">
             <div className="flex flex-col">
-              <span className="text-[6px] font-black text-slate-300 uppercase tracking-widest leading-none mb-0.5">Precio</span>
+              <span className="text-[7px] font-black text-slate-400 uppercase tracking-widest leading-none mb-0.5">Precio</span>
               <div className="flex items-baseline gap-0.5">
-                <span className="text-sm sm:text-base font-black text-slate-950 tracking-tighter group-hover:text-[#00a19a] transition-colors">
-                  <span className="text-[9px] font-bold mr-0.5">$</span>
-                  {data.precio.toLocaleString()}
+                <span className="text-base font-black text-slate-950 tracking-tight group-hover:text-[#00a19a] transition-colors">
+                  <span className="text-[10px] font-bold mr-0.5">$</span>
+                  {data.precio.toLocaleString("es-CO")}
                 </span>
-                <span className="text-[6px] font-bold text-slate-300 uppercase">Cop</span>
+                <span className="text-[7px] font-bold text-slate-400 uppercase">Cop</span>
               </div>
             </div>
 
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1.5">
               {cantidadEnCarrito > 0 && (
-                <div className="w-6 h-6 flex items-center justify-center bg-teal-50 text-[#00a19a] rounded-lg font-black text-[8px] border border-teal-100">
+                <div className="w-6 h-6 flex items-center justify-center bg-teal-50 text-[#00a19a] rounded-lg font-black text-[9px] border border-teal-100">
                   {cantidadEnCarrito}
                 </div>
               )}
               
               <motion.button
                 whileTap={{ scale: 0.9 }}
-                disabled={stockDisponible <= 0}
                 onClick={async (e) => {
                   e.stopPropagation();
                   const ok = await addToCarrito({
@@ -462,12 +568,7 @@ function ProductCardModern({ producto, idx, router, addToCarrito, carrito }: {
                   });
                   if (ok) toast.success("Añadido ✨");
                 }}
-                className={`
-                  w-9 h-9 flex items-center justify-center rounded-xl transition-all duration-500
-                  ${stockDisponible <= 0 
-                    ? "bg-slate-100 text-slate-200" 
-                    : "bg-slate-950 text-white hover:bg-[#00a19a] shadow-lg hover:shadow-teal-500/30"}
-                `}
+                className="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-900 text-white hover:bg-[#00a19a] shadow-md hover:shadow-teal-500/30 transition-all duration-300"
               >
                 <ShoppingCart className="w-4 h-4" />
               </motion.button>

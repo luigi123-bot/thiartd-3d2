@@ -1,12 +1,10 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { getSupabaseServer } from "~/lib/supabaseServer";
 import { sendQuotationEmail } from "~/lib/email-service";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!; // Bypass RLS
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 export async function POST(req: Request) {
+  const supabase = getSupabaseServer();
   try {
     const { pedidoId, total, pagoUrl, items, to, nombreCliente } = await req.json() as {
       pedidoId: number;

@@ -50,6 +50,26 @@ export default function RootLayout({
 }: Readonly<{ children: ReactNode }>) {
   return (
     <html lang="es" suppressHydrationWarning>
+      <head>
+        {/* Preconnect to critical third-party origins to reduce latency */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
+
+        {/* Supabase — used on every page for auth */}
+        <link
+          rel="preconnect"
+          href={`https://${process.env.NEXT_PUBLIC_SUPABASE_URL?.replace("https://", "") ?? "supabase.co"}`}
+        />
+        <link rel="dns-prefetch" href="https://supabase.co" />
+
+        {/* Cloudinary for product images */}
+        <link rel="preconnect" href="https://res.cloudinary.com" />
+        <link rel="dns-prefetch" href="https://res.cloudinary.com" />
+
+        {/* Prefetch the logo used in OpenGraph and hero */}
+        <link rel="preload" as="image" href="/logo.png" />
+      </head>
       <body className="antialiased font-sans" suppressHydrationWarning>
         <ToastProvider>
           <UiProvider>

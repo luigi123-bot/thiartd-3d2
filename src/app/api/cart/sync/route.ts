@@ -1,12 +1,18 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+function getSupabase() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key) throw new Error('Supabase env vars not set');
+  return createClient(url, key, {
+    global: { fetch: (input, init) => fetch(input, { ...init, signal: AbortSignal.timeout(10000) }) }
+  });
+}
 
 export async function POST(req: Request) {
   try {
+    const supabase = getSupabase();
     const body = await req.json() as { userId?: string; productos?: unknown[] };
     const userId = body.userId;
     const productos = body.productos;
@@ -15,8 +21,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Faltan datos' }, { status: 400 });
     }
 
-    // Upsert the cart for the user
-    // Usamos el id del usuario de auth o el de la tabla personalizada
     console.log(`[SYNC-CART] Guardando carrito para usuario_id: ${userId} (${productos.length} items).`);
     const { error } = await supabase
       .from('carrito')
@@ -24,7 +28,7 @@ export async function POST(req: Request) {
         usuario_id: userId,
         productos: JSON.stringify(productos),
         updated_at: new Date().toISOString(),
-        recordatorio_enviado: false, // Reset reminder flag on update
+        recordatorio_enviado: false,
       }, { onConflict: 'usuario_id' });
     
     if (error) {
@@ -33,7 +37,6 @@ export async function POST(req: Request) {
     }
 
     console.log(`[SYNC-CART] ✅ Carrito persistido con éxito para ${userId}.`);
-
     return NextResponse.json({ success: true });
   } catch (err) {
     const error = err as { message: string };
@@ -44,6 +47,7 @@ export async function POST(req: Request) {
 
 export async function GET(req: Request) {
   try {
+    const supabase = getSupabase();
     const { searchParams } = new URL(req.url);
     const userId = searchParams.get('userId');
 

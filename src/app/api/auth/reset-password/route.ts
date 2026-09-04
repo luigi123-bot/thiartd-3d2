@@ -1,23 +1,8 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { getSupabaseServer } from "~/lib/supabaseServer";
 import jwt from "jsonwebtoken";
 import { sendPasswordResetEmail } from "~/lib/email-service";
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-if (!supabaseUrl || !supabaseServiceKey) {
-  throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY or NEXT_PUBLIC_SUPABASE_URL environment variable");
-}
-
-// Cliente de Supabase con permisos de administrador
-const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false
-  }
-});
 
 // Clave secreta para JWT (DEBE estar en .env)
 const JWT_SECRET = process.env.JWT_SECRET ?? "tu_clave_secreta_muy_segura_cambiala_en_produccion";
@@ -50,6 +35,7 @@ function verificarTokenReset(token: string): { email: string; codigo: string } |
 
 // POST: Enviar código de recuperación
 export async function POST(req: NextRequest) {
+  const supabase = getSupabaseServer();
   try {
     const body = await req.json() as {
       email?: string;

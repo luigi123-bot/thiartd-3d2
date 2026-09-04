@@ -68,6 +68,21 @@ export const personalizaciones = pgTable("public.personalizaciones", {
   created_at: timestamp("created_at").defaultNow(),
 });
 
+// Tabla para variantes de productos (Escala x Estilo con stock y POD)
+export const productoVariantes = pgTable("public.producto_variantes", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  producto_id: uuid("producto_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
+  escala: varchar("escala", { length: 50 }).notNull(), // Ej: "1:6", "1:10", "15 cm", "25 cm"
+  estilo: varchar("estilo", { length: 50 }).notNull(), // Ej: "Sin Pintar (Resina)", "Pintado Full Color", "Bronce Metálico"
+  precio: numeric("precio", { precision: 10, scale: 2 }).notNull(),
+  stock: integer("stock").default(0).notNull(),
+  permite_pod: boolean("permite_pod").default(true).notNull(), // Si stock=0 y true -> permite compra POD
+  dias_fabricacion: integer("dias_fabricacion").default(4).notNull(), // Días estimados para impresión y post-proceso
+  imagen_url: text("imagen_url"),
+  sku: varchar("sku", { length: 100 }),
+  created_at: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+
 export const pedidos = pgTable("public.pedidos", {
   id: serial("id").primaryKey(),
   cliente_id: uuid("cliente_id"),
@@ -76,6 +91,11 @@ export const pedidos = pgTable("public.pedidos", {
   estado: varchar("estado", { length: 30 }),
   direccion: text("direccion"),
   datos_contacto: text("datos_contacto"),
+  // Información de entrega y POD
+  tipo_entrega: varchar("tipo_entrega", { length: 20 }).default("envio"), // 'envio' | 'recoleccion'
+  es_pod: boolean("es_pod").default(false), // true si requiere fabricación POD
+  fecha_estimada_lista: timestamp("fecha_estimada_lista", { withTimezone: true }),
+  etapa_kanban: integer("etapa_kanban").default(1), // 1: Por procesar, 2: Taller POD, 3: Listo, 4: Finalizado
   // Información de envío detallada
   direccion_envio: text("direccion_envio"),
   ciudad_envio: varchar("ciudad_envio", { length: 100 }),
@@ -91,10 +111,30 @@ export const pedidos = pgTable("public.pedidos", {
   numero_tracking: varchar("numero_tracking", { length: 100 }),
   empresa_envio: varchar("empresa_envio", { length: 50 }),
   pdf_guia_url: text("pdf_guia_url"),
+  guia_detalles: text("guia_detalles"), // JSON con información completa de origen, destino, paquetes y logística
   fecha_estimada_entrega: timestamp("fecha_estimada_entrega", { withTimezone: true }),
   fecha_real_entrega: timestamp("fecha_real_entrega", { withTimezone: true }),
   created_at: timestamp("created_at", { withTimezone: true }).defaultNow(),
   updated_at: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+
+// Tabla para el registro de recogidas / pickups programadas con la transportadora
+export const recogidas_envia = pgTable("public.recogidas_envia", {
+  id: serial("id").primaryKey(),
+  carrier: varchar("carrier", { length: 50 }).notNull(),
+  confirmation_number: varchar("confirmation_number", { length: 100 }).notNull(),
+  pickup_date: varchar("pickup_date", { length: 20 }).notNull(),
+  pickup_time_from: varchar("pickup_time_from", { length: 10 }).notNull(),
+  pickup_time_to: varchar("pickup_time_to", { length: 10 }).notNull(),
+  origin_address: text("origin_address").notNull(),
+  origin_city: varchar("origin_city", { length: 100 }).notNull(),
+  total_packages: integer("total_packages").default(1),
+  total_weight: numeric("total_weight", { precision: 8, scale: 2 }).default("1"),
+  pedidos_ids: text("pedidos_ids"), // JSON array de IDs de pedidos incluidos
+  instructions: text("instructions"),
+  status: varchar("status", { length: 30 }).default("programada"), // 'programada' | 'en_camino' | 'completada' | 'cancelada'
+  raw_response: text("raw_response"),
+  created_at: timestamp("created_at", { withTimezone: true }).defaultNow(),
 });
 
 // Nueva tabla para el historial de estados

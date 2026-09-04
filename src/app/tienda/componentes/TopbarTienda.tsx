@@ -3,7 +3,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, type MutableRefObject } from "react";
 import {
   IoIosSearch,
   IoIosCart,
@@ -17,6 +17,8 @@ import { supabase } from "~/lib/supabaseClient";
 import { useCarrito } from "~/components/providers/CarritoProvider";
 import SupabaseAuth from "~/components/SupabaseAuth";
 import BecomeCreatorModal from "~/components/BecomeCreatorModal";
+import CartPreviewDropdown from "~/components/CartPreviewDropdown";
+import CartDrawerModal from "~/components/CartDrawerModal";
 
 interface UserNotification {
     id: string | number;
@@ -36,6 +38,8 @@ export default function TopbarTienda({ becomeCreatorOpen, setBecomeCreatorOpen }
   const [showMobileSearch, setShowMobileSearch] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [localBecomeCreatorModalOpen, setLocalBecomeCreatorModalOpen] = useState(false);
+  const [cartPreviewOpen, setCartPreviewOpen] = useState(false);
+  const [cartModalOpen, setCartModalOpen] = useState(false);
   const [usuario, setUsuario] = useState<{ id?: string; nombre?: string; email?: string; avatar_url?: string } | null>(null);
   const [role, setRole] = useState<string | null>(null);
   const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
@@ -127,13 +131,18 @@ export default function TopbarTienda({ becomeCreatorOpen, setBecomeCreatorOpen }
     }
   }, [fetchUserNotifications]);
 
-  useEffect(() => {
-    void syncUser();
+  // Keep a stable ref to syncUser so the auth listener never goes stale
+  // and never needs to re-subscribe (avoids missing SIGNED_IN events during re-renders)
+  const syncUserRef = useRef(syncUser) as MutableRefObject<typeof syncUser>;
+  useEffect(() => { syncUserRef.current = syncUser; }, [syncUser]);
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event: string, _session) => {
+  useEffect(() => {
+    void syncUserRef.current();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, _session) => {
       console.log("[DEBUG Topbar] Auth state change:", _event);
       if (_event === "SIGNED_IN" || _event === "TOKEN_REFRESHED" || _event === "USER_UPDATED") {
-        void syncUser();
+        void syncUserRef.current();
       } else if (_event === "SIGNED_OUT") {
         setUsuario(null);
         setRole(null);
@@ -143,7 +152,7 @@ export default function TopbarTienda({ becomeCreatorOpen, setBecomeCreatorOpen }
     return () => {
       subscription.unsubscribe();
     };
-  }, [syncUser]);
+  }, []); // intentionally empty — auth listener must be set up once only
 
   useEffect(() => {
     if (!usuario?.id) return;
@@ -248,10 +257,32 @@ export default function TopbarTienda({ becomeCreatorOpen, setBecomeCreatorOpen }
                 <IoIosSearch className="w-6 h-6" />
               </Button>
 
-              <Button variant="ghost" size="icon" onClick={() => router.push("/tienda/carrito")} className="text-white hover:bg-white/10 relative">
-                <IoIosCart className="w-6 h-6" />
-                {cartCount > 0 && <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] h-5 w-5 rounded-full flex items-center justify-center border-2 border-[#00a19a]">{cartCount}</span>}
-              </Button>
+              {/* Botón Carrito con Preview Dropdown */}
+              <div className="relative">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setCartPreviewOpen(!cartPreviewOpen)}
+                  className="text-white hover:bg-white/10 relative transition-all active:scale-95"
+                  title="Ver Carrito"
+                >
+                  <IoIosCart className="w-6 h-6" />
+                  {cartCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-black h-5 w-5 rounded-full flex items-center justify-center border-2 border-[#00a19a] animate-in zoom-in">
+                      {cartCount}
+                    </span>
+                  )}
+                </Button>
+
+                <CartPreviewDropdown
+                  isOpen={cartPreviewOpen}
+                  onClose={() => setCartPreviewOpen(false)}
+                  onOpenFullModal={() => {
+                    setCartPreviewOpen(false);
+                    setCartModalOpen(true);
+                  }}
+                />
+              </div>
 
               <div className="relative" ref={notifRef}>
                 <Button variant="ghost" size="icon" className="text-white hover:bg-white/10 relative" onClick={handleOpenNotif}>
@@ -414,13 +445,23 @@ export default function TopbarTienda({ becomeCreatorOpen, setBecomeCreatorOpen }
       <SupabaseAuth 
         open={authModalOpen} 
         onOpenChange={setAuthModalOpen} 
-        onAuth={() => setAuthModalOpen(false)} 
+        onAuth={() => {
+          setAuthModalOpen(false);
+          // Immediately refresh topbar state after successful login,
+          // as a fallback in case the onAuthStateChange event is missed.
+          void syncUser();
+        }} 
         defaultTab={authDefaultTab}
       />
 
       <BecomeCreatorModal 
         open={isBecomeCreatorModalOpen} 
         onOpenChange={handleSetBecomeCreatorModalOpen} 
+      />
+
+      <CartDrawerModal
+        open={cartModalOpen}
+        onOpenChange={setCartModalOpen}
       />
     </>
   );

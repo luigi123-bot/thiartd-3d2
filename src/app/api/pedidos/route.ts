@@ -1,17 +1,18 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { getSupabaseServer } from "~/lib/supabaseServer";
 import { crearEnvioParaPedido } from "../../../../utils/envia";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-// Usar service_role key para bypass RLS policies
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 interface ProductoPedido {
+  id?: string;
   nombre: string;
   cantidad: number;
   precio_unitario: number;
   categoria?: string;
+  escala?: string;
+  estilo?: string;
+  es_pod?: boolean;
+  dias_fabricacion?: number;
 }
 
 interface DatosContacto {
@@ -22,11 +23,11 @@ interface DatosContacto {
 }
 
 interface DatosEnvio {
-  direccion: string;
-  ciudad: string;
-  departamento: string;
-  codigoPostal: string;
-  telefono: string;
+  direccion?: string;
+  ciudad?: string;
+  departamento?: string;
+  codigoPostal?: string;
+  telefono?: string;
   notas?: string;
 }
 
@@ -34,11 +35,15 @@ interface PedidoRequestBody {
   cliente_id?: string;
   productos: ProductoPedido[];
   total: number;
-  subtotal?: number; // Opcional, no se usa en la BD
+  subtotal?: number;
   costo_envio: number;
   estado: string;
+  tipo_entrega?: "envio" | "recoleccion";
+  es_pod?: boolean;
+  fecha_estimada_lista?: string;
+  etapa_kanban?: number;
   datos_contacto: DatosContacto;
-  datos_envio: DatosEnvio;
+  datos_envio?: DatosEnvio;
 }
 
 interface PedidoInserted {
@@ -47,12 +52,16 @@ interface PedidoInserted {
   productos: string;
   total: number;
   estado: string;
+  tipo_entrega?: string;
+  es_pod?: boolean;
+  fecha_estimada_lista?: string;
+  etapa_kanban?: number;
   datos_contacto: string;
-  direccion_envio: string;
-  ciudad_envio: string;
-  departamento_envio: string;
-  codigo_postal_envio: string;
-  telefono_envio: string;
+  direccion_envio?: string;
+  ciudad_envio?: string;
+  departamento_envio?: string;
+  codigo_postal_envio?: string;
+  telefono_envio?: string;
   notas_envio?: string;
   costo_envio: number;
   created_at: string;
@@ -67,15 +76,19 @@ interface SupabaseError {
 interface PedidoResponse {
   id: number;
   cliente_id: string | null;
-  productos: string; // JSON string from Supabase
+  productos: string;
   total: number;
   estado: string;
-  datos_contacto: string; // JSON string from Supabase
-  direccion_envio: string;
-  ciudad_envio: string;
-  departamento_envio: string;
-  codigo_postal_envio: string;
-  telefono_envio: string;
+  tipo_entrega?: string;
+  es_pod?: boolean;
+  fecha_estimada_lista?: string;
+  etapa_kanban?: number;
+  datos_contacto: string;
+  direccion_envio?: string;
+  ciudad_envio?: string;
+  departamento_envio?: string;
+  codigo_postal_envio?: string;
+  telefono_envio?: string;
   notas_envio?: string;
   costo_envio: number;
   payment_id?: string;
@@ -90,6 +103,9 @@ interface ProductoEnArreglo {
   cantidad?: number;
   precio?: number;
   precio_unitario?: number;
+  escala?: string;
+  estilo?: string;
+  es_pod?: boolean;
 }
 
 interface ContactoEnPedido {
@@ -98,6 +114,7 @@ interface ContactoEnPedido {
 }
 
 export async function POST(req: Request) {
+  const supabase = getSupabaseServer();
   try {
     const body = await req.json() as PedidoRequestBody;
     console.log("Datos recibidos en /api/pedidos:", body);
@@ -106,32 +123,39 @@ export async function POST(req: Request) {
       cliente_id,
       productos,
       total,
-      // subtotal ya no existe en la tabla
       costo_envio,
       estado,
+      tipo_entrega = "envio",
+      es_pod: explicitEsPod,
       datos_contacto,
-      datos_envio
+      datos_envio = {}
     } = body;
 
-    if (!productos || !estado || !datos_envio) {
+    if (!productos || !estado || !datos_contacto) {
       return NextResponse.json({ error: "Faltan campos obligatorios." }, { status: 400 });
     }
+
+    // Calcular si la orden tiene ítems de fabricación Print-on-Demand (POD)
+    const tieneItemsPOD = explicitEsPod ?? productos.some((p) => p.es_pod === true);
+
+    // Calcular fecha estimada de entrega / recogida
+    const diasEspera = tieneItemsPOD 
+      ? Math.max(...productos.map((p) => p.dias_fabricacion ?? 4), 4) 
+      : 1;
+    const fechaEstimada = new Date();
+    fechaEstimada.setDate(fechaEstimada.getDate() + diasEspera);
 
     // Actualizar datos del usuario si está registrado
     if (cliente_id && cliente_id !== "guest") {
       try {
-        // Verificar si el usuario existe en la tabla usuarios usando su auth_id
         const { data: usuarioExistente } = await supabase
           .from("usuarios")
           .select("id, telefono, direccion")
           .eq("auth_id", cliente_id)
           .single();
 
-        if (!usuarioExistente) {
-          console.log("Usuario no existe en tabla 'usuarios', omitiendo actualización o puedes crearlo aquí si lo deseas.");
-        } else {
-          console.log("✅ Usuario encontrado. Actualizando datos de contacto y envío en perfil...");
-          const { error: updateError } = await supabase
+        if (usuarioExistente) {
+          await supabase
             .from("usuarios")
             .update({
               telefono: datos_contacto.telefono || datos_envio.telefono,
@@ -142,12 +166,6 @@ export async function POST(req: Request) {
               cedula: datos_contacto.cedula
             })
             .eq("auth_id", cliente_id);
-            
-          if (updateError) {
-            console.warn("No se pudieron actualizar los datos del usuario. ¿Agregaste las columnas?", updateError.message);
-          } else {
-            console.log("✅ Perfil de usuario actualizado con los datos de esta compra.");
-          }
         }
       } catch (err) {
         console.warn("Excepción al intentar actualizar datos del usuario:", err);
@@ -158,17 +176,19 @@ export async function POST(req: Request) {
       cliente_id: cliente_id ?? null,
       productos: JSON.stringify(productos),
       total,
-      // REMOVIDO: subtotal (no existe en la tabla)
       estado,
+      tipo_entrega,
+      es_pod: tieneItemsPOD,
+      fecha_estimada_lista: fechaEstimada.toISOString(),
+      etapa_kanban: 1, // 1: Por procesar
       datos_contacto: JSON.stringify(datos_contacto ?? {}),
-      // Información de envío detallada
-      direccion_envio: datos_envio.direccion,
-      ciudad_envio: datos_envio.ciudad,
-      departamento_envio: datos_envio.departamento,
-      codigo_postal_envio: datos_envio.codigoPostal,
-      telefono_envio: datos_envio.telefono,
-      notas_envio: datos_envio.notas,
-      costo_envio,
+      direccion_envio: tipo_entrega === "recoleccion" ? "RECOGIDA EN TIENDA / TALLER" : (datos_envio.direccion ?? ""),
+      ciudad_envio: tipo_entrega === "recoleccion" ? "Cali" : (datos_envio.ciudad ?? ""),
+      departamento_envio: tipo_entrega === "recoleccion" ? "Valle del Cauca" : (datos_envio.departamento ?? ""),
+      codigo_postal_envio: datos_envio.codigoPostal ?? "",
+      telefono_envio: datos_envio.telefono ?? datos_contacto.telefono ?? "",
+      notas_envio: datos_envio.notas ?? "",
+      costo_envio: tipo_entrega === "recoleccion" ? 0 : costo_envio,
       created_at: new Date().toISOString(),
     };
 
@@ -181,13 +201,7 @@ export async function POST(req: Request) {
       .single<PedidoInserted>();
 
     if (error) {
-      console.error("❌ Error Supabase pedidos:", {
-        message: error.message,
-        code: error.code,
-        details: error.details,
-        hint: error.hint,
-        insertData,
-      });
+      console.error("❌ Error Supabase pedidos:", error);
       return NextResponse.json(
         { error: error.message, hint: error.hint, details: error.details },
         { status: 500 }
@@ -201,11 +215,11 @@ export async function POST(req: Request) {
 }
 
 export async function GET(req: Request) {
+  const supabase = getSupabaseServer();
   try {
     const { searchParams } = new URL(req.url);
     const pedidoId = searchParams.get("id");
 
-    // Si hay un ID específico, buscar ese pedido
     if (pedidoId) {
       const { data, error } = await supabase
         .from("pedidos")
@@ -221,7 +235,6 @@ export async function GET(req: Request) {
       return NextResponse.json({ pedido: data });
     }
 
-    // Si no hay ID, devolver todos los pedidos
     const { data, error } = await supabase
       .from("pedidos")
       .select("*")
@@ -240,6 +253,7 @@ export async function GET(req: Request) {
 }
 
 export async function PATCH(req: Request) {
+  const supabase = getSupabaseServer();
   try {
     const body = await req.json() as {
       pedido_id?: number;
@@ -247,13 +261,13 @@ export async function PATCH(req: Request) {
       payment_id?: string;
       payment_method?: string;
       estado?: string;
+      etapa_kanban?: number;
     };
     
-    // Aceptar tanto pedido_id como pedidoId
     const pedidoId = body.pedido_id ?? body.pedidoId;
-    const { payment_id, payment_method, estado } = body;
+    const { payment_id, payment_method, estado, etapa_kanban } = body;
 
-    console.log("➡️ Recibida actualización de pedido:", { pedidoId, estado, payment_id });
+    console.log("➡️ Recibida actualización de pedido:", { pedidoId, estado, etapa_kanban, payment_id });
 
     if (!pedidoId) {
       return NextResponse.json({ error: "Falta el ID del pedido" }, { status: 400 });
@@ -264,6 +278,7 @@ export async function PATCH(req: Request) {
       payment_id?: string;
       payment_method?: string;
       estado?: string;
+      etapa_kanban?: number;
     } = {
       updated_at: new Date().toISOString()
     };
@@ -271,6 +286,7 @@ export async function PATCH(req: Request) {
     if (payment_id) updateData.payment_id = payment_id;
     if (payment_method) updateData.payment_method = payment_method;
     if (estado) updateData.estado = estado;
+    if (typeof etapa_kanban === "number") updateData.etapa_kanban = etapa_kanban;
 
     const result = await supabase
       .from("pedidos")
@@ -286,28 +302,26 @@ export async function PATCH(req: Request) {
 
     const pedidoActualizado = result.data;
 
-    // 🔥 SI EL PEDIDO PASÓ A "pagado", DISPARAR EL CORREO AUTOMÁTICO
+    // 🔥 SI EL PEDIDO PASÓ A "pagado", DISPARAR CORREO DE FACTURA
     if (estado === "pagado" || (pedidoActualizado && pedidoActualizado.estado === "pagado")) {
       console.log("🚀 El pedido está PAGADO. Iniciando automatización de correo...");
       
       try {
         const { enviarEmailConfirmacion } = await import("../webhooks/wompi/emailConfirmacion");
         
-        // Extraer datos del contacto
         let contacto: ContactoEnPedido = {};
         try {
           if (pedidoActualizado) {
-            contacto = typeof pedidoActualizado.datos_contacto === 'string' 
+            contacto = typeof pedidoActualizado.datos_contacto === "string" 
               ? JSON.parse(pedidoActualizado.datos_contacto) as ContactoEnPedido
               : (pedidoActualizado.datos_contacto as unknown as ContactoEnPedido ?? {});
           }
         } catch (e) { console.error("Error parseando contacto:", e); }
 
-        // Extraer productos
         let productosRaw: ProductoEnArreglo[] = [];
         try {
           if (pedidoActualizado) {
-            productosRaw = typeof pedidoActualizado.productos === 'string' 
+            productosRaw = typeof pedidoActualizado.productos === "string" 
               ? JSON.parse(pedidoActualizado.productos) as ProductoEnArreglo[]
               : (pedidoActualizado.productos as unknown as ProductoEnArreglo[] ?? []);
           }
@@ -317,7 +331,6 @@ export async function PATCH(req: Request) {
         const nombreCliente = contacto.nombre ?? "Cliente";
 
         if (emailDestino && pedidoActualizado) {
-          console.log(`📧 Enviando factura a ${emailDestino} (Backup desde API Pedidos)...`);
           await enviarEmailConfirmacion({
             to: emailDestino,
             pedidoId: pedidoActualizado.id,
@@ -328,7 +341,7 @@ export async function PATCH(req: Request) {
               precio: p.precio ?? p.precio_unitario ?? 0,
             })),
             total: pedidoActualizado.total,
-            metodoPago: pedidoActualizado.payment_method ?? "TARJETA",
+            metodoPago: pedidoActualizado.payment_method ?? "MANUAL",
             transaccionId: pedidoActualizado.payment_id ?? `TX-${pedidoActualizado.id}`,
             referencia: pedidoActualizado.payment_id ?? `REF-${pedidoActualizado.id}`,
             direccionEnvio: pedidoActualizado.direccion_envio,
@@ -336,19 +349,13 @@ export async function PATCH(req: Request) {
             fechaPago: new Date().toISOString()
           });
           console.log("✅ Factura enviada automáticamente.");
-        } else {
-          console.warn("⚠️ No se encontró email del cliente en el pedido.");
         }
       } catch (emailErr) {
         console.error("❌ Error en envío automático de factura:", emailErr);
       }
 
-      // Generar guía de envío automática con Envía
-      try {
-        await crearEnvioParaPedido(pedidoId);
-      } catch (enviaError) {
-        console.error("❌ [ENVIA] Error generando envío automático (PATCH):", enviaError);
-      }
+      // NOTA: Generación automática de envíos desactivada por política operativa.
+      // Las guías se generan de forma manual o programada desde el panel administrativo de Envíos.
     }
 
     return NextResponse.json({ success: true, pedido: result.data });
@@ -357,4 +364,3 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
 }
-

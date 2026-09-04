@@ -1,9 +1,6 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { getSupabaseServer } from "~/lib/supabaseServer";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 interface ProductoBody {
   nombre?: string;
@@ -31,6 +28,7 @@ export async function PUT(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const supabase = getSupabaseServer();
   try {
     const rawBody = (await req.json()) as ProductoBody & { draft?: boolean };
     // Strip fields that don't exist in the productos table
@@ -110,6 +108,7 @@ export async function DELETE(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const supabase = getSupabaseServer();
   try {
     const { id } = await params;
 
@@ -145,6 +144,7 @@ export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const supabase = getSupabaseServer();
   const { id } = await params;
   console.log(`[GET PRODUCT API] Consultando producto con ID: ${id}`);
 

@@ -1,23 +1,25 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Card } from "~/components/ui/card";
+import React, { useEffect, useState, useMemo } from "react";
 import { Button } from "~/components/ui/button";
 import { createClient } from "@supabase/supabase-js";
 import { DetallePedidoModal } from "../../../components/DetallePedidoModal";
+import RecoleccionesModal from "../../../components/RecoleccionesModal";
 import {
-  Download, Search, Filter,
-  Clock, Package,
-  FileText, Settings2, Mail, ArrowUpRight, Calendar, CheckCircle2, AlertTriangle
-} from 'lucide-react';
+  Download, Search,
+  FileText, Settings2, Mail, CheckCircle2, AlertTriangle,
+  Clock, Truck, MapPin, Check,
+  ChevronRight, ChevronLeft, ArrowRight
+} from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter
 } from "~/components/ui/dialog";
 import { Input } from "~/components/ui/input";
 import { motion, AnimatePresence } from "framer-motion";
+import { toast } from "sonner";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "TU_SUPABASE_URL";
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "TU_SUPABASE_ANON_KEY";
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 interface Pedido {
@@ -28,6 +30,10 @@ interface Pedido {
   total: number;
   subtotal?: number;
   costo_envio?: number;
+  tipo_entrega?: "envio" | "recoleccion";
+  es_pod?: boolean;
+  etapa_kanban?: number; // 1: Por procesar, 2: Fabricación POD, 3: Listo, 4: Entregado
+  fecha_estimada_lista?: string;
   productos: string;
   datos_contacto?: string;
   direccion_envio?: string;
@@ -38,91 +44,82 @@ interface Pedido {
   notas_envio?: string;
   payment_id?: string;
   payment_method?: string;
+  numero_tracking?: string;
+  empresa_envio?: string;
 }
 
 interface Producto {
-  id: string;
-  titulo?: string;
+  id?: string;
   nombre?: string;
-  producto_id?: string;
+  name?: string;
   cantidad: number;
-  precio_unitario: number;
-  descripcion?: string;
+  precio_unitario?: number;
+  precio?: number;
+  es_pod?: boolean;
+  escala?: string;
+  estilo?: string;
 }
 
 interface DatosContacto {
   nombre?: string;
   email?: string;
+  telefono?: string;
 }
 
-type StatColor = "brand" | "amber" | "emerald" | "slate";
-
-interface IconProps {
-  className?: string;
-  size?: number | string;
-  stroke?: string | number;
-}
-
-interface StatCardProps {
-  title: string;
-  value: string | number;
-  icon: React.ComponentType<IconProps>;
-  color: StatColor;
-  detail: string;
-}
-
-function StatCard({ title, value, icon: Icon, color, detail }: StatCardProps) {
-  const colors: Record<StatColor, string> = {
-    brand: "bg-[#00a19a] text-white shadow-[#00a19a]/20",
-    amber: "bg-amber-500 text-white shadow-amber-500/20",
-    emerald: "bg-emerald-600 text-white shadow-emerald-600/20",
-    slate: "bg-slate-900 text-white shadow-slate-900/20",
-  };
-
-  return (
-    <motion.div
-      whileHover={{ y: -5 }}
-      className="bg-white rounded-[32px] p-8 border border-slate-100 shadow-xl flex flex-col justify-between h-full group transition-all"
-    >
-      <div className="flex justify-between items-start mb-6">
-        <div className={`w-14 h-14 ${colors[color]} rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform`}>
-          <Icon className="w-7 h-7" />
-        </div>
-        <div className="bg-slate-50 px-3 py-1 rounded-full text-[10px] font-black text-slate-400 uppercase tracking-widest border border-slate-100">
-          KPI
-        </div>
-      </div>
-      <div>
-        <h3 className="text-slate-500 text-sm font-bold uppercase tracking-widest mb-1">{title}</h3>
-        <p className="text-4xl font-black text-slate-900 tracking-tighter mb-4">{value}</p>
-        <p className="text-xs font-medium text-slate-400 flex items-center gap-1.5">
-          <ArrowUpRight className="w-4 h-4 text-emerald-500" />
-          {detail}
-        </p>
-      </div>
-    </motion.div>
-  );
-}
+const ETAPAS = [
+  {
+    id: 1,
+    titulo: "Por Procesar",
+    subtitulo: "Nuevos y por confirmar",
+    color: "border-amber-400 bg-amber-50/40 text-amber-900",
+    badgeColor: "bg-amber-100 text-amber-800",
+    dotColor: "bg-amber-500",
+  },
+  {
+    id: 2,
+    titulo: "En Fabricación (POD)",
+    subtitulo: "Impresión 3D & Pintura",
+    color: "border-blue-400 bg-blue-50/40 text-blue-900",
+    badgeColor: "bg-blue-100 text-blue-800",
+    dotColor: "bg-blue-500",
+  },
+  {
+    id: 3,
+    titulo: "Listo Entrega / Envío",
+    subtitulo: "En estantería de empaque",
+    color: "border-purple-400 bg-purple-50/40 text-purple-900",
+    badgeColor: "bg-purple-100 text-purple-800",
+    dotColor: "bg-purple-500",
+  },
+  {
+    id: 4,
+    titulo: "Entregado / En Ruta",
+    subtitulo: "Despachado o retirado",
+    color: "border-emerald-400 bg-emerald-50/40 text-emerald-900",
+    badgeColor: "bg-emerald-100 text-emerald-800",
+    dotColor: "bg-emerald-500",
+  },
+];
 
 export default function AdminPedidosPage() {
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [detallePedido, setDetallePedido] = useState<Pedido | null>(null);
   const [procesandoPago, setProcesandoPago] = useState<number | null>(null);
-  const [filtroEstado, setFiltroEstado] = useState<string>("todos");
-  const [currentPage, setCurrentPage] = useState(1);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filtroTipo, setFiltroTipo] = useState<"todos" | "envio" | "recoleccion" | "pod">("todos");
 
   const [generandoReporte, setGenerandoReporte] = useState(false);
   const [managerEmail, setManagerEmail] = useState("");
   const [openConfig, setOpenConfig] = useState(false);
 
-  // Estado para el diálogo de confirmación de pago manual
+  // Drag and Drop state
+  const [draggedPedidoId, setDraggedPedidoId] = useState<number | null>(null);
+  const [dragOverCol, setDragOverCol] = useState<number | null>(null);
+
+  // Diálogo de confirmación manual
   const [confirmarPagoOpen, setConfirmarPagoOpen] = useState(false);
   const [pedidoAConfirmar, setPedidoAConfirmar] = useState<Pedido | null>(null);
-  const [notaPago, setNotaPago] = useState("");
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [filtroEstado]);
+  const [openRecolecciones, setOpenRecolecciones] = useState(false);
 
   const fetchPedidos = async () => {
     const { data, error } = await supabase
@@ -139,9 +136,8 @@ export default function AdminPedidosPage() {
 
   useEffect(() => {
     void fetchPedidos();
-    // Cargar config actual
     fetch("/api/admin/configuraciones")
-      .then(r => r.json())
+      .then((r) => r.json())
       .then((d: unknown) => {
         const data = d as { valor?: string };
         setManagerEmail(data.valor ?? "");
@@ -149,48 +145,73 @@ export default function AdminPedidosPage() {
       .catch(console.error);
   }, []);
 
+  // Mover pedido de etapa (Kanban Drag & Drop o Botón)
+  const moverEtapa = async (pedidoId: number, nuevaEtapa: number) => {
+    try {
+      // Optimistic update
+      setPedidos((prev) =>
+        prev.map((p) => (p.id === pedidoId ? { ...p, etapa_kanban: nuevaEtapa } : p))
+      );
+
+      const res = await fetch("/api/pedidos", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          pedidoId,
+          etapa_kanban: nuevaEtapa,
+          estado:
+            nuevaEtapa === 1
+              ? "pendiente_pago"
+              : nuevaEtapa === 2
+              ? "en_produccion"
+              : nuevaEtapa === 3
+              ? "listo_entrega"
+              : "completado",
+        }),
+      });
+
+      if (res.ok) {
+        toast.success(`Pedido #${pedidoId} movido a Etapa ${nuevaEtapa}`);
+        void fetchPedidos();
+      } else {
+        toast.error("Error al actualizar la etapa");
+        void fetchPedidos();
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Error de conexión");
+      void fetchPedidos();
+    }
+  };
+
   const simularPagoAprobado = async (pedidoId: number) => {
     setProcesandoPago(pedidoId);
     try {
-      const response = await fetch('/api/pedidos', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/pedidos", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           pedidoId,
-          estado: 'pagado',
-          payment_id: `ADMIN-AUTH-${Date.now()}`,
-          payment_method: 'MANUAL_OFFLINE',
+          estado: "pagado",
+          etapa_kanban: 2, // Si se paga, pasa automáticamente a revisión/fabricación
+          payment_id: `ADMIN-MANUAL-${Date.now()}`,
+          payment_method: "MANUAL_OFFLINE",
         }),
       });
 
       if (response.ok) {
+        toast.success(`Pago del pedido #${pedidoId} aprobado exitosamente`);
         await fetchPedidos();
         if (detallePedido?.id === pedidoId) {
-          const { data, error } = (await supabase.from("pedidos").select("*").eq("id", pedidoId).single()) as unknown as { data: Pedido | null; error: Error | null };
-          if (!error && data) setDetallePedido(data);
+          const { data } = await supabase.from("pedidos").select("*").eq("id", pedidoId).single();
+          if (data) setDetallePedido(data as Pedido);
         }
       }
     } catch (error) {
-      console.error('Error:', error);
+      console.error("Error:", error);
+      toast.error("Error al aprobar pago");
     } finally {
       setProcesandoPago(null);
-    }
-  };
-
-  const handleUpdateEmail = async () => {
-    try {
-      const resp = await fetch("/api/admin/configuraciones", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ valor: managerEmail })
-      });
-      if (resp.ok) {
-        alert("✅ Correo del gerente actualizado.");
-        setOpenConfig(false);
-      }
-    } catch (error) {
-      console.error(error);
-      alert("Error al guardar.");
     }
   };
 
@@ -204,87 +225,139 @@ export default function AdminPedidosPage() {
       const resp = await fetch("/api/admin/reporte-gerencial", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ managerEmail })
+        body: JSON.stringify({ managerEmail }),
       });
       if (resp.ok) {
-        alert(`📊 Reporte enviado a: ${managerEmail}`);
+        toast.success(`Reporte gerencial enviado a ${managerEmail}`);
       } else {
-        alert("Error al generar el reporte.");
+        toast.error("Error al generar el reporte");
       }
-    } catch (e) {
-      console.error(e);
-      alert("Error de conexión.");
+    } catch {
+      toast.error("Error de conexión");
     } finally {
       setGenerandoReporte(false);
     }
   };
 
-  const filteredPedidos = filtroEstado === "todos"
-    ? pedidos
-    : pedidos.filter(p => p.estado === filtroEstado);
+  // Filtrado de pedidos
+  const pedidosFiltrados = useMemo(() => {
+    return pedidos.filter((p) => {
+      let matchSearch = true;
+      if (searchTerm) {
+        let contacto: DatosContacto = {};
+        try {
+          contacto = typeof p.datos_contacto === "string" ? JSON.parse(p.datos_contacto) : p.datos_contacto || {};
+        } catch {
+          // ignore
+        }
+        const str = `${p.id} ${contacto.nombre ?? ""} ${contacto.email ?? ""} ${p.ciudad_envio ?? ""}`.toLowerCase();
+        matchSearch = str.includes(searchTerm.toLowerCase());
+      }
 
-  const ITEMS_PER_PAGE = 8;
-  const totalPages = Math.ceil(filteredPedidos.length / ITEMS_PER_PAGE);
-  const paginatedPedidos = filteredPedidos.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+      let matchTipo = true;
+      if (filtroTipo === "envio") matchTipo = p.tipo_entrega !== "recoleccion";
+      if (filtroTipo === "recoleccion") matchTipo = p.tipo_entrega === "recoleccion";
+      if (filtroTipo === "pod") matchTipo = Boolean(p.es_pod);
 
-  // Calcular estadísticas
+      return matchSearch && matchTipo;
+    });
+  }, [pedidos, searchTerm, filtroTipo]);
 
-  const pendientesPago = pedidos.filter(p => p.estado === 'pendiente_pago').length;
-  const totalPedidos = pedidos.length;
-  const pagadosCount = pedidos.filter(p => p.estado === 'pagado').length;
+  // Agrupar pedidos por etapa (1, 2, 3, 4)
+  const pedidosPorEtapa = useMemo(() => {
+    const etapasMap: Record<number, Pedido[]> = { 1: [], 2: [], 3: [], 4: [] };
+    pedidosFiltrados.forEach((p) => {
+      let etapa = p.etapa_kanban ?? 1;
+      // Fallback si no tiene etapa asignada pero tiene estado
+      if (!p.etapa_kanban) {
+        if (p.estado === "pagado" || p.estado === "en_produccion") etapa = 2;
+        else if (p.estado === "listo_entrega" || p.estado === "en_transito") etapa = 3;
+        else if (p.estado === "entregado" || p.estado === "completado") etapa = 4;
+        else etapa = 1;
+      }
+      if (etapa < 1) etapa = 1;
+      if (etapa > 4) etapa = 4;
+      etapasMap[etapa]?.push(p);
+    });
+    return etapasMap;
+  }, [pedidosFiltrados]);
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] p-4 md:p-10 font-sans">
-      <div className="max-w-[1920px] mx-auto space-y-10">
-
-        {/* Header Section */}
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
-          <div className="space-y-2">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center text-white shadow-xl">
-                <Package className="w-6 h-6" />
-              </div>
-              <h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase">Panel de Pedidos</h1>
-            </div>
-            <p className="text-slate-500 font-medium">Gestión inteligente de ventas y logística</p>
+    <div className="min-h-screen bg-[#F8FAFC] p-4 md:p-8 font-sans">
+      <div className="max-w-[1920px] mx-auto space-y-6">
+        
+        {/* ── Top Bar / Header ── */}
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+          <div>
+            <h1 className="text-3xl font-black text-slate-900 tracking-tight">Gestor de Órdenes</h1>
+            <p className="text-xs font-semibold text-slate-400 mt-1">
+              Flujo de 4 Etapas: Recepción $\rightarrow$ Fabricación POD $\rightarrow$ Empaque/Envía $\rightarrow$ Entrega
+            </p>
           </div>
 
-          <div className="flex items-center gap-4 w-full lg:w-auto">
-            <div className="relative flex-1 lg:w-80">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+          <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+            {/* Buscador */}
+            <div className="relative flex-1 sm:w-72">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input
                 type="text"
-                placeholder="Buscar por cliente o ID..."
-                className="w-full h-14 pl-12 pr-4 bg-white border border-slate-200 rounded-2xl focus:ring-2 focus:ring-[#00a19a] outline-none shadow-sm transition-all text-sm font-bold"
+                placeholder="Buscar cliente, ID, ciudad..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full h-11 pl-10 pr-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold focus:bg-white outline-none focus:ring-2 focus:ring-[#00a19a]"
               />
             </div>
+
+            {/* Filtros tipo */}
+            <div className="flex gap-1.5 bg-slate-100 p-1 rounded-2xl">
+              {(
+                [
+                  { key: "todos", label: "Todos" },
+                  { key: "envio", label: "🚚 Envíos" },
+                  { key: "recoleccion", label: "📍 Recogida" },
+                  { key: "pod", label: "🔧 POD" },
+                ] as const
+              ).map((f) => (
+                <button
+                  key={f.key}
+                  onClick={() => setFiltroTipo(f.key)}
+                  className={`px-3 py-1.5 rounded-xl text-[11px] font-black uppercase transition-all ${
+                    filtroTipo === f.key
+                      ? "bg-slate-900 text-white shadow-md"
+                      : "text-slate-500 hover:text-slate-900"
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Botón Solicitar Recolección */}
             <Button
-              className="h-14 px-8 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 shadow-xl"
+              onClick={() => setOpenRecolecciones(true)}
+              className="h-11 px-4 rounded-2xl bg-[#1877f2] hover:bg-[#1565c0] text-white font-bold text-xs flex items-center gap-2 shadow-md"
             >
-              <Download className="w-5 h-5 mr-3" />
-              Exportar
+              <Truck className="w-4 h-4" />
+              <span>Recolecciones</span>
             </Button>
+
+            {/* Botón Reporte */}
             <div className="flex items-center">
               <Button
                 onClick={handleGenerarReporte}
                 disabled={generandoReporte}
-                className="h-10 px-4 rounded-l-md bg-purple-600 hover:bg-purple-700 text-white font-bold flex items-center gap-2 border-r border-purple-500"
+                className="h-11 px-4 rounded-l-2xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center gap-2"
               >
-                {generandoReporte ? (
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                ) : (
-                  <FileText className="w-4 h-4" />
-                )}
-                <span className="hidden sm:inline">Generar Reporte Gerencial</span>
-                <span className="sm:hidden">Reporte</span>
+                <FileText className="w-4 h-4" />
+                <span>Reporte</span>
               </Button>
               <Dialog open={openConfig} onOpenChange={setOpenConfig}>
                 <DialogTrigger asChild>
-                  <Button className="h-10 px-3 rounded-r-md bg-purple-600 hover:bg-purple-700 text-white border-l border-purple-500">
+                  <Button className="h-11 px-3 rounded-r-2xl bg-purple-600 hover:bg-purple-700 text-white border-l border-purple-500">
                     <Settings2 className="w-4 h-4" />
                   </Button>
                 </DialogTrigger>
-                <DialogContent>
+                <DialogContent className="rounded-3xl">
                   <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                       <Mail className="w-5 h-5" /> Configurar Correo Gerencial
@@ -298,7 +371,7 @@ export default function AdminPedidosPage() {
                     />
                   </div>
                   <DialogFooter>
-                    <Button onClick={handleUpdateEmail} className="bg-[#00a19a]">Guardar</Button>
+                    <Button onClick={() => setOpenConfig(false)} className="bg-[#00a19a]">Guardar</Button>
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
@@ -306,369 +379,206 @@ export default function AdminPedidosPage() {
           </div>
         </div>
 
-        {/* Dashboard Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-          <StatCard
-            title="Total Pedidos"
-            value={totalPedidos}
-            icon={Package as React.ComponentType<IconProps>}
-            color="brand"
-            detail={`${pagadosCount} completados`}
-          />
-          <StatCard
-            title="Pendientes"
-            value={pendientesPago}
-            icon={Clock as React.ComponentType<IconProps>}
-            color="amber"
-            detail="Esperando pago"
-          />
-        </div>
+        {/* ── Tablero Kanban Drag & Drop de 4 Etapas ── */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 items-start">
+          {ETAPAS.map((etapa) => {
+            const lista = pedidosPorEtapa[etapa.id] ?? [];
+            const isOver = dragOverCol === etapa.id;
 
-        {/* ─── FUNNEL VISUAL DE ETAPAS (Req 12) ─── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {[
-            {
-              key: "activo",
-              label: "Pedido Activo",
-              emoji: "📦",
-              estados: ["pendiente_cotizacion", "pendiente_pago"],
-              color: "from-amber-500 to-orange-500",
-              bg: "bg-amber-50",
-              border: "border-amber-200",
-              text: "text-amber-700",
-              dotColor: "bg-amber-500",
-            },
-            {
-              key: "produccion",
-              label: "Producción",
-              emoji: "🔧",
-              estados: ["pagado"],
-              color: "from-blue-500 to-indigo-500",
-              bg: "bg-blue-50",
-              border: "border-blue-200",
-              text: "text-blue-700",
-              dotColor: "bg-blue-500",
-            },
-            {
-              key: "transito",
-              label: "En Tránsito",
-              emoji: "🚚",
-              estados: ["en_transito", "enviado"],
-              color: "from-purple-500 to-violet-500",
-              bg: "bg-purple-50",
-              border: "border-purple-200",
-              text: "text-purple-700",
-              dotColor: "bg-purple-500",
-            },
-            {
-              key: "entregado",
-              label: "Entregados",
-              emoji: "✅",
-              estados: ["entregado", "completado"],
-              color: "from-emerald-500 to-green-500",
-              bg: "bg-emerald-50",
-              border: "border-emerald-200",
-              text: "text-emerald-700",
-              dotColor: "bg-emerald-500",
-            },
-          ].map((stage) => {
-            const count = pedidos.filter((p) => stage.estados.includes(p.estado)).length;
-            const pct = pedidos.length > 0 ? Math.round((count / pedidos.length) * 100) : 0;
-            const isSelected = stage.estados.some((e) => e === filtroEstado) || (filtroEstado === "todos" && stage.key === "activo");
             return (
-              <motion.button
-                key={stage.key}
-                whileHover={{ y: -4 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => setFiltroEstado(stage.estados[0] ?? "todos")}
-                className={`relative p-6 rounded-[28px] border-2 transition-all text-left overflow-hidden group ${
-                  isSelected
-                    ? `${stage.border} ${stage.bg} shadow-xl shadow-black/5 ring-2 ring-offset-2 ring-${stage.dotColor}`
-                    : "bg-white border-slate-100 hover:border-slate-200 shadow-md"
+              <div
+                key={etapa.id}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setDragOverCol(etapa.id);
+                }}
+                onDragLeave={() => setDragOverCol(null)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragOverCol(null);
+                  if (draggedPedidoId !== null) {
+                    void moverEtapa(draggedPedidoId, etapa.id);
+                    setDraggedPedidoId(null);
+                  }
+                }}
+                className={`bg-white rounded-3xl p-4 border-2 transition-all min-h-[680px] flex flex-col shadow-sm ${
+                  isOver ? "border-[#00a19a] ring-4 ring-[#00a19a]/15 bg-teal-50/30 scale-[1.01]" : "border-slate-100"
                 }`}
               >
-                {/* Gradient bar top */}
-                <div className={`absolute top-0 left-0 w-full h-1 bg-gradient-to-r ${stage.color}`} />
-                
-                <div className="flex items-center justify-between mb-4">
-                  <span className="text-2xl">{stage.emoji}</span>
-                  <div className={`${stage.bg} ${stage.text} ${stage.border} border px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest`}>
-                    {pct}%
+                {/* Header de la columna */}
+                <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
+                  <div className="flex items-center gap-2.5">
+                    <div className={`w-3 h-3 rounded-full ${etapa.dotColor}`} />
+                    <div>
+                      <h3 className="font-black text-sm text-slate-900">{etapa.titulo}</h3>
+                      <p className="text-[10px] text-slate-400 font-bold">{etapa.subtitulo}</p>
+                    </div>
                   </div>
+                  <span className="w-7 h-7 rounded-xl bg-slate-100 font-black text-xs text-slate-700 flex items-center justify-center">
+                    {lista.length}
+                  </span>
                 </div>
-                
-                <div className="text-3xl font-black text-slate-900 mb-1">{count}</div>
-                <div className="text-xs font-black text-slate-500 uppercase tracking-widest">{stage.label}</div>
-                
-                {/* Progress bar */}
-                <div className="mt-4 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${pct}%` }}
-                    transition={{ duration: 1, ease: "easeOut" }}
-                    className={`h-full bg-gradient-to-r ${stage.color} rounded-full`}
-                  />
+
+                {/* Lista de Tarjetas */}
+                <div className="space-y-3 flex-1 overflow-y-auto max-h-[750px] pr-1">
+                  {lista.length === 0 ? (
+                    <div className="h-40 border-2 border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center text-slate-400 p-4 text-center">
+                      <p className="text-xs font-bold">Sin órdenes en esta etapa</p>
+                      <p className="text-[10px] mt-1">Arrastra una tarjeta aquí</p>
+                    </div>
+                  ) : (
+                    lista.map((p) => {
+                      let contacto: DatosContacto = {};
+                      try {
+                        contacto = typeof p.datos_contacto === "string" ? JSON.parse(p.datos_contacto) : p.datos_contacto || {};
+                      } catch {
+                        // ignore
+                      }
+
+                      let productosList: Producto[] = [];
+                      try {
+                        productosList = typeof p.productos === "string" ? JSON.parse(p.productos) : p.productos || [];
+                      } catch {
+                        // ignore
+                      }
+
+                      const esRecogida = p.tipo_entrega === "recoleccion";
+                      const esPOD = Boolean(p.es_pod);
+
+                      return (
+                        <div
+                          key={p.id}
+                          draggable
+                          onDragStart={() => setDraggedPedidoId(p.id)}
+                          className="bg-slate-50 hover:bg-white p-4 rounded-2xl border border-slate-200 hover:border-slate-900 shadow-sm transition-all cursor-grab active:cursor-grabbing group select-none space-y-3"
+                        >
+                          {/* Top Card Info */}
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px] font-black text-[#00a19a] bg-teal-50 px-2.5 py-0.5 rounded-md border border-teal-100">
+                              #{p.id}
+                            </span>
+                            <span className="text-[10px] font-bold text-slate-400">
+                              {new Date(p.created_at).toLocaleDateString("es-CO", { day: "2-digit", month: "short" })}
+                            </span>
+                          </div>
+
+                          {/* Cliente & Total */}
+                          <div>
+                            <h4 className="font-black text-slate-900 text-sm line-clamp-1">
+                              {contacto.nombre || "Cliente"}
+                            </h4>
+                            <p className="text-lg font-black text-slate-900 tracking-tight mt-0.5">
+                              ${Number(p.total).toLocaleString("es-CO")}{" "}
+                              <span className="text-[10px] font-bold text-slate-400">COP</span>
+                            </p>
+                          </div>
+
+                          {/* Badges de Tipo & POD */}
+                          <div className="flex flex-wrap gap-1.5">
+                            {esRecogida ? (
+                              <span className="inline-flex items-center gap-1 bg-amber-100/80 text-amber-800 text-[10px] font-black px-2 py-0.5 rounded-md">
+                                <MapPin className="w-3 h-3" /> Recogida Taller
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 bg-blue-100/80 text-blue-800 text-[10px] font-black px-2 py-0.5 rounded-md">
+                                <Truck className="w-3 h-3" /> Envío a {p.ciudad_envio || "Domicilio"}
+                              </span>
+                            )}
+
+                            {esPOD && (
+                              <span className="inline-flex items-center gap-1 bg-purple-100 text-purple-800 text-[10px] font-black px-2 py-0.5 rounded-md">
+                                🔧 Print on Demand
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Resumen productos */}
+                          <div className="text-[11px] text-slate-500 font-medium line-clamp-2 border-t border-slate-200/60 pt-2">
+                            {productosList.map((pr) => `${pr.cantidad}x ${pr.nombre || pr.name}`).join(", ")}
+                          </div>
+
+                          {/* Botones de acción rápida & detalles */}
+                          <div className="flex items-center justify-between pt-1">
+                            <button
+                              type="button"
+                              onClick={() => setDetallePedido(p)}
+                              className="text-[11px] font-black text-slate-700 hover:text-[#00a19a] underline"
+                            >
+                              Ver detalles
+                            </button>
+
+                            <div className="flex items-center gap-1">
+                              {/* Botón aprobar pago si está pendiente */}
+                              {p.estado === "pendiente_pago" && etapa.id === 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setPedidoAConfirmar(p);
+                                    setConfirmarPagoOpen(true);
+                                  }}
+                                  className="h-7 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-black flex items-center gap-1"
+                                >
+                                  <Check className="w-3 h-3" /> Aprobar
+                                </button>
+                              )}
+
+                              {/* Flechas para mover en mobile o touch */}
+                              {etapa.id > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => moverEtapa(p.id, etapa.id - 1)}
+                                  className="w-7 h-7 bg-white hover:bg-slate-200 rounded-lg border border-slate-200 flex items-center justify-center text-slate-700"
+                                  title="Retroceder etapa"
+                                >
+                                  <ChevronLeft className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                              {etapa.id < 4 && (
+                                <button
+                                  type="button"
+                                  onClick={() => moverEtapa(p.id, etapa.id + 1)}
+                                  className="w-7 h-7 bg-slate-900 hover:bg-[#00a19a] rounded-lg text-white flex items-center justify-center"
+                                  title="Avanzar etapa"
+                                >
+                                  <ChevronRight className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
-              </motion.button>
+              </div>
             );
           })}
         </div>
-
-        {/* Main Content Card */}
-        <Card className="border-none shadow-2xl rounded-[40px] overflow-hidden bg-white ring-1 ring-slate-100">
-          {/* Table Toolbar */}
-          <div className="px-10 py-8 border-b border-slate-100 flex flex-col md:flex-row justify-between items-center gap-6 bg-slate-50/30">
-            <div className="flex items-center gap-6">
-              <div className="flex items-center gap-3">
-                <Filter className="w-5 h-5 text-slate-400" />
-                <span className="text-sm font-black text-slate-400 uppercase tracking-widest">Filtrar por:</span>
-              </div>
-              <div className="flex gap-2">
-                {["todos", "pendiente_cotizacion", "pendiente_pago", "pagado", "en_transito", "entregado", "pago_cancelado"].map((estado) => (
-                  <button
-                    key={estado}
-                    onClick={() => setFiltroEstado(estado)}
-                    className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${filtroEstado === estado
-                      ? "bg-slate-900 text-white shadow-lg scale-105"
-                      : "bg-white text-slate-500 border border-slate-200 hover:border-slate-900"
-                      }`}
-                  >
-                    {estado.replace(/_/g, " ")}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="text-sm text-slate-400 font-bold">
-              Mostrando <span className="text-slate-900">{filteredPedidos.length}</span> resultados
-            </div>
-          </div>
-
-
-          {/* Custom Table */}
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="bg-slate-50/50">
-                  <th className="px-4 md:px-10 py-4 md:py-6 text-left text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Cliente & Referencia</th>
-                  <th className="px-4 md:px-10 py-4 md:py-6 text-left text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Destino & Fecha</th>
-                  <th className="px-4 md:px-10 py-4 md:py-6 text-left text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Estado</th>
-                  <th className="px-4 md:px-10 py-4 md:py-6 text-right text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Total Inversión</th>
-                  <th className="px-4 md:px-10 py-4 md:py-6 text-center text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                <AnimatePresence>
-                  {paginatedPedidos.map((p, idx) => {
-                    const datosContacto = (typeof p.datos_contacto === "string"
-                      ? JSON.parse(p.datos_contacto)
-                      : p.datos_contacto) as unknown as DatosContacto || {};
-
-                    const pParsed = typeof p.productos === "string"
-                      ? JSON.parse(p.productos) as Producto[]
-                      : (p.productos as unknown as Producto[]) ?? [];
-
-                    const estadoColors: Record<string, string> = {
-                      pagado: "bg-emerald-50 text-emerald-700 border-emerald-100",
-                      pendiente_pago: "bg-amber-50 text-amber-700 border-amber-100",
-                      pendiente_cotizacion: "bg-orange-50 text-orange-700 border-orange-100",
-                      pago_cancelado: "bg-rose-50 text-rose-700 border-rose-100",
-                      pago_rechazado: "bg-rose-50 text-rose-700 border-rose-100",
-                    };
-
-                    return (
-                      <motion.tr
-                        key={p.id}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: idx * 0.05 }}
-                        className="hover:bg-slate-50/80 transition-all group"
-                      >
-                        <td className="px-4 md:px-10 py-4 md:py-8">
-                          <div className="flex items-center gap-5">
-                            <div className="w-12 h-12 bg-slate-900 rounded-2xl flex items-center justify-center text-white font-black text-lg shadow-lg group-hover:scale-110 transition-transform">
-                              {(datosContacto.nombre ?? 'U').charAt(0).toUpperCase()}
-                            </div>
-                            <div>
-                              <div className="text-base font-black text-slate-900 tracking-tight leading-none mb-1.5">
-                                {datosContacto.nombre ?? 'Usuario Desconocido'}
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <span className="text-[10px] font-black text-[#00a19a] uppercase tracking-tighter bg-[#00a19a]/10 px-2 py-0.5 rounded-md">
-                                  ID #{p.id}
-                                </span>
-                                <span className="text-xs text-slate-400 font-bold">{datosContacto.email ?? '-'}</span>
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-4 md:px-10 py-4 md:py-8">
-                          <div className="text-sm font-black text-slate-900 leading-tight mb-1">
-                            {p.ciudad_envio ?? '-'}
-                          </div>
-                          <div className="flex items-center gap-2 text-[10px] text-slate-400 font-black uppercase tracking-widest">
-                            <Calendar className="w-3.5 h-3.5" />
-                            {new Date(p.created_at).toLocaleDateString('es-ES', {
-                              day: '2-digit',
-                              month: 'short',
-                              year: 'numeric'
-                            })}
-                          </div>
-                        </td>
-                        <td className="px-4 md:px-10 py-4 md:py-8">
-                          <span className={`inline-flex items-center px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border ${estadoColors[p.estado] ?? 'bg-slate-50 text-slate-600 border-slate-100'}`}>
-                            <div className={`w-1.5 h-1.5 rounded-full mr-2.5 ${p.estado === 'pagado' ? 'bg-emerald-500 animate-pulse' :
-                              p.estado === 'pendiente_pago' ? 'bg-amber-500' : 'bg-rose-500'
-                              }`} />
-                            {p.estado.replace(/_/g, ' ')}
-                          </span>
-                        </td>
-                        <td className="px-4 md:px-10 py-4 md:py-8 text-right">
-                          <div className="text-2xl font-black text-slate-900 tracking-tighter">
-                            ${Number(p.total).toLocaleString('es-CO')}
-                          </div>
-                          <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-0.5">
-                            {pParsed.length} ARTÍCULOS
-                          </div>
-                        </td>
-                        <td className="px-4 md:px-10 py-4 md:py-8">
-                          <div className="flex justify-center gap-3">
-                            <Button
-                              onClick={() => setDetallePedido(p)}
-                              className="h-12 px-6 bg-white border-2 border-slate-100 hover:border-slate-900 text-slate-900 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all hover:shadow-lg active:scale-95"
-                            >
-                              Detalles
-                            </Button>
-                            {p.estado === 'pendiente_pago' && (
-                              <Button
-                                onClick={() => {
-                                  setPedidoAConfirmar(p);
-                                  setNotaPago("");
-                                  setConfirmarPagoOpen(true);
-                                }}
-                                disabled={procesandoPago === p.id}
-                                title="Aprobar pago manualmente"
-                                className="h-12 w-12 bg-[#00a19a] hover:bg-[#00897B] text-white rounded-xl shadow-lg shadow-[#00a19a]/20 flex items-center justify-center transition-all hover:scale-105 active:scale-95"
-                              >
-                                {procesandoPago === p.id ? (
-                                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                ) : (
-                                  <CheckCircle2 className="w-5 h-5" />
-                                )}
-                              </Button>
-                            )}
-                          </div>
-                        </td>
-                      </motion.tr>
-                    );
-                  })}
-                </AnimatePresence>
-              </tbody>
-            </table>
-          </div>
-
-          {/* Pagination Controls */}
-          {totalPages > 1 && (
-            <div className="px-10 py-6 border-t border-slate-100 flex items-center justify-between bg-slate-50/20">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                disabled={currentPage === 1}
-                className="h-10 px-4 rounded-xl text-xs font-bold border-slate-200"
-              >
-                Anterior
-              </Button>
-              <div className="flex items-center gap-1.5">
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                  <button
-                    key={page}
-                    onClick={() => setCurrentPage(page)}
-                    className={`w-9 h-9 rounded-xl text-xs font-black transition-all ${
-                      currentPage === page
-                        ? "bg-slate-900 text-white shadow-md scale-105"
-                        : "bg-white text-slate-500 border border-slate-200 hover:border-slate-900"
-                    }`}
-                  >
-                    {page}
-                  </button>
-                ))}
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                disabled={currentPage === totalPages}
-                className="h-10 px-4 rounded-xl text-xs font-bold border-slate-200"
-              >
-                Siguiente
-              </Button>
-            </div>
-          )}
-        </Card>
       </div>
 
-      {/* ── Diálogo de Confirmación de Pago Manual ── */}
+      {/* Modal Confirmación de Pago Manual */}
       <Dialog open={confirmarPagoOpen} onOpenChange={setConfirmarPagoOpen}>
-        <DialogContent className="max-w-md rounded-2xl">
+        <DialogContent className="max-w-md rounded-3xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-slate-900">
               <AlertTriangle className="w-5 h-5 text-amber-500" />
-              Confirmar Aprobación de Pago
+              Confirmar Pago Manual
             </DialogTitle>
           </DialogHeader>
 
           {pedidoAConfirmar && (
-            <div className="py-2 space-y-4">
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800 font-medium">
-                Estás a punto de marcar el pedido{" "}
-                <span className="font-black">#{pedidoAConfirmar.id}</span> como{" "}
-                <span className="font-black text-emerald-700">PAGADO</span> manualmente.
-                <br />
-                <span className="text-xs text-amber-600 mt-1 block">
-                  Esta acción enviará el correo de confirmación al cliente y generará la guía de envío.
-                </span>
-              </div>
-
-              <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 text-xs space-y-1">
-                <div className="flex justify-between">
-                  <span className="text-slate-500 font-bold">Cliente:</span>
-                  <span className="text-slate-800 font-black">
-                    {(() => {
-                      try {
-                        const c = typeof pedidoAConfirmar.datos_contacto === "string"
-                          ? JSON.parse(pedidoAConfirmar.datos_contacto) as DatosContacto
-                          : pedidoAConfirmar.datos_contacto as unknown as DatosContacto;
-                        return c?.nombre ?? "-";
-                      } catch { return "-"; }
-                    })()}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500 font-bold">Total:</span>
-                  <span className="text-slate-800 font-black">${Number(pedidoAConfirmar.total).toLocaleString('es-CO')}</span>
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-black text-slate-600 uppercase tracking-wider">
-                  Nota / Motivo (opcional)
-                </label>
-                <Input
-                  placeholder="Ej: Cliente envió comprobante de transferencia"
-                  value={notaPago}
-                  onChange={(e) => setNotaPago(e.target.value)}
-                  className="rounded-xl border-slate-200 text-sm"
-                />
-              </div>
+            <div className="py-2 space-y-4 text-xs font-semibold text-slate-700">
+              <p>
+                ¿Deseas marcar el pedido <strong>#{pedidoAConfirmar.id}</strong> como <strong>PAGADO</strong>?
+              </p>
+              <p className="text-slate-500">
+                Se enviará automáticamente el correo de factura al cliente y el pedido avanzará a la Etapa 2 (Fabricación / Revisión).
+              </p>
             </div>
           )}
 
           <DialogFooter className="gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setConfirmarPagoOpen(false)}
-              className="rounded-xl border-slate-200 text-slate-600 font-bold"
-            >
+            <Button variant="outline" onClick={() => setConfirmarPagoOpen(false)} className="rounded-xl font-bold">
               Cancelar
             </Button>
             <Button
@@ -678,27 +588,29 @@ export default function AdminPedidosPage() {
                 setConfirmarPagoOpen(false);
                 await simularPagoAprobado(pedidoAConfirmar.id);
                 setPedidoAConfirmar(null);
-                setNotaPago("");
               }}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black flex items-center gap-2"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black"
             >
-              {procesandoPago === pedidoAConfirmar?.id ? (
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              ) : (
-                <CheckCircle2 className="w-4 h-4" />
-              )}
-              Sí, aprobar pago
+              {procesandoPago === pedidoAConfirmar?.id ? "Aprobando..." : "Sí, Aprobar Pago"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Modal Detail */}
+      {/* Modal Detalle de Pedido */}
       <DetallePedidoModal
         pedido={detallePedido}
         onClose={() => setDetallePedido(null)}
         onAprobarPago={simularPagoAprobado}
         procesandoPago={procesandoPago}
+      />
+
+      {/* Modal de Recolecciones estilo Envía */}
+      <RecoleccionesModal
+        open={openRecolecciones}
+        onOpenChange={setOpenRecolecciones}
+        pedidosList={pedidos}
+        onRecogidaExitosa={fetchPedidos}
       />
     </div>
   );

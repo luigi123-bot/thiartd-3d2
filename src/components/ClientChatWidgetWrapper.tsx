@@ -34,7 +34,9 @@ export default function ClientChatWidgetWrapper() {
         setClienteNombre(meta?.nombre ?? meta?.full_name ?? data.user.email ?? "Cliente");
         setClienteEmail(data.user.email ?? "");
       }
-      setLoaded(true);
+      // Diferir la carga del ChatWidget 2s después del primer render
+      // para liberar el hilo principal durante LCP y TTI
+      setTimeout(() => setLoaded(true), 2000);
     };
 
     void getUser();

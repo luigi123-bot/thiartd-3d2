@@ -38,6 +38,7 @@ interface DatosCheckout {
 export default function CheckoutPage() {
   const [carrito, setCarrito] = useState<CarritoProducto[]>([]);
   const [loading, setLoading] = useState(false);
+  const [tipoEntrega, setTipoEntrega] = useState<"envio" | "recoleccion">("envio");
   const [usuario, setUsuario] = useState<{ id?: string; email?: string; nombre?: string } | null>(null);
   const [datosCheckout, setDatosCheckout] = useState<DatosCheckout>({
     nombre: "",
@@ -114,7 +115,7 @@ export default function CheckoutPage() {
 
   // Calcular totales
   const subtotal = carrito.reduce((acc, producto) => acc + (producto.precio * producto.cantidad), 0);
-  const envio = 0; // Envío gratis para testing en producción
+  const envio = tipoEntrega === "recoleccion" ? 0 : 0; // Envío gratis en promoción
   const total = subtotal + envio;
 
   // Detectar entorno de desarrollo
@@ -129,6 +130,10 @@ export default function CheckoutPage() {
   };
 
   const validarFormulario = () => {
+    if (tipoEntrega === "recoleccion") {
+      const camposRequeridos = ['nombre', 'email', 'telefono', 'cedula'];
+      return camposRequeridos.every(campo => datosCheckout[campo as keyof DatosCheckout]);
+    }
     const camposRequeridos = ['nombre', 'email', 'telefono', 'direccion', 'ciudad', 'departamento', 'codigoPostal', 'cedula'];
     return camposRequeridos.every(campo => datosCheckout[campo as keyof DatosCheckout]);
   };
@@ -137,7 +142,9 @@ export default function CheckoutPage() {
     if (!validarFormulario()) {
       toast({
         title: "Campos incompletos",
-        description: "Por favor completa todos los campos obligatorios",
+        description: tipoEntrega === "recoleccion" 
+          ? "Por favor completa tu nombre, email, teléfono y cédula para la recolección"
+          : "Por favor completa todos los campos de envío obligatorios",
         variant: "destructive"
       });
       return;
@@ -168,11 +175,13 @@ export default function CheckoutPage() {
           precio: prod.precio,
           categoria: prod.categoria,
           imagen: prod.imagen,
+          es_pod: prod.stock <= 0,
         })),
         subtotal,
         costo_envio: envio,
         total,
         estado: "pendiente_pago",
+        tipo_entrega: tipoEntrega,
         datos_contacto: {
           nombre: datosCheckout.nombre,
           email: datosCheckout.email,
@@ -180,10 +189,10 @@ export default function CheckoutPage() {
           cedula: datosCheckout.cedula,
         },
         datos_envio: {
-          direccion: datosCheckout.direccion,
-          ciudad: datosCheckout.ciudad,
-          departamento: datosCheckout.departamento,
-          codigoPostal: datosCheckout.codigoPostal,
+          direccion: tipoEntrega === "recoleccion" ? "RECOGIDA EN TIENDA / TALLER THIART 3D" : datosCheckout.direccion,
+          ciudad: tipoEntrega === "recoleccion" ? "Cali" : datosCheckout.ciudad,
+          departamento: tipoEntrega === "recoleccion" ? "Valle del Cauca" : datosCheckout.departamento,
+          codigoPostal: tipoEntrega === "recoleccion" ? "760001" : datosCheckout.codigoPostal,
           telefono: datosCheckout.telefono,
           notas: datosCheckout.notas,
         }
@@ -307,152 +316,206 @@ export default function CheckoutPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-4 sm:py-6 md:py-8 px-4">
+    <div className="min-h-screen bg-[#F8FAFC] py-6 sm:py-10 px-4">
       <div className="max-w-6xl mx-auto">
         {/* Breadcrumb */}
-        <div className="flex items-center gap-2 mb-4 sm:mb-6 text-sm">
-          <Link href="/tienda/carrito" className="flex items-center gap-2 text-[#00a19a] hover:underline">
+        <div className="flex items-center gap-2 mb-6 text-sm">
+          <Link href="/tienda/carrito" className="flex items-center gap-2 text-[#00a19a] hover:underline font-bold">
             <ArrowLeft className="w-4 h-4" />
-            <span className="hidden xs:inline">Volver al carrito</span>
-            <span className="xs:hidden">Volver</span>
+            <span>Volver al carrito</span>
           </Link>
         </div>
 
-        <h1 className="text-2xl sm:text-3xl font-bold mb-4 sm:mb-6 md:mb-8">Finalizar compra</h1>
+        <h1 className="text-3xl sm:text-4xl font-black text-slate-900 mb-8 tracking-tight">Finalizar Compra</h1>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 md:gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Formulario de checkout */}
-          <div className="lg:col-span-2">
-            <Card className="p-4 sm:p-6 overflow-hidden">
-              <h2 className="text-lg sm:text-xl font-semibold mb-4 sm:mb-6">Información de envío</h2>
+          <div className="lg:col-span-2 space-y-6">
+            
+            {/* ── Selector de Método de Entrega ── */}
+            <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-md">
+              <h2 className="text-base font-black text-slate-900 uppercase tracking-wider mb-4">
+                1. Selecciona cómo recibir tu compra
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setTipoEntrega("envio")}
+                  className={`p-5 rounded-2xl border-2 text-left transition-all flex flex-col justify-between ${
+                    tipoEntrega === "envio"
+                      ? "border-[#00a19a] bg-teal-50/50 shadow-md ring-2 ring-[#00a19a]/20"
+                      : "border-slate-200 bg-white hover:border-slate-300"
+                  }`}
+                >
+                  <div className="flex items-center gap-3 mb-2">
+                    <Truck className={`w-5 h-5 ${tipoEntrega === "envio" ? "text-[#00a19a]" : "text-slate-400"}`} />
+                    <span className="font-black text-sm text-slate-900">Envío a Domicilio</span>
+                  </div>
+                  <p className="text-xs text-slate-500 font-medium">Recibe en tu casa u oficina en cualquier ciudad de Colombia vía Envía.</p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setTipoEntrega("recoleccion")}
+                  className={`p-5 rounded-2xl border-2 text-left transition-all flex flex-col justify-between ${
+                    tipoEntrega === "recoleccion"
+                      ? "border-[#00a19a] bg-teal-50/50 shadow-md ring-2 ring-[#00a19a]/20"
+                      : "border-slate-200 bg-white hover:border-slate-300"
+                  }`}
+                >
+                  <div className="flex items-center gap-3 mb-2">
+                    <span className="text-lg">📍</span>
+                    <span className="font-black text-sm text-slate-900">Recoger en Taller (Cali)</span>
+                  </div>
+                  <p className="text-xs text-slate-500 font-medium">Gratis. Recoge personalmente en cuanto la pieza esté terminada.</p>
+                </button>
+              </div>
+            </div>
+
+            <Card className="p-6 sm:p-8 rounded-3xl border-slate-100 shadow-md">
+              <h2 className="text-base font-black text-slate-900 uppercase tracking-wider mb-6">
+                2. Datos de {tipoEntrega === "recoleccion" ? "Contacto y Recogida" : "Envío y Facturación"}
+              </h2>
+
+              {tipoEntrega === "recoleccion" && (
+                <div className="mb-6 p-4 rounded-2xl bg-amber-50/80 border border-amber-200 text-xs font-semibold text-amber-900 space-y-1">
+                  <p className="font-black flex items-center gap-1.5 text-amber-950">
+                    <span>🏢</span> Punto de Recogida: Taller Principal Thiart 3D
+                  </p>
+                  <p className="text-slate-700">Calle 5 # 24A-152, Cali, Valle del Cauca</p>
+                  <p className="text-slate-500">Horario de atención: Lunes a Sábado de 9:00 AM a 6:00 PM. Te notificaremos al correo tan pronto esté lista.</p>
+                </div>
+              )}
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs sm:text-sm font-medium mb-1">Nombre completo *</label>
+                  <label className="block text-xs font-bold text-slate-600 mb-1 uppercase tracking-wider">Nombre completo *</label>
                   <Input
                     name="nombre"
                     value={datosCheckout.nombre}
                     onChange={handleInputChange}
                     placeholder="Tu nombre completo"
-                    className="text-sm sm:text-base"
+                    className="rounded-xl border-slate-200"
                     required
                   />
                 </div>
                 
                 <div>
-                  <label className="block text-xs sm:text-sm font-medium mb-1">Email *</label>
+                  <label className="block text-xs font-bold text-slate-600 mb-1 uppercase tracking-wider">Email para confirmación *</label>
                   <Input
                     name="email"
                     type="email"
                     value={datosCheckout.email}
                     onChange={handleInputChange}
                     placeholder="tu@email.com"
-                    className="text-sm sm:text-base"
+                    className="rounded-xl border-slate-200"
                     required
                   />
                 </div>
                 
                 <div>
-                  <label className="block text-xs sm:text-sm font-medium mb-1">Teléfono *</label>
+                  <label className="block text-xs font-bold text-slate-600 mb-1 uppercase tracking-wider">Teléfono / WhatsApp *</label>
                   <Input
                     name="telefono"
                     value={datosCheckout.telefono}
                     onChange={handleInputChange}
-                    placeholder="+57 300 123 4567"
-                    className="text-sm sm:text-base"
+                    placeholder="300 123 4567"
+                    className="rounded-xl border-slate-200"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs sm:text-sm font-medium mb-1">Cédula / NIT (CC) *</label>
+                  <label className="block text-xs font-bold text-slate-600 mb-1 uppercase tracking-wider">Cédula / NIT *</label>
                   <Input
                     name="cedula"
                     value={datosCheckout.cedula}
                     onChange={handleInputChange}
                     placeholder="Ej: 1000123456"
-                    className="text-sm sm:text-base"
+                    className="rounded-xl border-slate-200"
                     required
                   />
                 </div>
+                
+                {tipoEntrega === "envio" && (
+                  <>
+                    <div className="md:col-span-2">
+                      <label className="block text-xs font-bold text-slate-600 mb-1 uppercase tracking-wider">Dirección de Entrega *</label>
+                      <Input
+                        name="direccion"
+                        value={datosCheckout.direccion}
+                        onChange={handleInputChange}
+                        placeholder="Calle 123 # 45-67, Apto 101"
+                        className="rounded-xl border-slate-200"
+                        required
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-xs font-bold text-slate-600 mb-1 uppercase tracking-wider">Departamento *</label>
+                      <select
+                        value={datosCheckout.departamento}
+                        onChange={handleDepartamentoChange}
+                        className="w-full bg-white border border-slate-200 focus:border-[#00a19a] rounded-xl text-sm p-3 font-semibold text-slate-800"
+                        required
+                      >
+                        <option value="">Selecciona departamento</option>
+                        {DEPARTAMENTOS.map(dept => (
+                          <option key={dept.codigo} value={dept.nombre}>{dept.nombre}</option>
+                        ))}
+                      </select>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-xs font-bold text-slate-600 mb-1 uppercase tracking-wider">Ciudad / Municipio *</label>
+                      <select
+                        value={datosCheckout.ciudad}
+                        onChange={e => setDatosCheckout(prev => ({ ...prev, ciudad: e.target.value }))}
+                        className="w-full bg-white border border-slate-200 focus:border-[#00a19a] rounded-xl text-sm p-3 font-semibold text-slate-800 disabled:bg-slate-50"
+                        disabled={!datosCheckout.departamento}
+                        required
+                      >
+                        <option value="">Selecciona municipio</option>
+                        {ciudadesDisponibles.map(ciudad => (
+                          <option key={ciudad} value={ciudad}>{ciudad}</option>
+                        ))}
+                      </select>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-xs font-bold text-slate-600 mb-1 uppercase tracking-wider">Código Postal *</label>
+                      <Input
+                        name="codigoPostal"
+                        value={datosCheckout.codigoPostal}
+                        onChange={handleInputChange}
+                        placeholder="110111"
+                        className="rounded-xl border-slate-200"
+                        required
+                      />
+                    </div>
+                  </>
+                )}
                 
                 <div className="md:col-span-2">
-                  <label className="block text-xs sm:text-sm font-medium mb-1">Dirección *</label>
-                  <Input
-                    name="direccion"
-                    value={datosCheckout.direccion}
-                    onChange={handleInputChange}
-                    placeholder="Calle 123 #45-67, Apto 101"
-                    className="text-sm sm:text-base"
-                    required
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-xs sm:text-sm font-medium mb-1">Departamento *</label>
-                  <select
-                    value={datosCheckout.departamento}
-                    onChange={handleDepartamentoChange}
-                    className="w-full bg-white border border-gray-300 focus:border-[#00a19a] focus:ring-1 focus:ring-[#00a19a] rounded-md text-sm p-2.5 transition-all text-slate-800"
-                    required
-                  >
-                    <option value="">Selecciona un departamento</option>
-                    {DEPARTAMENTOS.map(dept => (
-                      <option key={dept.codigo} value={dept.nombre}>{dept.nombre}</option>
-                    ))}
-                  </select>
-                </div>
-                
-                <div>
-                  <label className="block text-xs sm:text-sm font-medium mb-1">Ciudad *</label>
-                  <select
-                    value={datosCheckout.ciudad}
-                    onChange={e => setDatosCheckout(prev => ({ ...prev, ciudad: e.target.value }))}
-                    className="w-full bg-white border border-gray-300 focus:border-[#00a19a] focus:ring-1 focus:ring-[#00a19a] rounded-md text-sm p-2.5 transition-all text-slate-800 disabled:bg-slate-50 disabled:text-slate-400"
-                    disabled={!datosCheckout.departamento}
-                    required
-                  >
-                    <option value="">Selecciona un municipio</option>
-                    {ciudadesDisponibles.map(ciudad => (
-                      <option key={ciudad} value={ciudad}>{ciudad}</option>
-                    ))}
-                  </select>
-                </div>
-                
-                <div>
-                  <label className="block text-xs sm:text-sm font-medium mb-1">Código postal *</label>
-                  <Input
-                    name="codigoPostal"
-                    value={datosCheckout.codigoPostal}
-                    onChange={handleInputChange}
-                    placeholder="110111"
-                    className="text-sm sm:text-base"
-                    required
-                  />
-                </div>
-                
-                <div className="md:col-span-2">
-                  <label className="block text-xs sm:text-sm font-medium mb-1">Notas adicionales</label>
+                  <label className="block text-xs font-bold text-slate-600 mb-1 uppercase tracking-wider">Notas / Instrucciones Especiales</label>
                   <textarea
                     name="notas"
                     value={datosCheckout.notas}
                     onChange={handleInputChange}
-                    placeholder="Instrucciones especiales para la entrega..."
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00a19a]"
-                    rows={3}
+                    placeholder="Detalles sobre entrega o especificaciones artísticas..."
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm outline-none focus:border-[#00a19a]"
+                    rows={2}
                   />
                 </div>
               </div>
             </Card>
 
             {/* Información de seguridad */}
-            <Card className="p-6 mt-6 overflow-hidden">
-              <div className="flex items-center gap-4">
-                <Shield className="w-8 h-8 text-green-500" />
-                <div>
-                  <h3 className="font-semibold">Pago seguro</h3>
-                  <p className="text-sm text-gray-600">Protegido por Wompi. Tus datos están seguros.</p>
-                </div>
+            <Card className="p-5 rounded-2xl border-slate-100 shadow-sm flex items-center gap-4 bg-slate-50">
+              <Shield className="w-8 h-8 text-[#00a19a] flex-shrink-0" />
+              <div>
+                <h4 className="font-black text-xs text-slate-800 uppercase tracking-wider">Pago 100% Protegido y Cifrado</h4>
+                <p className="text-xs text-slate-500 mt-0.5">Tus transacciones se procesan de forma segura a través de Wompi Bancolombia.</p>
               </div>
             </Card>
           </div>
