@@ -45,7 +45,6 @@ const config = {
 	},
 	experimental: {
 		optimizePackageImports: [
-			"framer-motion",
 			"lucide-react",
 			"react-icons",
 			"@radix-ui/react-accordion",
