@@ -44,6 +44,8 @@ const config = {
 		],
 	},
 	experimental: {
+		// Incrusta el CSS en el <head> para eliminar la petición que bloquea el render.
+		inlineCss: true,
 		optimizePackageImports: [
 			"lucide-react",
 			"react-icons",

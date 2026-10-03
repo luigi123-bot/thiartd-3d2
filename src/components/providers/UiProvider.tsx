@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { Progress } from "~/components/ui/progress";
 
@@ -25,8 +25,15 @@ export function UiProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(false);
   const [show, setShow] = useState(false);
   const [progress, setProgress] = useState(0);
+  // Evita mostrar el overlay en la carga inicial: el HTML ya viene renderizado
+  // desde el servidor y taparlo retrasa el LCP.
+  const isFirstRender = useRef(true);
 
   useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
     setLoading(true);
     setShow(true);
     setProgress(10);

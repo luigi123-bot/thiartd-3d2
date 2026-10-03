@@ -92,6 +92,12 @@
     "lodash": "^4.17.21",
     "tar": "^7.5.22"
   },
+  "browserslist": [
+    "chrome >= 111",
+    "edge >= 111",
+    "firefox >= 111",
+    "safari >= 16.4"
+  ],
   "ct3aMetadata": {
     "initVersion": "7.39.3"
   },
