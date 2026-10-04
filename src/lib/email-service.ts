@@ -591,7 +591,7 @@ export async function sendAbandonedCartReminder(params: SendAbandonedCartReminde
       to,
       subject: `🛒 ¡Aún tienes artículos en tu carrito! – Thiart 3D`,
       html,
-    })) as unknown;
+    })) as SentMessageInfo;
     console.log('✅ Recordatorio de carrito enviado:', (info as { messageId?: string }).messageId);
     return { success: true, data: info };
   } catch (err: unknown) {
@@ -716,8 +716,8 @@ export async function sendQuotationEmail(params: SendQuotationEmailParams): Prom
       to,
       subject: `📋 Tu Cotización para el Pedido #${pedidoId} está lista – Thiart 3D`,
       html,
-    })) as { messageId: string; response: string };
-    console.log('✅ Correo de cotización enviado:', info.messageId);
+    })) as SentMessageInfo;
+    console.log('✅ Correo de cotización enviado:', (info as { messageId?: string }).messageId);
     return { success: true, data: info };
   } catch (err: unknown) {
     console.error('❌ Error en sendQuotationEmail:', err);

@@ -1,7 +1,6 @@
 "use client";
 import React, { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
-import { Progress } from "~/components/ui/progress";
 
 /**
  * Spinner 3D animado, requiere los estilos personalizados en tu archivo global de CSS.
@@ -62,9 +61,20 @@ export function UiProvider({ children }: { children: React.ReactNode }) {
     <>
       {(loading || show) && (
         <>
-          {/* Barra de progreso arriba */}
+          {/* Barra de progreso arriba (div plano: evita cargar Radix en todas las páginas) */}
           <div className="fixed top-0 left-0 w-full z-[10000]">
-            <Progress value={progress} className="h-1 bg-[#00a19a]/20" />
+            <div
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={progress}
+              className="relative h-1 w-full overflow-hidden rounded-full bg-[#00a19a]/20"
+            >
+              <div
+                className="bg-primary h-full w-full flex-1 transition-all"
+                style={{ transform: `translateX(-${100 - progress}%)` }}
+              />
+            </div>
           </div>
           <SpinnerLoader />
         </>

@@ -16,6 +16,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { FiBriefcase, FiUser, FiCheck } from "react-icons/fi";
 import Footer from "~/components/Footer";
+import LazyOnVisible from "~/components/LazyOnVisible";
 
 // ── Componentes diferidos — fuera del critical rendering path ──────────────
 const TopbarTienda = dynamic(
@@ -242,7 +243,16 @@ export default function HomeClient() {
                 Descubre nuestras creaciones en 3D más populares y valoradas, esculpidas con la más alta calidad.
               </p>
             </div>
-            <ProductosCarrusel soloDestacados />
+            <LazyOnVisible
+              minHeight={400}
+              fallback={
+                <div className="flex justify-center items-center py-20">
+                  <div className="w-10 h-10 border-4 border-[#00a19a]/20 border-t-[#00a19a] rounded-full animate-spin" />
+                </div>
+              }
+            >
+              <ProductosCarrusel soloDestacados />
+            </LazyOnVisible>
           </div>
         </section>
       </main>
