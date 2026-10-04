@@ -110,7 +110,7 @@ export async function POST(req: Request) {
       // Verificar si el pedido ya tiene número de tracking
       const { data: pedidoActual } = await supabase
         .from("pedidos")
-        .select("numero_tracking, empresa_envio, datos_contacto, ciudad_envio, fecha_estimada_entrega")
+        .select("numero_tracking, empresa_envio, datos_contacto, ciudad_envio, fecha_estimada_entrega, pdf_guia_url")
         .eq("id", pedido_id)
         .single<{
           numero_tracking: string | null;
@@ -118,6 +118,7 @@ export async function POST(req: Request) {
           datos_contacto: string | null;
           ciudad_envio: string | null;
           fecha_estimada_entrega: string | null;
+          pdf_guia_url: string | null;
         }>();
 
       if (!pedidoActual?.numero_tracking) {
@@ -129,7 +130,7 @@ export async function POST(req: Request) {
           // Leer el pedido actualizado para obtener el tracking recién asignado
           const { data: pedidoConGuia } = await supabase
             .from("pedidos")
-            .select("numero_tracking, empresa_envio, datos_contacto, ciudad_envio, fecha_estimada_entrega")
+            .select("numero_tracking, empresa_envio, datos_contacto, ciudad_envio, fecha_estimada_entrega, pdf_guia_url")
             .eq("id", pedido_id)
             .single<{
               numero_tracking: string | null;
@@ -137,6 +138,7 @@ export async function POST(req: Request) {
               datos_contacto: string | null;
               ciudad_envio: string | null;
               fecha_estimada_entrega: string | null;
+              pdf_guia_url: string | null;
             }>();
 
           if (pedidoConGuia?.numero_tracking) {
@@ -163,6 +165,7 @@ export async function POST(req: Request) {
                   empresaEnvio: pedidoConGuia.empresa_envio ?? "Transportista",
                   ciudadDestino: pedidoConGuia.ciudad_envio ?? undefined,
                   fechaEstimada: pedidoConGuia.fecha_estimada_entrega ?? undefined,
+                  pdfGuiaUrl: pedidoConGuia.pdf_guia_url ?? `/api/pedidos/${pedido_id}/guia-pdf`,
                 });
                 console.log(`[TRACKING] ✉️ Email de envío enviado a ${contacto.email} para pedido #${pedido_id}`);
               } else {
@@ -202,6 +205,7 @@ export async function POST(req: Request) {
                 empresaEnvio: pedidoActual.empresa_envio ?? "Transportista",
                 ciudadDestino: pedidoActual.ciudad_envio ?? undefined,
                 fechaEstimada: pedidoActual.fecha_estimada_entrega ?? undefined,
+                pdfGuiaUrl: pedidoActual.pdf_guia_url ?? `/api/pedidos/${pedido_id}/guia-pdf`,
               });
               console.log(`[TRACKING] ✉️ Email de envío (manual/actualización) enviado a ${contacto.email} para pedido #${pedido_id}`);
             } else {

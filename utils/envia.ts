@@ -420,27 +420,65 @@ export const crearEnvioParaPedido = async (pedidoId: number) => {
       };
 
       // 5. Guardar en Base de Datos
-      const { data: pedidoActualizado, error: updateError } = await supabase
+      // Generar URL oficial de la guía en PDF con diseño profesional y logo de Thiart 3D
+      const guiaPdfUrlOficial = `/api/pedidos/${pedidoId}/guia-pdf`;
+
+      const datosActualizar: Record<string, unknown> = {
+        numero_tracking: trackingNumber,
+        empresa_envio: carrier,
+        pdf_guia_url: guiaPdfUrlOficial,
+        updated_at: new Date().toISOString()
+      };
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let pedidoActualizado: any = null;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let updateError: any = null;
+
+      // Intentar actualizar primero con guia_detalles si la columna existiera
+      const intentoConDetalles = await supabase
         .from("pedidos")
         .update({
-          numero_tracking: trackingNumber,
-          empresa_envio: carrier,
+          ...datosActualizar,
           guia_detalles: JSON.stringify(guiaCompleta),
-          updated_at: new Date().toISOString()
         })
         .eq("id", pedidoId)
         .select()
         .single();
 
-      if (pedidoActualizado) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-        pedidoActualizado.pdf_guia_url = labelUrl;
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-        pedidoActualizado.guia_detalles = guiaCompleta;
+      if (intentoConDetalles.error && intentoConDetalles.error.message?.includes("guia_detalles")) {
+        console.warn(`[ENVIA] 'guia_detalles' no existe en pedidos, guardando con columnas existentes.`);
+        const intentoSinDetalles = await supabase
+          .from("pedidos")
+          .update(datosActualizar)
+          .eq("id", pedidoId)
+          .select()
+          .single();
+        pedidoActualizado = intentoSinDetalles.data;
+        updateError = intentoSinDetalles.error;
+      } else {
+        pedidoActualizado = intentoConDetalles.data;
+        updateError = intentoConDetalles.error;
       }
 
       if (updateError) {
         console.error(`[ENVIA] Error guardando guía en pedido #${pedidoId}:`, updateError.message);
+      }
+
+      if (!pedidoActualizado) {
+        // En caso de que el select retorne nulo pero la guía fue creada con éxito en Envía
+        pedidoActualizado = {
+          id: pedidoId,
+          numero_tracking: trackingNumber,
+          empresa_envio: carrier,
+          pdf_guia_url: guiaPdfUrlOficial,
+          guia_detalles: guiaCompleta
+        };
+      } else {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        pedidoActualizado.pdf_guia_url = guiaPdfUrlOficial;
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        pedidoActualizado.guia_detalles = guiaCompleta;
       }
 
       // 6. Registrar en historial de envíos
@@ -510,15 +548,23 @@ export const programarRecogidaEnvia = async (params: ProgramarRecogidaParams): P
   let rawResponse = "";
 
   if (ENVIA_API_KEY) {
+    const carrierName = params.carrier.toLowerCase();
     const payloadPickup = {
-      carrier: params.carrier.toLowerCase(),
+      carrier: carrierName,
       origin: ORIGEN_DEFECTO,
+      shipment: {
+        carrier: carrierName,
+        type: 1
+      },
       pickupDate: params.pickupDate,
       pickupTime: {
         from: params.pickupTimeFrom,
         to: params.pickupTimeTo
       },
+      pickupTimeFrom: params.pickupTimeFrom,
+      pickupTimeTo: params.pickupTimeTo,
       trackingNumbers: trackingNumbers.length > 0 ? trackingNumbers : undefined,
+      shipments: trackingNumbers.length > 0 ? trackingNumbers.map((t) => ({ trackingNumber: t })) : undefined,
       packages: [
         {
           content: "Paquetes y piezas 3D Thiart",
@@ -536,11 +582,12 @@ export const programarRecogidaEnvia = async (params: ProgramarRecogidaParams): P
     console.log("[ENVIA-PICKUP] Payload enviado a Envia:", JSON.stringify(payloadPickup));
 
     const endpoints = [
-      "https://api.envia.com/ship/pickup/",
-      "https://api-test.envia.com/ship/pickup/"
+      "https://api-test.envia.com/ship/pickup/",
+      "https://api.envia.com/ship/pickup/"
     ];
 
     let apiSuccess = false;
+    let apiErrorMessage = "";
 
     for (const url of endpoints) {
       if (apiSuccess) break;
@@ -552,22 +599,46 @@ export const programarRecogidaEnvia = async (params: ProgramarRecogidaParams): P
           }
         });
 
-        console.log(`[ENVIA-PICKUP] Respuesta exitosa de (${url}):`, JSON.stringify(resp.data));
+        console.log(`[ENVIA-PICKUP] Respuesta de (${url}):`, JSON.stringify(resp.data));
         rawResponse = JSON.stringify(resp.data);
+        
         // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-        if (resp.data && (resp.data.data || resp.data.confirmationNumber || resp.data.pickupId)) {
+        if (resp.data?.meta === "error" || resp.data?.error) {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-          confirmationNumber = String(resp.data.confirmationNumber || resp.data.pickupId || resp.data.data?.[0]?.confirmationNumber || confirmationNumber);
+          apiErrorMessage = String(resp.data?.error?.message || resp.data?.error?.description || "Error devuelto por transportadora");
+          console.warn(`[ENVIA-PICKUP] Envia rechazó la recogida en ${url}:`, apiErrorMessage);
+          continue;
         }
-        console.log(`[ENVIA-PICKUP] Confirmación de recogida oficial en Envía: ${confirmationNumber}`);
-        apiSuccess = true;
+
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        if (resp.data?.data && Array.isArray(resp.data.data) && resp.data.data.length > 0) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+          const item = resp.data.data[0];
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+          confirmationNumber = String(item.pickupNumber || item.confirmationNumber || item.pickupId || confirmationNumber);
+          apiSuccess = true;
+          console.log(`[ENVIA-PICKUP] ✅ Recogida oficial confirmada por Envía con número: ${confirmationNumber}`);
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        } else if (resp.data && (resp.data.pickupNumber || resp.data.confirmationNumber || resp.data.pickupId)) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+          confirmationNumber = String(resp.data.pickupNumber || resp.data.confirmationNumber || resp.data.pickupId);
+          apiSuccess = true;
+          console.log(`[ENVIA-PICKUP] ✅ Recogida oficial confirmada por Envía con número: ${confirmationNumber}`);
+        }
       } catch (apiErr) {
         if (axios.isAxiosError(apiErr)) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+          apiErrorMessage = String(apiErr.response?.data?.error?.message || apiErr.response?.data?.message || apiErr.message);
           console.warn(`[ENVIA-PICKUP] Intento fallido en ${url}:`, apiErr.response?.data || apiErr.message);
-        } else {
-          console.warn(`[ENVIA-PICKUP] Intento fallido en ${url}:`, apiErr);
+        } else if (apiErr instanceof Error) {
+          apiErrorMessage = apiErr.message;
+          console.warn(`[ENVIA-PICKUP] Intento fallido en ${url}:`, apiErr.message);
         }
       }
+    }
+
+    if (!apiSuccess && apiErrorMessage) {
+      console.warn(`[ENVIA-PICKUP] No se pudo confirmar recogida con Envia: ${apiErrorMessage}`);
     }
   }
 

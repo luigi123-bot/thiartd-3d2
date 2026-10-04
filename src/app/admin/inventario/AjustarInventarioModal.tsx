@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "~/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "~/components/ui/dialog";
 import { Button } from "~/components/ui/button";
 import { FiPlus, FiMinus } from "react-icons/fi";
 
@@ -38,6 +38,9 @@ export default function AjustarInventarioModal({
           <DialogTitle>
             Ajustar Inventario
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            Ajustar cantidad y precio de inventario
+          </DialogDescription>
         </DialogHeader>
         <div className="mb-2 text-sm text-gray-600">
           Ajusta el stock de <b>{producto?.nombre}</b>. Stock actual: <b>{producto?.stock}</b>

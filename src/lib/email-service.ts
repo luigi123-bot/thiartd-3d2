@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import nodemailer from 'nodemailer';
 import type { Transporter, SendMailOptions, SentMessageInfo } from 'nodemailer';
+import { obtenerGuiaPdfBufferPorPedidoId } from './generate-guia-pdf';
 
 interface SendPasswordResetEmailParams {
   to: string;
@@ -965,6 +966,8 @@ export async function sendShippingEmail(
   const { to, nombreCliente, pedidoId, numeroTracking, empresaEnvio, ciudadDestino, fechaEstimada, pdfGuiaUrl } = params;
 
   const trackingUrl = `https://thiart3d.com/tienda/tracking/${pedidoId}`;
+  const appBaseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://thiart3d.com";
+  const guiaPdfDownloadUrl = `${appBaseUrl}/api/pedidos/${pedidoId}/guia-pdf`;
 
   const fechaFormateada = fechaEstimada
     ? new Date(fechaEstimada).toLocaleDateString("es-CO", {
@@ -1011,7 +1014,7 @@ export async function sendShippingEmail(
               </p>
               <p style="font-size: 15px; color: #475569; margin: 0 0 32px 0; line-height: 1.6;">
                 Tu pedido <strong>#${pedidoId}</strong> ya salió de nuestras instalaciones. 
-                Puedes rastrear tu envío en cualquier momento usando el número de guía.
+                Puedes rastrear tu envío en cualquier momento usando el número de guía o descargar tu guía de transporte oficial adjunta.
               </p>
 
               <!-- TRACKING CARD -->
@@ -1058,11 +1061,31 @@ export async function sendShippingEmail(
                 </tr>
               </table>
 
-              <!-- CTA -->
+              <!-- AVISO DE GUÍA ADJUNTA -->
+              <div style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 14px; padding: 16px 20px; margin-bottom: 28px; text-align: center;">
+                <p style="margin: 0; font-size: 13px; color: #166534; font-weight: 600; line-height: 1.5;">
+                  📎 <strong>Guía Oficial Adjunta:</strong> Hemos adjuntado a este correo tu guía de envío oficial en PDF con diseño exclusivo y código de barras para entrega y seguimiento.
+                </p>
+              </div>
+
+              <!-- BOTONES DE ACCIÓN -->
               <div style="text-align: center; margin-bottom: 32px;">
-                <a href="${trackingUrl}" style="background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%); color: #ffffff; padding: 18px 40px; border-radius: 14px; text-decoration: none; font-weight: 800; display: inline-block; font-size: 15px; box-shadow: 0 10px 20px rgba(20,184,166,0.25); letter-spacing: 0.5px;">
-                  📍 VER RASTREO EN TIEMPO REAL
-                </a>
+                <table width="100%" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td align="center" style="padding-bottom: 12px;">
+                      <a href="${trackingUrl}" style="background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%); color: #ffffff; padding: 16px 36px; border-radius: 14px; text-decoration: none; font-weight: 800; display: inline-block; font-size: 14px; box-shadow: 0 10px 20px rgba(20,184,166,0.25); letter-spacing: 0.5px;">
+                        📍 VER RASTREO EN TIEMPO REAL
+                      </a>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td align="center">
+                      <a href="${guiaPdfDownloadUrl}" style="background: #0f172a; color: #38bdf8; padding: 14px 32px; border-radius: 14px; text-decoration: none; font-weight: 800; display: inline-block; font-size: 13px; border: 1px solid #334155; letter-spacing: 0.5px;">
+                        📄 DESCARGAR GUÍA OFICIAL (PDF)
+                      </a>
+                    </td>
+                  </tr>
+                </table>
               </div>
 
               <p style="font-size: 13px; color: #94a3b8; text-align: center; margin: 0;">
@@ -1094,11 +1117,30 @@ export async function sendShippingEmail(
   try {
     const transporter: Transporter = createTransporter();
 
-    // Adjuntar PDF de guía si está disponible
+    // 1. Adjuntar PDF de guía oficial con el nuevo diseño exclusivo de Thiart 3D
     const attachments: SendMailOptions['attachments'] = [];
-    if (pdfGuiaUrl) {
+    try {
+      const pdfBuffer = await obtenerGuiaPdfBufferPorPedidoId(pedidoId);
+      if (pdfBuffer && pdfBuffer.length > 0) {
+        attachments.push({
+          filename: `guia-thiart3d-pedido-${pedidoId}.pdf`,
+          content: pdfBuffer,
+          contentType: 'application/pdf',
+        });
+        console.log(`📎 PDF de guía oficial Thiart 3D adjuntado (${pdfBuffer.length} bytes)`);
+      }
+    } catch (pdfErr) {
+      console.warn('⚠️ No se pudo generar el PDF oficial de Thiart 3D internamente:', pdfErr);
+    }
+
+    // 2. Fallback: Si no se pudo generar el buffer directo, intentar descargar desde pdfGuiaUrl
+    if (attachments.length === 0 && pdfGuiaUrl) {
       try {
-        const pdfResponse = await fetch(pdfGuiaUrl);
+        const targetUrl = pdfGuiaUrl.startsWith("http")
+          ? pdfGuiaUrl
+          : `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}${pdfGuiaUrl}`;
+
+        const pdfResponse = await fetch(targetUrl);
         if (pdfResponse.ok) {
           const pdfBuffer = Buffer.from(await pdfResponse.arrayBuffer());
           attachments.push({
@@ -1106,10 +1148,10 @@ export async function sendShippingEmail(
             content: pdfBuffer,
             contentType: 'application/pdf',
           });
-          console.log(`📎 PDF de guía adjuntado (${pdfBuffer.length} bytes)`);
+          console.log(`📎 PDF de guía fallback adjuntado (${pdfBuffer.length} bytes)`);
         }
       } catch (pdfErr) {
-        console.warn('⚠️ No se pudo descargar el PDF de la guía:', pdfErr);
+        console.warn('⚠️ No se pudo descargar el PDF de la guía fallback:', pdfErr);
       }
     }
 

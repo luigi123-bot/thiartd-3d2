@@ -97,21 +97,30 @@ export async function POST(req: Request) {
       );
     }
 
-    // Convertir a centavos (Wompi maneja centavos)
-    const amountInCents = Math.round(amount * 100);
+    // Determinar el ambiente (test o producción) basado en la clave privada
+    const isTestMode = wompiPrivateKey.startsWith('prv_test_');
+    console.log(`🔧 Usando modo Wompi: ${isTestMode ? 'TEST (Sandbox)' : 'PRODUCCIÓN'}`);
 
-    // Wompi requiere un mínimo de $1,500 COP (150,000 centavos) en modo TEST
+    // Convertir a centavos (Wompi maneja centavos)
+    let amountInCents = Math.round(amount * 100);
+
+    // Wompi requiere un mínimo de $1,500 COP (150,000 centavos)
     const WOMPI_MIN_AMOUNT = 150000; // 150,000 centavos = $1,500 COP
     
     if (amountInCents < WOMPI_MIN_AMOUNT) {
-      return NextResponse.json(
-        { 
-          error: `El monto mínimo para procesar pagos con Wompi es de $1,500 COP. Monto actual: $${amount.toFixed(0)} COP`,
-          minimum_required: WOMPI_MIN_AMOUNT / 100,
-          current_amount: amount
-        },
-        { status: 400 }
-      );
+      if (isTestMode) {
+        console.warn(`⚠️ [WOMPI-TEST] Monto recibido ($${amount.toFixed(0)} COP) es menor al mínimo de Wompi ($1,500 COP). Ajustando a $1,500 COP para pruebas de sandbox sin interrumpir el flujo.`);
+        amountInCents = WOMPI_MIN_AMOUNT;
+      } else {
+        return NextResponse.json(
+          { 
+            error: `El monto mínimo para procesar pagos con Wompi es de $1,500 COP. Monto actual: $${amount.toFixed(0)} COP`,
+            minimum_required: WOMPI_MIN_AMOUNT / 100,
+            current_amount: amount
+          },
+          { status: 400 }
+        );
+      }
     }
 
     // Crear link de pago en lugar de transacción directa
@@ -138,13 +147,9 @@ export async function POST(req: Request) {
       usingPrivateKey: wompiPrivateKey.substring(0, 15) + "...",
     });
 
-    // Determinar el ambiente (test o producción) basado en la clave privada
-    const isTestMode = wompiPrivateKey.startsWith('prv_test_');
     const wompiApiUrl = isTestMode 
       ? "https://sandbox.wompi.co/v1/payment_links"  // SANDBOX para pruebas
       : "https://production.wompi.co/v1/payment_links"; // PRODUCCIÓN
-    
-    console.log(`🔧 Usando modo: ${isTestMode ? 'TEST (Sandbox)' : 'PRODUCCIÓN'}`);
 
     const response = await fetch(wompiApiUrl, {
       method: "POST",

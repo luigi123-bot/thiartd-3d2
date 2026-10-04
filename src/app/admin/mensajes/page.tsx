@@ -4,7 +4,7 @@ import { FiSend, FiUser, FiSearch, FiMoreVertical, FiCheck, FiMessageCircle, FiA
 import { MdDoneAll } from "react-icons/md";
 import { createClient } from "@supabase/supabase-js";
 import Loader from "~/components/providers/UiProvider";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "~/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "~/components/ui/dialog";
 import { useToast } from "~/components/ui/use-toast";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
@@ -528,10 +528,13 @@ export default function AdminMensajesPage() {
 								{modalUser ? getInitial(modalUser.nombre) : ""}
 							</div>
 							<div className="text-left">
-								<h2 className="text-xl font-black text-gray-900 leading-none mb-1">{modalUser?.nombre}</h2>
-								<p className="text-xs text-emerald-600 font-bold">{modalUser?.email}</p>
+								<span className="block text-xl font-black text-gray-900 leading-none mb-1">{modalUser?.nombre}</span>
+								<span className="block text-xs text-emerald-600 font-bold">{modalUser?.email}</span>
 							</div>
 						</DialogTitle>
+						<DialogDescription className="sr-only">
+							Historial de pedidos y detalles del usuario {modalUser?.nombre}
+						</DialogDescription>
 					</DialogHeader>
 					
 					<div className="py-6">

@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Plus, Minus, Trash2, ShoppingBag, ArrowRight, Truck, ShieldCheck, X, Sparkles } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "~/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "~/components/ui/dialog";
 import { Button } from "~/components/ui/button";
 import { useCarrito } from "~/components/providers/CarritoProvider";
 import { toast } from "sonner";
@@ -38,9 +38,9 @@ export default function CartDrawerModal({ open, onOpenChange }: CartDrawerModalP
               <DialogTitle className="text-lg font-black tracking-tight text-white">
                 Bolsa de Compras
               </DialogTitle>
-              <p className="text-xs text-slate-300 font-medium">
+              <DialogDescription className="text-xs text-slate-300 font-medium">
                 {totalItems} {totalItems === 1 ? "artículo seleccionado" : "artículos seleccionados"}
-              </p>
+              </DialogDescription>
             </div>
           </div>
         </DialogHeader>

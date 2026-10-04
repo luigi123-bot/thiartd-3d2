@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogFooter } from "~/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "~/components/ui/dialog";
 import { Button } from "~/components/ui/button";
 import { FiTrash2, FiPlus, FiCpu, FiTag, FiMaximize2, FiActivity, FiCheck } from "react-icons/fi";
 import { Settings } from "lucide-react";
@@ -143,8 +143,8 @@ export default function ConfiguracionModal({ open, onOpenChange }: Configuracion
               <Settings className="w-6 h-6 text-[#00a19a]" />
             </div>
             <div>
-              <h2 className="text-xl font-black text-slate-900 tracking-tighter uppercase leading-none mb-1.5">Configuración Global</h2>
-              <p className="text-xs text-slate-400 font-semibold tracking-wide uppercase">Parámetros del Sistema y Catálogos</p>
+              <DialogTitle className="text-xl font-black text-slate-900 tracking-tighter uppercase leading-none mb-1.5">Configuración Global</DialogTitle>
+              <DialogDescription className="text-xs text-slate-400 font-semibold tracking-wide uppercase">Parámetros del Sistema y Catálogos</DialogDescription>
             </div>
           </div>
         </div>
