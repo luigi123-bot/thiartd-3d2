@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { type AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
+import { supabase } from "~/lib/supabaseClient";
 
 const categorias = [
   "Figuras",
@@ -94,6 +95,38 @@ function ProductosTiendaPageInner() {
 
   useEffect(() => {
     void fetchProductos();
+
+    // Sincronización en tiempo real del stock y catálogo con Supabase Realtime
+    const channel = supabase
+      .channel("tienda-productos-realtime-stock")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "productos" },
+        (payload) => {
+          if (payload.eventType === "UPDATE") {
+            const updated = payload.new as Partial<Product> & { id: string | number };
+            setProductos((prev) =>
+              prev.map((p) =>
+                String(p.id) === String(updated.id)
+                  ? {
+                      ...p,
+                      ...updated,
+                      stock: Number(updated.stock ?? p.stock),
+                    }
+                  : p
+              )
+            );
+          } else {
+            // Cuando se crea (INSERT) o elimina (DELETE) un producto: recargar catálogo
+            void fetchProductos();
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
   }, []);
 
   const handleCheckbox = (type: "categoria" | "tamano" | "precio", value: string) => {
@@ -281,7 +314,7 @@ function ProductosTiendaPageInner() {
                   <Button variant="outline" onClick={limpiarFiltros} className="rounded-2xl h-12 px-6 font-black uppercase text-[10px] tracking-widest border-2">Ver todo</Button>
                 </motion.div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-5 md:gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-5 md:gap-6">
                   {productosFiltrados.map((producto, idx) => (
                     <ProductCardModern 
                       key={producto.id} 
@@ -439,10 +472,15 @@ function ProductCardModern({ producto, idx, router, addToCarrito, carrito }: {
 
   const enCarrito = carrito.find((p) => String(p.id) === String(producto.id));
   const cantidadEnCarrito = enCarrito?.cantidad ?? 0;
-  const stockDisponible = Math.max(0, (producto.stock ?? 1) - cantidadEnCarrito);
+  const stockActual = typeof producto.stock === "number" ? producto.stock : Number(producto.stock ?? 0);
+  const stockDisponible = Math.max(0, stockActual - cantidadEnCarrito);
 
   const handleAddToCart = async (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (stockDisponible <= 0) {
+      toast.error(`"${data.nombre}" no tiene stock disponible`);
+      return;
+    }
     const ok = await addToCarrito({
       id: String(producto.id),
       nombre: data.nombre,
@@ -455,9 +493,6 @@ function ProductCardModern({ producto, idx, router, addToCarrito, carrito }: {
     });
     if (ok) toast.success(`"${data.nombre}" agregado al carrito ✨`);
   };
-
-  // Cuota estimada sin interés
-  const cuotaEstimada = Math.round(data.precio / 3);
 
   return (
     <motion.div
@@ -473,10 +508,10 @@ function ProductCardModern({ producto, idx, router, addToCarrito, carrito }: {
         onMouseLeave={handleMouseLeave}
         className="group cursor-pointer relative h-full bg-white border border-slate-200/90 hover:border-slate-300 rounded-2xl shadow-sm hover:shadow-xl hover:shadow-slate-200/60 transition-all duration-300 flex flex-col overflow-hidden"
       >
-        {/* Contenedor Visual de Medios Compacto */}
+        {/* Contenedor Visual de Medios (Imágenes y Videos con Auto-play) */}
         <div 
           onMouseMove={handleMouseMove}
-          className="h-44 sm:h-48 md:h-52 w-full relative bg-white flex items-center justify-center p-2.5 overflow-hidden border-b border-slate-100 group/media select-none"
+          className="h-40 sm:h-44 md:h-48 w-full relative bg-white flex items-center justify-center p-2.5 overflow-hidden border-b border-slate-100 group/media select-none"
         >
           {/* Contenido Visual (Imagen o Video) */}
           <AnimatePresence mode="wait">
@@ -514,17 +549,17 @@ function ProductCardModern({ producto, idx, router, addToCarrito, carrito }: {
                   playsInline
                   className="w-full h-full object-contain"
                 />
-                <div className="absolute top-2 left-2 bg-black/80 backdrop-blur-md px-1.5 py-0.5 rounded text-[8px] font-black text-teal-300 uppercase tracking-widest flex items-center gap-1 z-10 shadow-sm">
+                <div className="absolute top-2.5 left-2.5 bg-black/80 backdrop-blur-md px-2 py-0.5 rounded text-[8px] font-black text-teal-300 uppercase tracking-widest flex items-center gap-1 z-10 shadow-sm">
                   <Play className="w-2.5 h-2.5 fill-current" /> Video 3D
                 </div>
               </motion.div>
             ) : (
-              <Package className="w-10 h-10 text-slate-200 stroke-[1]" />
+              <Package className="w-12 h-12 text-slate-200 stroke-[1]" />
             )}
           </AnimatePresence>
 
-          {/* Insignia Superior Izquierda */}
-          <div className="absolute top-2 left-2 z-20 flex flex-col gap-1 items-start pointer-events-none">
+          {/* Insignia Superior Izquierda (Mercado Libre Style: "MÁS VENDIDO" / "3D") */}
+          <div className="absolute top-2.5 left-2.5 z-20 flex flex-col gap-1 items-start pointer-events-none">
             {data.destacado && (
               <span className="bg-[#ff7733] text-white text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-sm shadow-sm">
                 MÁS VENDIDO
@@ -537,7 +572,7 @@ function ProductCardModern({ producto, idx, router, addToCarrito, carrito }: {
             )}
           </div>
 
-          {/* Botón de Favoritos */}
+          {/* Botón de Favoritos (Corazón Mercado Libre) */}
           <button 
             type="button"
             onClick={(e) => {
@@ -546,34 +581,34 @@ function ProductCardModern({ producto, idx, router, addToCarrito, carrito }: {
               setIsFavorite(next);
               toast.success(next ? "Guardado en tus favoritos ❤️" : "Eliminado de tus favoritos");
             }}
-            className="absolute top-2 right-2 z-20 w-7 h-7 rounded-full bg-white/95 hover:bg-white border border-slate-200/80 shadow-sm flex items-center justify-center transition-all hover:scale-110 active:scale-95"
+            className="absolute top-2.5 right-2.5 z-20 w-8 h-8 rounded-full bg-white/95 hover:bg-white border border-slate-200/80 shadow-sm flex items-center justify-center transition-all hover:scale-110 active:scale-95"
             title="Favorito"
           >
-            <Heart className={`w-3.5 h-3.5 transition-colors ${isFavorite ? "fill-rose-500 text-rose-500" : "text-slate-400 hover:text-rose-500"}`} />
+            <Heart className={`w-4 h-4 transition-colors ${isFavorite ? "fill-rose-500 text-rose-500" : "text-slate-400 hover:text-rose-500"}`} />
           </button>
 
-          {/* Flechas de Navegación Manual */}
+          {/* Flechas de Navegación Manual (Aparecen al pasar el cursor) */}
           {mediaList.length > 1 && (
             <>
               <button
                 type="button"
                 onClick={handlePrevMedia}
-                className="absolute left-1 top-1/2 -translate-y-1/2 w-6 h-6 bg-white/95 hover:bg-white text-slate-800 rounded-full shadow-md flex items-center justify-center opacity-0 group-hover/media:opacity-100 transition-opacity z-20 hover:scale-110 active:scale-95 border border-slate-200"
+                className="absolute left-1.5 top-1/2 -translate-y-1/2 w-7 h-7 bg-white/95 hover:bg-white text-slate-800 rounded-full shadow-md flex items-center justify-center opacity-0 group-hover/media:opacity-100 transition-opacity z-20 hover:scale-110 active:scale-95 border border-slate-200"
                 title="Foto anterior"
               >
-                <ChevronLeft className="w-3.5 h-3.5" />
+                <ChevronLeft className="w-4 h-4" />
               </button>
               <button
                 type="button"
                 onClick={handleNextMedia}
-                className="absolute right-1 top-1/2 -translate-y-1/2 w-6 h-6 bg-white/95 hover:bg-white text-slate-800 rounded-full shadow-md flex items-center justify-center opacity-0 group-hover/media:opacity-100 transition-opacity z-20 hover:scale-110 active:scale-95 border border-slate-200"
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 w-7 h-7 bg-white/95 hover:bg-white text-slate-800 rounded-full shadow-md flex items-center justify-center opacity-0 group-hover/media:opacity-100 transition-opacity z-20 hover:scale-110 active:scale-95 border border-slate-200"
                 title="Siguiente foto"
               >
-                <ChevronRight className="w-3.5 h-3.5" />
+                <ChevronRight className="w-4 h-4" />
               </button>
 
-              {/* Indicadores de Segmento estilo Mercado Libre */}
-              <div className="absolute bottom-1.5 left-2.5 right-2.5 flex items-center gap-1 z-20 pointer-events-auto">
+              {/* Indicadores de Segmento estilo Mercado Libre (Barras delgadas horizontales) */}
+              <div className="absolute bottom-2 left-3 right-3 flex items-center gap-1 z-20 pointer-events-auto">
                 {mediaList.map((_, mIdx) => (
                   <div
                     key={mIdx}
@@ -581,7 +616,7 @@ function ProductCardModern({ producto, idx, router, addToCarrito, carrito }: {
                       e.stopPropagation();
                       setActiveMediaIndex(mIdx);
                     }}
-                    className={`h-0.5 flex-1 rounded-full cursor-pointer transition-all duration-300 ${
+                    className={`h-1 flex-1 rounded-full cursor-pointer transition-all duration-300 ${
                       activeMediaIndex === mIdx
                         ? "bg-[#00a19a] shadow-sm"
                         : "bg-slate-200/90 hover:bg-slate-300"
@@ -593,63 +628,68 @@ function ProductCardModern({ producto, idx, router, addToCarrito, carrito }: {
           )}
         </div>
 
-        {/* Información del Producto Compacta */}
+        {/* Información del Producto (Diseño Compacto y Balanceado) */}
         <div className="p-3 sm:p-3.5 flex flex-col flex-1 justify-between bg-white">
           <div>
-            {/* Categoría y Calificación en una sola línea */}
-            <div className="flex items-center justify-between text-[11px] mb-1">
-              <span className="text-[#00a19a] font-bold uppercase tracking-wider text-[10px] truncate max-w-[150px]">
-                {data.categoria}
+            {/* Categoría, Creador y Calificación en una sola línea limpia */}
+            <div className="flex items-center justify-between gap-1 mb-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#00a19a] truncate">
+                {data.categoria} <span className="text-slate-300 font-normal">•</span> <span className="text-slate-400">{data.creador}</span>
               </span>
-              <span className="flex items-center gap-1 font-bold text-slate-700 text-xs shrink-0">
-                <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-                4.9 <span className="text-slate-400 font-normal text-[10px]">(18)</span>
-              </span>
+              <div className="flex items-center gap-0.5 text-amber-400 shrink-0">
+                <Star className="w-3 h-3 fill-current" />
+                <span className="font-bold text-slate-700 text-[11px]">4.9</span>
+                <span className="text-slate-400 text-[10px]">(18)</span>
+              </div>
             </div>
 
-            {/* Título en 1 o 2 líneas limpio */}
+            {/* Título conciso y elegante */}
             <h3 className="text-sm sm:text-[15px] font-semibold text-slate-800 line-clamp-1 leading-snug group-hover:text-[#00a19a] transition-colors">
               {data.nombre}
             </h3>
 
-            {/* Bloque de Precio y Financiación */}
-            <div className="mt-1.5 flex items-baseline justify-between gap-1 flex-wrap">
+            {/* Precio y Stock en Tiempo Real (Sincronizado con la creación de productos) */}
+            <div className="mt-2 flex items-center justify-between">
               <div className="flex items-baseline gap-1">
-                <span className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">
+                <span className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
                   ${data.precio.toLocaleString("es-CO")}
                 </span>
                 <span className="text-[10px] font-bold text-slate-400 uppercase">
                   COP
                 </span>
               </div>
-              <span className="text-[11px] text-slate-500 font-medium">
-                3x ${cuotaEstimada.toLocaleString("es-CO")}
-              </span>
-            </div>
 
-            {/* Envío y Disponibilidad en fila compacta */}
-            <div className="mt-1.5 flex items-center justify-between text-xs pt-1.5 border-t border-slate-100">
-              <div className="flex items-center gap-1 text-emerald-600 font-bold text-[11px]">
-                <Truck className="w-3.5 h-3.5 shrink-0" />
-                <span>Envío gratis mañana</span>
+              {/* Stock disponible real sincronizado en vivo */}
+              <div>
+                {stockDisponible > 3 ? (
+                  <span className="text-[11px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md">
+                    Stock: {stockDisponible} unid.
+                  </span>
+                ) : stockDisponible > 0 ? (
+                  <span className="text-[11px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
+                    ¡Últimas {stockDisponible} unid.!
+                  </span>
+                ) : (
+                  <span className="text-[11px] font-bold text-rose-600 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-md">
+                    Sin stock
+                  </span>
+                )}
               </div>
-              <span className="text-[10px] text-slate-400 font-medium truncate max-w-[110px] text-right">
-                {stockDisponible > 0 ? `${stockDisponible} disponibles` : "Bajo demanda"}
-              </span>
             </div>
           </div>
 
           {/* Botón de Acción / Carrito Compacto */}
-          <div className="mt-2.5">
+          <div className="mt-3 pt-2.5 border-t border-slate-100">
             {cantidadEnCarrito > 0 ? (
-              <div className="w-full flex items-center justify-between bg-teal-50 border border-teal-200 rounded-xl px-2.5 py-1.5 text-xs">
-                <span className="font-bold text-[#00a19a] flex items-center gap-1.5 text-[11px]">
-                  <Check className="w-3 h-3" /> En carrito ({cantidadEnCarrito})
+              <div className="w-full h-8.5 bg-teal-50 border border-teal-200 rounded-xl px-2.5 flex items-center justify-between text-xs font-bold text-[#00a19a]">
+                <span className="flex items-center gap-1 text-[11px]">
+                  <Check className="w-3.5 h-3.5" /> En el carrito ({cantidadEnCarrito})
                 </span>
                 <button
                   type="button"
+                  disabled={stockDisponible <= 0}
                   onClick={handleAddToCart}
-                  className="w-5 h-5 rounded bg-[#00a19a] text-white flex items-center justify-center font-bold text-xs hover:bg-[#007973] transition-colors"
+                  className="w-5 h-5 rounded bg-[#00a19a] text-white flex items-center justify-center font-bold text-[11px] hover:bg-[#007973] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                   title="Agregar otra unidad"
                 >
                   +1
@@ -658,11 +698,12 @@ function ProductCardModern({ producto, idx, router, addToCarrito, carrito }: {
             ) : (
               <button
                 type="button"
+                disabled={stockDisponible <= 0}
                 onClick={handleAddToCart}
-                className="w-full h-8.5 py-1.5 rounded-xl bg-slate-900 hover:bg-[#00a19a] text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm hover:shadow-teal-500/20 transition-all duration-300 active:scale-95"
+                className="w-full h-8.5 rounded-xl bg-slate-900 hover:bg-[#00a19a] disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm hover:shadow-teal-500/20 transition-all duration-300 active:scale-95"
               >
                 <ShoppingCart className="w-3.5 h-3.5" />
-                Agregar al carrito
+                {stockDisponible <= 0 ? "Sin stock disponible" : "Agregar al carrito"}
               </button>
             )}
           </div>
