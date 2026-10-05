@@ -53,12 +53,13 @@ export async function POST(req: Request) {
       video_url?: string;
       user_id?: string;
       imagenes?: string[];
+      precios_variantes?: Record<string, unknown>;
     };
     
     const body = (await req.json()) as ProductoBody;
     const { 
       nombre, precio, descripcion, tamano, categoria, stock, 
-      detalles, destacado, image_url, model_url, video_url, user_id, imagenes 
+      detalles, destacado, image_url, model_url, video_url, user_id, imagenes, precios_variantes
     } = body;
 
     // Validación de campos obligatorios
@@ -82,6 +83,7 @@ export async function POST(req: Request) {
       image_url: image_url ?? null,
       model_url: model_url ?? null,
       video_url: video_url ?? null,
+      precios_variantes: precios_variantes ?? {},
       ...(user_id ? { user_id } : {}),
     };
 

@@ -7,7 +7,7 @@ import { Textarea } from "~/components/ui/textarea";
 import { ProductImageUpload, ProductModel3DUpload, ProductVideoUpload } from "~/components/FileUploadWidget";
 import Image from "next/image";
 import { FiX } from "react-icons/fi";
-import { Package, Star, ArrowLeft, ArrowRight, Trash2, Box, Video, Image as ImageIcon, Plus, Link as LinkIcon, Check } from "lucide-react";
+import { Package, Star, ArrowLeft, ArrowRight, Trash2, Box, Video, Image as ImageIcon, Plus, Link as LinkIcon, Check, Printer, Clock } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 const categorias = [
@@ -39,6 +39,7 @@ interface Product {
   video_url?: string;
   user_id?: string;
   usuario_id?: string; 
+  precios_variantes?: { escalas?: string[]; estilos?: string[]; es_pod?: boolean; dias_fabricacion?: number } | string | Record<string, unknown>;
 }
 
 export default function CreateProductModal({ 
@@ -81,6 +82,61 @@ export default function CreateProductModal({
   const [customImageUrl, setCustomImageUrl] = useState<string>("");
   const [showImageUrlInput, setShowImageUrlInput] = useState(false);
   const [questions, setQuestions] = useState<string[]>([]);
+
+  // Opciones de múltiples escalas, estilos y Print on Demand
+  const ESCALAS_SUGERIDAS = ["15 cm (Mini)", "25 cm (Estándar)", "35 cm (Coleccionista)", "Escala Real 1:1"];
+  const ESTILOS_SUGERIDOS = [
+    "Sin Pintar (Resina Gris)",
+    "Pintado a Mano Full Color",
+    "Acabado Bronce Envejecido",
+    "Efecto Mármol Blanco",
+    "Fibra de Carbono / Mate"
+  ];
+
+  const [escalasSeleccionadas, setEscalasSeleccionadas] = useState<string[]>(["25 cm (Estándar)"]);
+  const [nuevaEscalaInput, setNuevaEscalaInput] = useState<string>("");
+  const [estilosSeleccionados, setEstilosSeleccionados] = useState<string[]>(["Sin Pintar (Resina Gris)"]);
+  const [nuevoEstiloInput, setNuevoEstiloInput] = useState<string>("");
+  const [esPOD, setEsPOD] = useState<boolean>(true); // Print on Demand activado por defecto
+  const [diasFabricacion, setDiasFabricacion] = useState<number>(4);
+
+  const toggleEscala = (esc: string) => {
+    setEscalasSeleccionadas((prev) =>
+      prev.includes(esc)
+        ? prev.length > 1
+          ? prev.filter((e) => e !== esc)
+          : prev
+        : [...prev, esc]
+    );
+  };
+
+  const agregarEscalaPersonalizada = () => {
+    const val = nuevaEscalaInput.trim();
+    if (!val) return;
+    if (!escalasSeleccionadas.includes(val)) {
+      setEscalasSeleccionadas((prev) => [...prev, val]);
+    }
+    setNuevaEscalaInput("");
+  };
+
+  const toggleEstilo = (est: string) => {
+    setEstilosSeleccionados((prev) =>
+      prev.includes(est)
+        ? prev.length > 1
+          ? prev.filter((e) => e !== est)
+          : prev
+        : [...prev, est]
+    );
+  };
+
+  const agregarEstiloPersonalizado = () => {
+    const val = nuevoEstiloInput.trim();
+    if (!val) return;
+    if (!estilosSeleccionados.includes(val)) {
+      setEstilosSeleccionados((prev) => [...prev, val]);
+    }
+    setNuevoEstiloInput("");
+  };
   
   interface Creator {
     id: string;
@@ -197,9 +253,56 @@ export default function CreateProductModal({
       if (product.video_url) {
         setVideoPreview(product.video_url);
       }
+
+      // Reconstruir múltiples escalas, estilos y POD
+      let loadedEscalas: string[] = [];
+      let loadedEstilos: string[] = [];
+      let loadedEsPod = true;
+      let loadedDias = 4;
+
+      if (product.precios_variantes) {
+        try {
+          const pv = typeof product.precios_variantes === "string" 
+            ? JSON.parse(product.precios_variantes) as Record<string, unknown>
+            : (product.precios_variantes as Record<string, unknown>);
+          if (Array.isArray(pv.escalas) && pv.escalas.length > 0) loadedEscalas = pv.escalas as string[];
+          if (Array.isArray(pv.estilos) && pv.estilos.length > 0) loadedEstilos = pv.estilos as string[];
+          if (typeof pv.es_pod === "boolean") loadedEsPod = pv.es_pod;
+          if (typeof pv.dias_fabricacion === "number") loadedDias = pv.dias_fabricacion;
+        } catch (e) {
+          console.warn("Error parseando precios_variantes:", e);
+        }
+      }
+
+      if (loadedEscalas.length === 0) {
+        if (product.tamano) {
+          loadedEscalas = product.tamano.includes(",") 
+            ? product.tamano.split(",").map((s) => s.trim()) 
+            : [product.tamano];
+        } else {
+          loadedEscalas = ["25 cm (Estándar)"];
+        }
+      }
+
+      if (loadedEstilos.length === 0) {
+        if (product.categoria) {
+          loadedEstilos = [product.categoria];
+        } else {
+          loadedEstilos = ["Sin Pintar (Resina Gris)"];
+        }
+      }
+
+      setEscalasSeleccionadas(loadedEscalas);
+      setEstilosSeleccionados(loadedEstilos);
+      setEsPOD(loadedEsPod);
+      setDiasFabricacion(loadedDias);
     } else {
       setQuestions([]);
       setGalleryImages([]);
+      setEscalasSeleccionadas(["25 cm (Estándar)"]);
+      setEstilosSeleccionados(["Sin Pintar (Resina Gris)"]);
+      setEsPOD(true);
+      setDiasFabricacion(4);
       setForm({
         nombre: "",
         precio: 0,
@@ -268,17 +371,25 @@ export default function CreateProductModal({
 
       const formData = {
         ...form,
+        tamano: escalasSeleccionadas.join(", ") || tamanos[0],
+        categoria: estilosSeleccionados[0] || form.categoria || categorias[0],
         image_url: finalCoverImage,
         imagenes: finalSecondaryImages,
         model_url: finalModelUrl,
         video_url: finalVideoUrl,
         detalles: JSON.stringify(questions),
+        precios_variantes: {
+          escalas: escalasSeleccionadas,
+          estilos: estilosSeleccionados,
+          es_pod: esPOD,
+          dias_fabricacion: Number(diasFabricacion) || 4,
+        },
       };
 
       console.log("[CreateProductModal] Enviando formData:", formData);
 
       let res: Response;
-      if (product?.id && !isNaN(Number(product.id))) {
+      if (product?.id) {
         res = await fetch(`/api/productos/${product.id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -465,33 +576,144 @@ export default function CreateProductModal({
                     </div>
                   )}
 
-                  {/* Step 2: Clasificación */}
+                  {/* Step 2: Clasificación y Especificaciones (Múltiples Escalas y Estilos) */}
                   {step === 1 && (
                     <div className="space-y-6">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-2.5 bg-slate-50/50 p-6 rounded-2xl border border-slate-100">
-                          <label className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] ml-1">Escala Disponible</label>
-                          <select 
-                            name="tamano" 
-                            value={form.tamano} 
-                            onChange={handleChange}
-                            className="w-full h-11 rounded-2xl border border-slate-200 px-5 bg-white font-bold text-slate-900 outline-none focus:border-[#00a19a]"
-                          >
-                            {tamanos.map(t => <option key={t} value={t}>{t}</option>)}
-                          </select>
+                      {/* Escalas Disponibles: selección de una o varias */}
+                      <div className="bg-slate-50/70 p-6 rounded-2xl border border-slate-200 space-y-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                          <div>
+                            <label className="text-xs font-black text-slate-800 uppercase tracking-[0.2em]">
+                              Escalas Disponibles (Selecciona una o varias)
+                            </label>
+                            <p className="text-[11px] text-slate-500 mt-0.5">
+                              El cliente podrá elegir cualquiera de estas escalas para la obra.
+                            </p>
+                          </div>
+                          <span className="text-xs font-bold text-[#00a19a] bg-teal-50 px-2.5 py-1 rounded-full border border-teal-100 w-fit">
+                            {escalasSeleccionadas.length} seleccionada(s)
+                          </span>
                         </div>
 
-                        <div className="space-y-2.5 bg-slate-50/50 p-6 rounded-2xl border border-slate-100">
-                          <label className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] ml-1">Estilo de la Obra</label>
-                          <select 
-                            name="categoria" 
-                            value={form.categoria} 
-                            onChange={handleChange}
-                            className="w-full h-11 rounded-2xl border border-slate-200 px-5 bg-white font-bold text-slate-900 outline-none focus:border-[#00a19a]"
-                          >
-                            {categorias.map(c => <option key={c} value={c}>{c}</option>)}
-                          </select>
+                        {/* Chips de escalas */}
+                        <div className="flex flex-wrap gap-2">
+                          {Array.from(new Set([...ESCALAS_SUGERIDAS, ...escalasSeleccionadas])).map((esc) => {
+                            const isSelected = escalasSeleccionadas.includes(esc);
+                            return (
+                              <button
+                                key={esc}
+                                type="button"
+                                onClick={() => toggleEscala(esc)}
+                                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all border flex items-center gap-1.5 ${
+                                  isSelected
+                                    ? "bg-slate-900 text-white border-slate-900 shadow-sm"
+                                    : "bg-white text-slate-600 border-slate-200 hover:border-slate-300"
+                                }`}
+                              >
+                                {isSelected && <Check className="w-3.5 h-3.5 text-teal-400" />}
+                                <span>{esc}</span>
+                              </button>
+                            );
+                          })}
                         </div>
+
+                        {/* Añadir escala personalizada */}
+                        <div className="flex gap-2 pt-2 border-t border-slate-200/60">
+                          <Input
+                            placeholder="Añadir otra escala personalizada (Ej: 45 cm, 1:4)..."
+                            value={nuevaEscalaInput}
+                            onChange={(e) => setNuevaEscalaInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                agregarEscalaPersonalizada();
+                              }
+                            }}
+                            className="h-10 text-xs rounded-xl bg-white"
+                          />
+                          <Button
+                            type="button"
+                            onClick={agregarEscalaPersonalizada}
+                            className="h-10 px-4 rounded-xl bg-[#00a19a] hover:bg-[#007973] text-white text-xs font-bold"
+                          >
+                            Agregar
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Estilos y Acabados de la Obra: selección de uno o varios */}
+                      <div className="bg-slate-50/70 p-6 rounded-2xl border border-slate-200 space-y-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                          <div>
+                            <label className="text-xs font-black text-slate-800 uppercase tracking-[0.2em]">
+                              Estilo de la Obra (Selecciona uno o varios)
+                            </label>
+                            <p className="text-[11px] text-slate-500 mt-0.5">
+                              Selecciona los estilos, pinturas o acabados en los que se ofrecerá esta obra.
+                            </p>
+                          </div>
+                          <span className="text-xs font-bold text-[#00a19a] bg-teal-50 px-2.5 py-1 rounded-full border border-teal-100 w-fit">
+                            {estilosSeleccionados.length} seleccionado(s)
+                          </span>
+                        </div>
+
+                        {/* Chips de estilos */}
+                        <div className="flex flex-wrap gap-2">
+                          {Array.from(new Set([...ESTILOS_SUGERIDOS, ...estilosSeleccionados])).map((est) => {
+                            const isSelected = estilosSeleccionados.includes(est);
+                            return (
+                              <button
+                                key={est}
+                                type="button"
+                                onClick={() => toggleEstilo(est)}
+                                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all border flex items-center gap-1.5 ${
+                                  isSelected
+                                    ? "bg-[#00a19a] text-white border-[#00a19a] shadow-sm"
+                                    : "bg-white text-slate-600 border-slate-200 hover:border-slate-300"
+                                }`}
+                              >
+                                {isSelected && <Check className="w-3.5 h-3.5 text-white" />}
+                                <span>{est}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        {/* Añadir estilo personalizado */}
+                        <div className="flex gap-2 pt-2 border-t border-slate-200/60">
+                          <Input
+                            placeholder="Añadir otro acabado o estilo artístico..."
+                            value={nuevoEstiloInput}
+                            onChange={(e) => setNuevoEstiloInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                agregarEstiloPersonalizado();
+                              }
+                            }}
+                            className="h-10 text-xs rounded-xl bg-white"
+                          />
+                          <Button
+                            type="button"
+                            onClick={agregarEstiloPersonalizado}
+                            className="h-10 px-4 rounded-xl bg-slate-900 hover:bg-black text-white text-xs font-bold"
+                          >
+                            Agregar
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Categoría Global de Tienda */}
+                      <div className="space-y-2.5 bg-slate-50/50 p-6 rounded-2xl border border-slate-100">
+                        <label className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] ml-1">Categoría en Tienda</label>
+                        <select 
+                          name="categoria" 
+                          value={form.categoria} 
+                          onChange={handleChange}
+                          className="w-full h-11 rounded-2xl border border-slate-200 px-5 bg-white font-bold text-slate-900 outline-none focus:border-[#00a19a]"
+                        >
+                          {categorias.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
                       </div>
 
                       {/* Solo mostrar asignación si NO es modo creador */}
@@ -522,7 +744,7 @@ export default function CreateProductModal({
                     </div>
                   )}
 
-                  {/* Step 3: Valores */}
+                  {/* Step 3: Valores & Modalidad Print on Demand vs Stock */}
                   {step === 2 && (
                     <div className="space-y-6">
                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -541,7 +763,7 @@ export default function CreateProductModal({
                           </div>
 
                           <div className="space-y-2.5 bg-slate-50/50 p-6 rounded-2xl border border-slate-100">
-                            <label className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] ml-1">Reserva / Stock</label>
+                            <label className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] ml-1">Reserva / Stock Físico</label>
                             <Input 
                               name="stock" 
                               type="number" 
@@ -550,23 +772,84 @@ export default function CreateProductModal({
                               className="h-11 px-5 rounded-2xl border-slate-200 bg-white font-black text-xl text-center outline-none focus:border-[#00a19a]" 
                             />
                           </div>
+                       </div>
 
-                          <div className="flex items-center gap-3 bg-slate-50/50 p-6 rounded-2xl border border-slate-100 col-span-1 md:col-span-2">
-                            <input 
-                              type="checkbox" 
-                              name="destacado"
-                              id="destacadoForm" 
-                              checked={form.destacado} 
-                              onChange={(e) => setForm({ ...form, destacado: e.target.checked })}
-                              className="w-5 h-5 rounded text-[#00a19a] focus:ring-[#00a19a]"
-                            />
-                            <div className="flex flex-col">
-                              <label htmlFor="destacadoForm" className="text-sm font-bold text-slate-800 cursor-pointer select-none">
-                                Destacar esta obra
-                              </label>
-                              <span className="text-xs text-slate-500">Marcar este producto como recomendado en la tienda.</span>
-                            </div>
-                          </div>
+                       {/* CONFIGURACIÓN PRINT ON DEMAND (Se imprime cuando se compra) */}
+                       <div className={`p-6 rounded-3xl border-2 transition-all space-y-4 ${
+                         esPOD ? "bg-teal-50/40 border-[#00a19a]/40 shadow-sm" : "bg-slate-50/50 border-slate-200"
+                       }`}>
+                         <div className="flex items-start justify-between gap-4">
+                           <div className="space-y-1">
+                             <div className="flex items-center gap-2">
+                               <Printer className="w-5 h-5 text-[#00a19a]" />
+                               <h4 className="text-sm font-black text-slate-900 uppercase tracking-wider">
+                                 Se Imprime Cuando Se Compra — Print on Demand (POD)
+                               </h4>
+                             </div>
+                             <p className="text-xs text-slate-600 leading-relaxed max-w-xl">
+                               {esPOD ? (
+                                 <span className="text-teal-900 font-medium">
+                                   <strong>Modo Activo:</strong> La pieza se imprime en 3D bajo pedido cuando el cliente compre. No requiere stock previo y nunca se bloquea por falta de inventario inicial.
+                                 </span>
+                               ) : (
+                                 <span className="text-slate-600 font-medium">
+                                   <strong>Modo Stock Físico:</strong> Se vende únicamente de la reserva disponible ({form.stock} unid). Cuando el stock llegue a 0, aparecerá automáticamente como <strong>&quot;Producto no disponible&quot;</strong> en la tienda y la compra se bloqueará.
+                                 </span>
+                               )}
+                             </p>
+                           </div>
+
+                           <label className="relative inline-flex items-center cursor-pointer shrink-0 mt-1">
+                             <input
+                               type="checkbox"
+                               checked={esPOD}
+                               onChange={(e) => setEsPOD(e.target.checked)}
+                               className="sr-only peer"
+                             />
+                             <div className="w-12 h-6.5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[3px] after:left-[3px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#00a19a]"></div>
+                           </label>
+                         </div>
+
+                         {esPOD && (
+                           <div className="pt-3 border-t border-teal-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-teal-100">
+                             <div>
+                               <span className="text-xs font-black text-slate-900 uppercase tracking-wider block">
+                                 Días Estimados de Fabricación 3D
+                               </span>
+                               <span className="text-[11px] text-slate-500">
+                                 Tiempo necesario para modelar, imprimir, curar y pintar la pieza antes de coordinar la recolección con Envía.
+                               </span>
+                             </div>
+                             <div className="flex items-center gap-2 shrink-0">
+                               <Input
+                                 type="number"
+                                 min={1}
+                                 max={30}
+                                 value={diasFabricacion}
+                                 onChange={(e) => setDiasFabricacion(Number(e.target.value) || 4)}
+                                 className="w-20 h-10 text-center font-black text-base bg-slate-50 rounded-xl border-slate-200"
+                               />
+                               <span className="text-xs font-bold text-slate-700">días hábiles</span>
+                             </div>
+                           </div>
+                         )}
+                       </div>
+
+                       <div className="flex items-center gap-3 bg-slate-50/50 p-6 rounded-2xl border border-slate-100">
+                         <input 
+                           type="checkbox" 
+                           name="destacado"
+                           id="destacadoForm" 
+                           checked={form.destacado} 
+                           onChange={(e) => setForm({ ...form, destacado: e.target.checked })}
+                           className="w-5 h-5 rounded text-[#00a19a] focus:ring-[#00a19a]"
+                         />
+                         <div className="flex flex-col">
+                           <label htmlFor="destacadoForm" className="text-sm font-bold text-slate-800 cursor-pointer select-none">
+                             Destacar esta obra
+                           </label>
+                           <span className="text-xs text-slate-500">Marcar este producto como recomendado en la tienda.</span>
+                         </div>
                        </div>
                     </div>
                   )}

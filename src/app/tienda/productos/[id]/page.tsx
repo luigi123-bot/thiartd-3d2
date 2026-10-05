@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Package, Ruler, Tag, Star, Sparkles, Minus, Plus, Check, Clock, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Package, Ruler, Tag, Star, Sparkles, Minus, Plus, Check, Clock, ShieldCheck, Printer, AlertCircle } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { Card } from "~/components/ui/card";
 import { Model3DViewer } from "~/components/Model3DViewer";
@@ -29,6 +29,7 @@ interface Producto {
   modelo_url?: string;
   video_url?: string;
   usuarios?: { nombre: string } | null;
+  precios_variantes?: { escalas?: string[]; estilos?: string[]; es_pod?: boolean; dias_fabricacion?: number } | Record<string, unknown>;
 }
 
 interface Variante {
@@ -94,6 +95,11 @@ export default function ProductoDetallePage() {
           modelo_url: data.modelo_url ? String(data.modelo_url) : (data.model_url ? String(data.model_url) : undefined),
           video_url: data.video_url ? String(data.video_url) : undefined,
           usuarios: data.usuarios as { nombre: string } | null,
+          precios_variantes: data.precios_variantes
+            ? (typeof data.precios_variantes === "string" 
+                ? JSON.parse(data.precios_variantes) as Record<string, unknown>
+                : data.precios_variantes as Record<string, unknown>)
+            : undefined,
         });
       }
 
@@ -120,6 +126,37 @@ export default function ProductoDetallePage() {
     void fetchProducto();
   }, [fetchProducto]);
 
+  // Listas dinámicas de escalas y estilos desde la configuración del producto
+  const listaEscalas = useMemo(() => {
+    const pvEscalas = (producto?.precios_variantes as Record<string, unknown>)?.escalas;
+    if (Array.isArray(pvEscalas) && pvEscalas.length > 0) return pvEscalas as string[];
+    if (producto?.tamano) {
+      return producto.tamano.includes(",") 
+        ? producto.tamano.split(",").map((s) => s.trim()) 
+        : [producto.tamano];
+    }
+    return ESCALAS_DEFAULT;
+  }, [producto]);
+
+  const listaEstilos = useMemo(() => {
+    const pvEstilos = (producto?.precios_variantes as Record<string, unknown>)?.estilos;
+    if (Array.isArray(pvEstilos) && pvEstilos.length > 0) return pvEstilos as string[];
+    return ESTILOS_DEFAULT.map((e) => e.nombre);
+  }, [producto]);
+
+  // Sincronizar selección inicial cuando cargue el producto
+  useEffect(() => {
+    if (listaEscalas.length > 0 && !listaEscalas.includes(selectedEscala)) {
+      setSelectedEscala(listaEscalas[0]!);
+    }
+  }, [listaEscalas, selectedEscala]);
+
+  useEffect(() => {
+    if (listaEstilos.length > 0 && !listaEstilos.includes(selectedEstilo)) {
+      setSelectedEstilo(listaEstilos[0]!);
+    }
+  }, [listaEstilos, selectedEstilo]);
+
   // Calcular precio dinámico según variante/estilo seleccionado
   const precioCalculado = useMemo(() => {
     if (!producto) return 0;
@@ -135,16 +172,18 @@ export default function ProductoDetallePage() {
     return Math.round(producto.precio * (estiloInfo?.multiplicador ?? 1) * escalaExtra);
   }, [producto, variantes, selectedEscala, selectedEstilo]);
 
-  // Determinar stock y modo POD
+  // Determinar stock y modo POD (Se imprime cuando se compra)
   const { stockActual, esPOD, diasFabricacion } = useMemo(() => {
     const varEncontrada = variantes.find(
       (v) => v.escala === selectedEscala && v.estilo === selectedEstilo
     );
     const stock = varEncontrada ? varEncontrada.stock : (producto?.stock ?? 0);
-    const es_pod = stock <= 0;
-    const dias = varEncontrada?.dias_fabricacion ?? 4;
+    const pv = producto?.precios_variantes as Record<string, unknown> | undefined;
+    // Si la variante lo especifica, o si el producto tiene es_pod configurado
+    const es_pod = varEncontrada ? varEncontrada.permite_pod : Boolean(pv?.es_pod);
+    const dias = varEncontrada?.dias_fabricacion ?? (Number(pv?.dias_fabricacion) || 4);
     return { stockActual: stock, esPOD: es_pod, diasFabricacion: dias };
-  }, [variantes, selectedEscala, selectedEstilo, producto?.stock]);
+  }, [variantes, selectedEscala, selectedEstilo, producto]);
 
   // Media items para la galería estilo Mercado Libre
   const mediaItems: MediaItem[] = useMemo(() => {
@@ -176,6 +215,10 @@ export default function ProductoDetallePage() {
 
   const handleAddToCart = async () => {
     if (!producto) return;
+    if (!esPOD && stockActual <= 0) {
+      toast.error("Este producto no está disponible (stock agotado)");
+      return;
+    }
     const ok = await addToCarrito({
       id: String(producto.id),
       nombre: `${producto.nombre} (${selectedEscala} - ${selectedEstilo})`,
@@ -187,12 +230,16 @@ export default function ProductoDetallePage() {
       destacado: producto.destacado,
     });
     if (ok) {
-      toast.success("Añadido al carrito con tus especificaciones");
+      toast.success(esPOD ? "Añadido al carrito (Fabricación Print on Demand)" : "Añadido al carrito");
     }
   };
 
   const handleBuyNow = async () => {
     if (!producto) return;
+    if (!esPOD && stockActual <= 0) {
+      toast.error("Este producto no está disponible (stock agotado)");
+      return;
+    }
     await handleAddToCart();
     router.push("/tienda/carrito");
   };
@@ -322,48 +369,60 @@ export default function ProductoDetallePage() {
                 <span className="text-xs font-black text-slate-400 uppercase">COP</span>
               </div>
 
-              {/* ── Badge de Disponibilidad y Fabricación ── */}
+              {/* ── Badge de Disponibilidad y Fabricación (POD vs Stock) ── */}
               <div className="p-4 rounded-2xl border text-xs font-semibold flex items-start gap-3 bg-slate-50 border-slate-200">
-                {!esPOD ? (
+                {esPOD ? (
+                  <>
+                    <Clock className="w-5 h-5 text-[#00a19a] flex-shrink-0" />
+                    <div>
+                      <p className="font-black text-[#007973] uppercase tracking-wider flex items-center gap-1.5">
+                        <Printer className="w-3.5 h-3.5" /> Se imprime cuando se compra (Print on Demand)
+                      </p>
+                      <p className="text-slate-500 mt-0.5">
+                        Modelado 3D + impresión y acabado sobre pedido. Listo en aprox. <strong>{diasFabricacion} días hábiles</strong>.
+                      </p>
+                    </div>
+                  </>
+                ) : stockActual > 0 ? (
                   <>
                     <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 mt-1 animate-pulse" />
                     <div>
                       <p className="font-black text-emerald-800 uppercase tracking-wider">
                         En Stock ({stockActual} unidades disponibles)
                       </p>
-                      <p className="text-slate-500 mt-0.5">Listo para despacho hoy o recolección inmediata en taller.</p>
+                      <p className="text-slate-500 mt-0.5">Listo para despacho inmediato o recolección en taller.</p>
                     </div>
                   </>
                 ) : (
                   <>
-                    <Clock className="w-5 h-5 text-blue-600 flex-shrink-0" />
+                    <AlertCircle className="w-5 h-5 text-rose-600 flex-shrink-0" />
                     <div>
-                      <p className="font-black text-blue-800 uppercase tracking-wider">
-                        Fabricación Print-on-Demand (POD)
+                      <p className="font-black text-rose-800 uppercase tracking-wider">
+                        Producto No Disponible
                       </p>
                       <p className="text-slate-500 mt-0.5">
-                        Impresión 3D + acabado personalizado sobre pedido. Listo en aprox. <strong>{diasFabricacion} días hábiles</strong>.
+                        El stock físico para esta obra se ha agotado.
                       </p>
                     </div>
                   </>
                 )}
               </div>
 
-              {/* ── 1. Selector de Escala ── */}
+              {/* ── 1. Selector de Escala (Dinámico según producto) ── */}
               <div className="space-y-2.5">
                 <label className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center justify-between">
                   <span>1. Selecciona la Escala</span>
-                  <span className="text-[10px] text-teal-600 font-bold">Tamaño de la obra</span>
+                  <span className="text-[10px] text-teal-600 font-bold">{listaEscalas.length} disponible(s)</span>
                 </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {ESCALAS_DEFAULT.map((esc) => {
+                <div className="flex flex-wrap gap-2">
+                  {listaEscalas.map((esc) => {
                     const isSelected = selectedEscala === esc;
                     return (
                       <button
                         key={esc}
                         type="button"
                         onClick={() => setSelectedEscala(esc)}
-                        className={`p-3 rounded-xl text-xs font-black text-center transition-all border ${
+                        className={`px-4 py-3 rounded-xl text-xs font-black text-center transition-all border ${
                           isSelected
                             ? "bg-slate-900 text-white border-slate-900 shadow-md scale-105"
                             : "bg-white text-slate-600 border-slate-200 hover:border-slate-400"
@@ -376,27 +435,27 @@ export default function ProductoDetallePage() {
                 </div>
               </div>
 
-              {/* ── 2. Selector de Estilo de Obra ── */}
+              {/* ── 2. Selector de Estilo de Obra (Dinámico según producto) ── */}
               <div className="space-y-2.5">
                 <label className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center justify-between">
                   <span>2. Selecciona el Estilo / Acabado</span>
-                  <span className="text-[10px] text-teal-600 font-bold">Pintura & Material</span>
+                  <span className="text-[10px] text-teal-600 font-bold">{listaEstilos.length} opción(es)</span>
                 </label>
                 <div className="space-y-2">
-                  {ESTILOS_DEFAULT.map((est) => {
-                    const isSelected = selectedEstilo === est.nombre;
+                  {listaEstilos.map((estNombre) => {
+                    const isSelected = selectedEstilo === estNombre;
                     return (
                       <button
-                        key={est.nombre}
+                        key={estNombre}
                         type="button"
-                        onClick={() => setSelectedEstilo(est.nombre)}
+                        onClick={() => setSelectedEstilo(estNombre)}
                         className={`w-full p-3.5 rounded-xl text-xs font-bold text-left transition-all border flex items-center justify-between ${
                           isSelected
                             ? "bg-teal-50/70 border-[#00a19a] text-teal-950 ring-1 ring-[#00a19a]"
                             : "bg-white text-slate-600 border-slate-200 hover:border-slate-300"
                         }`}
                       >
-                        <span>{est.nombre}</span>
+                        <span>{estNombre}</span>
                         {isSelected && <Check className="w-4 h-4 text-[#00a19a]" />}
                       </button>
                     );
@@ -428,20 +487,22 @@ export default function ProductoDetallePage() {
                 </div>
               </div>
 
-              {/* Botones de Compra */}
+              {/* Botones de Compra (Deshabilitados si el stock físico está agotado) */}
               <div className="grid gap-3">
                 <Button
+                  disabled={!esPOD && stockActual <= 0}
                   onClick={handleBuyNow}
-                  className="h-14 bg-[#00a19a] hover:bg-[#007973] text-white rounded-2xl text-sm font-black tracking-wider uppercase shadow-xl shadow-[#00a19a]/25 active:scale-95 transition-all"
+                  className="h-14 bg-[#00a19a] hover:bg-[#007973] disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white rounded-2xl text-sm font-black tracking-wider uppercase shadow-xl shadow-[#00a19a]/25 active:scale-95 transition-all"
                 >
-                  Comprar Ahora
+                  {!esPOD && stockActual <= 0 ? "Producto no disponible" : "Comprar Ahora"}
                 </Button>
                 <Button
+                  disabled={!esPOD && stockActual <= 0}
                   variant="outline"
                   onClick={handleAddToCart}
-                  className="h-14 border-2 border-slate-200 hover:border-slate-900 text-slate-800 rounded-2xl text-sm font-black uppercase active:scale-95 transition-all"
+                  className="h-14 border-2 border-slate-200 hover:border-slate-900 disabled:border-slate-100 disabled:bg-slate-50 disabled:text-slate-300 disabled:cursor-not-allowed text-slate-800 rounded-2xl text-sm font-black uppercase active:scale-95 transition-all"
                 >
-                  Agregar al Carrito
+                  {!esPOD && stockActual <= 0 ? "Agotado" : "Agregar al Carrito"}
                 </Button>
               </div>
             </Card>

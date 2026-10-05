@@ -104,9 +104,9 @@ export default function HomeClient() {
                 Bienvenidos al futuro
               </span>
               <h1 className="text-4xl sm:text-6xl md:text-7xl lg:text-[5rem] font-black text-white leading-[1.05] tracking-tight mb-6 drop-shadow-xl">
-                Imprimiendo <br />
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-200 to-[#00a19a] filter brightness-125 saturate-150">tus ideas</span> <br />
-                <span className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-teal-100 block mt-2 opacity-95">con un impacto sostenible.</span>
+                Diseño & Fabricación 3D <br />
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-200 to-[#00a19a] filter brightness-125 saturate-150">con un impacto</span> <br />
+                <span className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-teal-100 block mt-2 opacity-95">sostenible y exclusivo.</span>
               </h1>
               <p className="text-base sm:text-lg md:text-xl text-teal-50/90 mb-10 max-w-xl mx-auto lg:mx-0 font-medium leading-relaxed">
                 En THIART 3D transformamos botellas plásticas recicladas en piezas 3D únicas para marcas y personas que quieren diseño con propósito.
@@ -232,14 +232,14 @@ export default function HomeClient() {
         />
 
         {/* ─── Productos Destacados ──────────────────────────── */}
-        <section className="py-20 md:py-32 bg-white rounded-t-[3rem] shadow-[0_-20px_40px_-15px_rgba(0,0,0,0.05)] relative z-20">
-          <div className="relative max-w-7xl mx-auto px-4">
-            <div className="text-center mb-16">
-              <span className="text-[#00a19a] font-bold tracking-[0.2em] uppercase text-xs mb-3 block">Los Más Buscados</span>
-              <h2 className="text-4xl sm:text-5xl md:text-6xl font-black mb-6 text-slate-800 tracking-tight">
+        <section className="py-12 md:py-16 bg-white rounded-t-[3rem] shadow-[0_-20px_40px_-15px_rgba(0,0,0,0.05)] relative z-20">
+          <div className="relative max-w-7xl mx-auto px-4 sm:px-6">
+            <div className="text-center mb-8">
+              <span className="text-[#00a19a] font-bold tracking-[0.2em] uppercase text-xs mb-2 block">Los Más Buscados</span>
+              <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-3 text-slate-800 tracking-tight">
                 Productos Destacados
               </h2>
-              <p className="text-lg md:text-xl text-slate-500 max-w-2xl mx-auto font-medium leading-relaxed">
+              <p className="text-sm sm:text-base text-slate-500 max-w-2xl mx-auto font-medium leading-relaxed">
                 Descubre nuestras creaciones en 3D más populares y valoradas, esculpidas con la más alta calidad.
               </p>
             </div>

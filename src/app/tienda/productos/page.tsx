@@ -6,7 +6,7 @@ import { Input } from "~/components/ui/input";
 import { 
   ShoppingCart, X, Filter, Sparkles, Package, Tag, 
   BadgeDollarSign, Heart, Truck, Star, Zap, Check, 
-  ChevronLeft, ChevronRight, Play 
+  ChevronLeft, ChevronRight, Play, Printer, Clock, AlertCircle
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -47,6 +47,8 @@ type Product = {
   producto_imagenes?: { image_url: string }[];
   details?: string;
   usuarios?: { nombre: string } | null;
+  precios_variantes?: Record<string, unknown> | string;
+  es_pod?: boolean;
 };
 
 import { useCarrito, type CarritoItem } from "~/components/providers/CarritoProvider";
@@ -648,7 +650,7 @@ function ProductCardModern({ producto, idx, router, addToCarrito, carrito }: {
               {data.nombre}
             </h3>
 
-            {/* Precio y Stock en Tiempo Real (Sincronizado con la creación de productos) */}
+            {/* Precio y Stock en Tiempo Real (Sincronizado con POD y Stock físico) */}
             <div className="mt-2 flex items-center justify-between">
               <div className="flex items-baseline gap-1">
                 <span className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
@@ -659,53 +661,106 @@ function ProductCardModern({ producto, idx, router, addToCarrito, carrito }: {
                 </span>
               </div>
 
-              {/* Stock disponible real sincronizado en vivo */}
+              {/* Stock disponible / Print on Demand */}
               <div>
-                {stockDisponible > 3 ? (
-                  <span className="text-[11px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md">
-                    Stock: {stockDisponible} unid.
-                  </span>
-                ) : stockDisponible > 0 ? (
-                  <span className="text-[11px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
-                    ¡Últimas {stockDisponible} unid.!
-                  </span>
-                ) : (
-                  <span className="text-[11px] font-bold text-rose-600 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-md">
-                    Sin stock
-                  </span>
-                )}
+                {(() => {
+                  let isPOD = Boolean(producto.es_pod);
+                  if (producto.precios_variantes) {
+                    try {
+                      const pv = typeof producto.precios_variantes === "string" 
+                        ? JSON.parse(producto.precios_variantes) as Record<string, unknown>
+                        : producto.precios_variantes;
+                      if (typeof pv?.es_pod === "boolean") isPOD = pv.es_pod;
+                    } catch {}
+                  }
+
+                  if (isPOD) {
+                    return (
+                      <span className="text-[11px] font-bold text-teal-700 bg-teal-50 border border-teal-200 px-2 py-0.5 rounded-md flex items-center gap-1">
+                        <Printer className="w-3 h-3 text-[#00a19a]" /> Bajo pedido (POD)
+                      </span>
+                    );
+                  }
+                  if (stockDisponible > 3) {
+                    return (
+                      <span className="text-[11px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md">
+                        Stock: {stockDisponible} unid.
+                      </span>
+                    );
+                  }
+                  if (stockDisponible > 0) {
+                    return (
+                      <span className="text-[11px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
+                        ¡Últimas {stockDisponible} unid.!
+                      </span>
+                    );
+                  }
+                  return (
+                    <span className="text-[11px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-md">
+                      No disponible
+                    </span>
+                  );
+                })()}
               </div>
             </div>
           </div>
 
           {/* Botón de Acción / Carrito Compacto */}
           <div className="mt-3 pt-2.5 border-t border-slate-100">
-            {cantidadEnCarrito > 0 ? (
-              <div className="w-full h-8.5 bg-teal-50 border border-teal-200 rounded-xl px-2.5 flex items-center justify-between text-xs font-bold text-[#00a19a]">
-                <span className="flex items-center gap-1 text-[11px]">
-                  <Check className="w-3.5 h-3.5" /> En el carrito ({cantidadEnCarrito})
-                </span>
+            {(() => {
+              let isPOD = Boolean(producto.es_pod);
+              if (producto.precios_variantes) {
+                try {
+                  const pv = typeof producto.precios_variantes === "string" 
+                    ? JSON.parse(producto.precios_variantes) as Record<string, unknown>
+                    : producto.precios_variantes;
+                  if (typeof pv?.es_pod === "boolean") isPOD = pv.es_pod;
+                } catch {}
+              }
+
+              const estaAgotado = !isPOD && stockDisponible <= 0;
+
+              if (estaAgotado) {
+                return (
+                  <button
+                    type="button"
+                    disabled
+                    className="w-full h-8.5 rounded-xl bg-slate-100 border border-slate-200 text-slate-400 font-bold text-xs flex items-center justify-center gap-1.5 cursor-not-allowed select-none"
+                  >
+                    Producto no disponible
+                  </button>
+                );
+              }
+
+              if (cantidadEnCarrito > 0) {
+                return (
+                  <div className="w-full h-8.5 bg-teal-50 border border-teal-200 rounded-xl px-2.5 flex items-center justify-between text-xs font-bold text-[#00a19a]">
+                    <span className="flex items-center gap-1 text-[11px]">
+                      <Check className="w-3.5 h-3.5" /> En el carrito ({cantidadEnCarrito})
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleAddToCart}
+                      className="w-5 h-5 rounded bg-[#00a19a] text-white flex items-center justify-center font-bold text-[11px] hover:bg-[#007973] transition-colors"
+                      title="Agregar otra unidad"
+                    >
+                      +1
+                    </button>
+                  </div>
+                );
+              }
+
+              return (
                 <button
                   type="button"
-                  disabled={stockDisponible <= 0}
                   onClick={handleAddToCart}
-                  className="w-5 h-5 rounded bg-[#00a19a] text-white flex items-center justify-center font-bold text-[11px] hover:bg-[#007973] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                  title="Agregar otra unidad"
+                  className="w-full h-8.5 rounded-xl bg-slate-900 hover:bg-[#00a19a] text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm hover:shadow-teal-500/20 transition-all duration-300 active:scale-95"
                 >
-                  +1
+                  <ShoppingCart className="w-3.5 h-3.5" />
+                  {isPOD ? "Pedir (Print on Demand)" : "Agregar al carrito"}
                 </button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                disabled={stockDisponible <= 0}
-                onClick={handleAddToCart}
-                className="w-full h-8.5 rounded-xl bg-slate-900 hover:bg-[#00a19a] disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm hover:shadow-teal-500/20 transition-all duration-300 active:scale-95"
-              >
-                <ShoppingCart className="w-3.5 h-3.5" />
-                {stockDisponible <= 0 ? "Sin stock disponible" : "Agregar al carrito"}
-              </button>
-            )}
+              );
+            })()}
           </div>
         </div>
       </div>

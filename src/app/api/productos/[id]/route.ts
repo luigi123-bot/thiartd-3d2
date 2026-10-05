@@ -16,6 +16,7 @@ interface ProductoBody {
   video_url?: string;
   user_id?: string;
   imagenes?: string[];
+  precios_variantes?: Record<string, unknown>;
 }
 
 interface Producto extends ProductoBody {
@@ -43,7 +44,7 @@ export async function PUT(
       );
     }
 
-    const productToUpdate = {
+    const productToUpdate: Record<string, unknown> = {
       nombre: body.nombre,
       precio: body.precio,
       descripcion: body.descripcion,
@@ -56,6 +57,10 @@ export async function PUT(
       model_url: body.model_url,
       video_url: body.video_url,
     };
+
+    if (body.precios_variantes !== undefined) {
+      productToUpdate.precios_variantes = body.precios_variantes;
+    }
 
     console.log("[PUT API] Actualizando producto con:", JSON.stringify(productToUpdate, null, 2));
 

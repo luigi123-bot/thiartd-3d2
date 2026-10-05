@@ -33,7 +33,7 @@ export default function Footer() {
             </Link>
 
             <h2 className="text-white font-black text-xl leading-snug mb-3">
-              Imprimiendo tus Ideas con un<br/>
+              Diseño & Fabricación 3D con un<br/>
               <span className="text-[#00a19a]">impacto sostenible.</span>
             </h2>
             <p className="text-sm text-slate-400 leading-relaxed max-w-sm mb-6 font-medium">

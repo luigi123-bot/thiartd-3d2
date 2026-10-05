@@ -371,17 +371,17 @@ export function DetallePedidoModal({
                       {status.label}
                     </span>
                     {pedido.tipo_entrega === "recoleccion" ? (
-                      <span className="px-3 py-1 text-[9px] font-black rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 tracking-widest uppercase">
-                        📍 Recogida en Taller
+                      <span className="px-3 py-1 text-[9px] font-black rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 tracking-widest uppercase flex items-center gap-1">
+                        <MapPin className="w-3 h-3" /> Recogida en Taller
                       </span>
                     ) : (
-                      <span className="px-3 py-1 text-[9px] font-black rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 tracking-widest uppercase">
-                        🚚 Envío a Domicilio
+                      <span className="px-3 py-1 text-[9px] font-black rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 tracking-widest uppercase flex items-center gap-1">
+                        <Truck className="w-3 h-3" /> Envío a Domicilio
                       </span>
                     )}
                     {pedido.es_pod && (
-                      <span className="px-3 py-1 text-[9px] font-black rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20 tracking-widest uppercase">
-                        🔧 Print On Demand
+                      <span className="px-3 py-1 text-[9px] font-black rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20 tracking-widest uppercase flex items-center gap-1">
+                        <Printer className="w-3 h-3" /> Print On Demand
                       </span>
                     )}
                     <p className="text-slate-400 text-[11px] font-bold flex items-center gap-1.5">
@@ -443,9 +443,10 @@ export function DetallePedidoModal({
                           onClick={handleGenerarGuia}
                           disabled={generandoGuiaManual}
                           size="sm"
-                          className="bg-slate-900 hover:bg-[#00a19a] text-white font-black text-xs h-9 px-4 rounded-xl shadow-md transition-all"
+                          className="bg-slate-900 hover:bg-[#00a19a] text-white font-black text-xs h-9 px-4 rounded-xl shadow-md transition-all flex items-center gap-1.5"
                         >
-                          {generandoGuiaManual ? "Generando con Envía..." : "🚀 Generar Guía Ahora"}
+                          <Truck className="w-3.5 h-3.5" />
+                          <span>{generandoGuiaManual ? "Generando con Envía..." : "Generar Guía Oficial"}</span>
                         </Button>
                       )}
                     </div>
@@ -557,11 +558,11 @@ export function DetallePedidoModal({
                           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Link de Pago Wompi</label>
                           <input type="text" className="w-full h-10 bg-slate-50 border border-slate-200 rounded-xl px-3 text-xs font-bold mb-2 focus:border-[#00a19a] outline-none" value={pagoUrl} onChange={(e) => setPagoUrl(e.target.value)} />
                           <Button variant="outline" className="w-full h-9 rounded-xl text-[10px] font-black uppercase" onClick={handleGenerarLink} disabled={generandoLink}>
-                            {generandoLink ? "Generando..." : "✨ Generar Link Wompi"}
+                            {generandoLink ? "Generando..." : "Generar Link Wompi"}
                           </Button>
                         </div>
                         <Button className="w-full h-12 bg-[#00a19a] hover:bg-[#007973] text-white font-black rounded-xl shadow-md" onClick={handleEnviarCotizacion} disabled={enviandoCotizacion}>
-                          {enviandoCotizacion ? "Enviando..." : "🚀 Enviar al Cliente"}
+                          {enviandoCotizacion ? "Enviando..." : "Enviar al Cliente"}
                         </Button>
                       </div>
                     </div>
@@ -593,9 +594,10 @@ export function DetallePedidoModal({
                         <Button
                           onClick={() => onAprobarPago(pedido.id)}
                           disabled={procesandoPago === pedido.id}
-                          className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl shadow-md"
+                          className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl shadow-md flex items-center justify-center gap-1.5"
                         >
-                          {procesandoPago === pedido.id ? "Aprobando..." : "✓ Validar Pago Manual"}
+                          <Check className="w-4 h-4" />
+                          <span>{procesandoPago === pedido.id ? "Aprobando..." : "Validar Pago Manual"}</span>
                         </Button>
                       )}
                     </>
