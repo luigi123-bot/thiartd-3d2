@@ -171,23 +171,27 @@ async function procesarTransaccionActualizada(
   };
 
   const nuevoEstado = estadoMap[transaction.status] ?? "pendiente_pago";
+  console.log(`Estado del pago: ${transaction.status} -> ${nuevoEstado}`);
 
-  const estadoEmojis: Record<string, string> = {
-    pagado: "✅",
-    pago_rechazado: "❌",
-    pago_cancelado: "🚫",
-    error_pago: "⚠️",
-    pendiente_pago: "⏳",
-  };
+  // Consultar si el pedido es POD para aplicar Regla 1 (Stock vs Impresión)
+  const { data: pedidoOriginal } = await supabase
+    .from("pedidos")
+    .select("id, es_pod, tipo_entrega, fecha_estimada_lista")
+    .eq("id", pedidoId)
+    .single();
 
-  console.log(`\n${estadoEmojis[nuevoEstado] ?? "📌"} Estado del pago: ${transaction.status} → ${nuevoEstado}`);
+  const esPOD = Boolean(pedidoOriginal?.es_pod);
+  // Regla 1: Si tiene stock, no pasa por impresión -> directo a Etapa 3 ("Por recoger / Listo")
+  // Si es POD, pasa a Etapa 2 ("En fabricación POD")
+  const nuevaEtapa = nuevoEstado === "pagado" ? (esPOD ? 2 : 3) : 1;
 
   // Actualizar pedido en Supabase
-  console.log("\n💾 ACTUALIZANDO PEDIDO EN SUPABASE...");
+  console.log("Actualizando pedido en Supabase...");
   const { data: pedidoActualizado, error } = await supabase
     .from("pedidos")
     .update({
       estado: nuevoEstado,
+      etapa_kanban: nuevaEtapa,
       payment_id: transaction.id,
       payment_method: transaction.payment_method_type,
       payment_status: transaction.status,
@@ -198,40 +202,65 @@ async function procesarTransaccionActualizada(
     .single<PedidoData>();
 
   if (error) {
-    console.error("   ❌ Error actualizando pedido en Supabase:", error.message);
+    console.error("Error actualizando pedido en Supabase:", error.message);
     throw error;
   }
 
-  console.log("   ✅ Pedido actualizado correctamente:");
-  console.log("      ID      :", pedidoId);
-  console.log("      Estado  :", nuevoEstado);
-  console.log("      Pay ID  :", transaction.id);
-  console.log("      Método  :", transaction.payment_method_type);
+  console.log("Pedido actualizado correctamente:", {
+    id: pedidoId,
+    estado: nuevoEstado,
+    etapa_kanban: nuevaEtapa,
+    es_pod: esPOD,
+    payId: transaction.id,
+  });
 
-  // Solo enviar email si el pago fue APROBADO
+  // Solo enviar email y disparar logística si el pago fue APROBADO
   if (transaction.status === "APPROVED" && pedidoActualizado) {
     await enviarEmailConfirmacionCompleto(pedidoActualizado, transaction);
 
-    // NOTA: Creación automática de envíos desactivada por política operativa.
-    // Los envíos se gestionan de forma manual o programada por el administrador desde el panel de Envíos.
-    console.log(`ℹ️ [ENVIA] Creación automática de guía al pagar DESACTIVADA para pedido #${pedidoId}. El envío se generará de forma manual o programada.`);
+    // Regla 2: Cuando el pedido esté en print on demand (POD), programar con Envía el día y hora para recoger
+    if (esPOD && pedidoOriginal?.tipo_entrega !== "recoleccion") {
+      try {
+        const { programarRecogidaEnvia } = await import("../../../../../utils/envia");
+        const fechaLista = pedidoOriginal?.fecha_estimada_lista 
+          ? new Date(pedidoOriginal.fecha_estimada_lista)
+          : new Date(Date.now() + 4 * 24 * 60 * 60 * 1000);
+        const pickupDateStr = fechaLista.toISOString().split("T")[0];
+        
+        if (pickupDateStr) {
+          await programarRecogidaEnvia({
+            carrier: "coordinadora",
+            pickupDate: pickupDateStr,
+            pickupTimeFrom: "09:00",
+            pickupTimeTo: "17:00",
+            totalPackages: 1,
+            totalWeight: 1.5,
+            instructions: `Recolección POD Pedido #${pedidoId} en Taller Thiart 3D (Cali)`,
+            pedidosIds: [pedidoId]
+          });
+          console.log(`[POD ENVIA] Recolección programada automáticamente para el ${pickupDateStr} (09:00 - 17:00)`);
+        }
+      } catch (pickupErr) {
+        console.warn("[POD ENVIA] Error al programar recolección Envía:", pickupErr);
+      }
+    }
     
     // Limpiar el carrito en la base de datos ya que la compra fue exitosa
     if (pedidoActualizado.cliente_id) {
-      console.log(`\n🛒 LIMPIANDO CARRITO PARA USUARIO: ${pedidoActualizado.cliente_id}`);
+      console.log(`Limpiando carrito para usuario: ${pedidoActualizado.cliente_id}`);
       const { error: clearError } = await supabase
         .from("carrito")
         .delete()
         .eq("usuario_id", pedidoActualizado.cliente_id);
       
       if (clearError) {
-        console.warn("   ⚠️ No se pudo limpiar el carrito en BD:", clearError.message);
+        console.warn("No se pudo limpiar el carrito en BD:", clearError.message);
       } else {
-        console.log("   ✅ Carrito eliminado de la base de datos.");
+        console.log("Carrito eliminado de la base de datos.");
       }
     }
   } else {
-    console.log(`\n📭 Sin email - Estado "${transaction.status}" no requiere confirmación`);
+    console.log(`Sin email - Estado "${transaction.status}" no requiere confirmación`);
   }
 }
 

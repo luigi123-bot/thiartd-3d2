@@ -267,11 +267,20 @@ export async function PATCH(req: Request) {
     const pedidoId = body.pedido_id ?? body.pedidoId;
     const { payment_id, payment_method, estado, etapa_kanban } = body;
 
-    console.log("➡️ Recibida actualización de pedido:", { pedidoId, estado, etapa_kanban, payment_id });
+    console.log("Recibida actualización de pedido:", { pedidoId, estado, etapa_kanban, payment_id });
 
     if (!pedidoId) {
       return NextResponse.json({ error: "Falta el ID del pedido" }, { status: 400 });
     }
+
+    // Consultar datos actuales del pedido para aplicar automatizaciones de stock vs POD
+    const { data: pedidoOriginal } = await supabase
+      .from("pedidos")
+      .select("id, es_pod, tipo_entrega, fecha_estimada_lista, datos_contacto, total, direccion_envio, ciudad_envio, productos")
+      .eq("id", pedidoId)
+      .single();
+
+    const esPOD = Boolean(pedidoOriginal?.es_pod);
 
     const updateData: {
       updated_at: string;
@@ -286,7 +295,14 @@ export async function PATCH(req: Request) {
     if (payment_id) updateData.payment_id = payment_id;
     if (payment_method) updateData.payment_method = payment_method;
     if (estado) updateData.estado = estado;
-    if (typeof etapa_kanban === "number") updateData.etapa_kanban = etapa_kanban;
+
+    // ── REGLA 1: Si tiene stock, no pasa por impresión -> directo al funnel en Etapa 3 (Por recoger / Listo)
+    // Si es POD, pasa a Etapa 2 (En fabricación POD)
+    if (typeof etapa_kanban === "number") {
+      updateData.etapa_kanban = etapa_kanban;
+    } else if (estado === "pagado") {
+      updateData.etapa_kanban = esPOD ? 2 : 3;
+    }
 
     const result = await supabase
       .from("pedidos")
@@ -296,16 +312,17 @@ export async function PATCH(req: Request) {
       .single<PedidoResponse>();
 
     if (result.error) {
-      console.error("❌ Error actualizando pedido en Supabase:", result.error);
+      console.error("Error actualizando pedido en Supabase:", result.error);
       return NextResponse.json({ error: result.error.message }, { status: 500 });
     }
 
     const pedidoActualizado = result.data;
 
-    // 🔥 SI EL PEDIDO PASÓ A "pagado", DISPARAR CORREO DE FACTURA
+    // Disparar automatizaciones si el pedido pasó a PAGADO
     if (estado === "pagado" || (pedidoActualizado && pedidoActualizado.estado === "pagado")) {
-      console.log("🚀 El pedido está PAGADO. Iniciando automatización de correo...");
+      console.log(`Pedido #${pedidoId} pagado. Procesando automatizaciones...`);
       
+      // Enviar correo de factura al cliente
       try {
         const { enviarEmailConfirmacion } = await import("../webhooks/wompi/emailConfirmacion");
         
@@ -348,19 +365,43 @@ export async function PATCH(req: Request) {
             ciudadEnvio: pedidoActualizado.ciudad_envio,
             fechaPago: new Date().toISOString()
           });
-          console.log("✅ Factura enviada automáticamente.");
+          console.log("Factura enviada automáticamente al cliente.");
         }
       } catch (emailErr) {
-        console.error("❌ Error en envío automático de factura:", emailErr);
+        console.error("Error en envío automático de factura:", emailErr);
       }
 
-      // NOTA: Generación automática de envíos desactivada por política operativa.
-      // Las guías se generan de forma manual o programada desde el panel administrativo de Envíos.
+      // ── REGLA 2: Cuando el pedido esté en print on demand (POD), programar con Envía el día y hora para recoger
+      if (esPOD && pedidoOriginal?.tipo_entrega !== "recoleccion") {
+        try {
+          const { programarRecogidaEnvia } = await import("../../../../utils/envia");
+          const fechaLista = pedidoOriginal?.fecha_estimada_lista 
+            ? new Date(pedidoOriginal.fecha_estimada_lista)
+            : new Date(Date.now() + 4 * 24 * 60 * 60 * 1000);
+          const pickupDateStr = fechaLista.toISOString().split("T")[0];
+          
+          if (pickupDateStr) {
+            await programarRecogidaEnvia({
+              carrier: "coordinadora",
+              pickupDate: pickupDateStr,
+              pickupTimeFrom: "09:00",
+              pickupTimeTo: "17:00",
+              totalPackages: 1,
+              totalWeight: 1.5,
+              instructions: `Recolección POD Pedido #${pedidoId} en Taller Thiart 3D (Cali)`,
+              pedidosIds: [pedidoId]
+            });
+            console.log(`[POD ENVIA] Recolección programada automáticamente para el ${pickupDateStr} de 09:00 a 17:00`);
+          }
+        } catch (pickupErr) {
+          console.warn("[POD ENVIA] Error al programar recolección Envía:", pickupErr);
+        }
+      }
     }
 
     return NextResponse.json({ success: true, pedido: result.data });
   } catch (err) {
-    console.error("❌ Error inesperado en PATCH /api/pedidos:", err);
+    console.error("Error inesperado en PATCH /api/pedidos:", err);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
 }

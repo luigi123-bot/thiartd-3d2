@@ -68,11 +68,14 @@ export async function POST(req: Request) {
     const mRows = (mensajes ?? []) as MessageRow[];
 
     // 2. Calcular estadísticas principales
-    const totalIncome = pRows
-      .filter((p) => p.estado === 'pagado')
-      .reduce((acc, p) => acc + Number(p.total), 0);
+    const isConfirmedSale = (st: string) => 
+      ['pagado', 'en_produccion', 'listo_entrega', 'en_transito', 'entregado', 'completado'].includes((st ?? '').toLowerCase());
 
-    const paidCount = pRows.filter((p) => p.estado === 'pagado').length;
+    const totalIncome = pRows
+      .filter((p) => isConfirmedSale(p.estado))
+      .reduce((acc, p) => acc + (Number(p.total) || 0), 0);
+
+    const paidCount = pRows.filter((p) => isConfirmedSale(p.estado)).length;
     const pendingCount = pRows.filter((p) => p.estado === 'pendiente_pago').length;
     const quotationsCount = pRows.filter((p) => p.estado === 'pendiente_cotizacion').length;
     const cancelledCount = pRows.filter((p) => p.estado === 'pago_cancelado' || p.estado === 'cancelado').length;

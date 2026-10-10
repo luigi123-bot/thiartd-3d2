@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "~/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "~/components/ui/dialog";
 import { Input } from "~/components/ui/input";
 import { Textarea } from "~/components/ui/textarea";
 import { Button } from "~/components/ui/button";
@@ -37,6 +37,9 @@ export default function ContactModal({ open, onOpenChangeAction }: { open: boole
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Contáctanos</DialogTitle>
+          <DialogDescription className="sr-only">
+            Formulario de contacto y soporte
+          </DialogDescription>
         </DialogHeader>
         {success ? (
           <div className="text-green-600 text-center py-4">¡Mensaje enviado correctamente!</div>

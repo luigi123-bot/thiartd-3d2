@@ -4,6 +4,7 @@ import React, { useState, useMemo } from "react";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "~/components/ui/dialog";
@@ -14,13 +15,14 @@ import { ORIGEN_DEFECTO } from "../../utils/envia";
 
 interface GuiaItem {
   id: number;
-  numero_tracking?: string;
-  empresa_envio?: string;
-  tipo_entrega?: "envio" | "recoleccion";
+  numero_tracking?: string | null;
+  empresa_envio?: string | null;
   total: number;
   created_at: string;
-  ciudad_envio?: string;
-  datos_contacto?: string;
+  ciudad_envio?: string | null;
+  datos_contacto?: string | null;
+  estado?: string | null;
+  tipo_entrega?: string | null;
 }
 
 interface RecoleccionesModalProps {
@@ -45,12 +47,12 @@ export default function RecoleccionesModal({
   const hoyStr = new Date().toISOString().split("T")[0]!;
   const [fechaRecoleccion, setFechaRecoleccion] = useState<string>(hoyStr);
   const [horaInicial, setHoraInicial] = useState<string>("08:00");
-  const [horaFinal, setHoraFinal] = useState<string>("19:00");
+  const [horaFinal, setHoraFinal] = useState<string>("17:00");
 
-  // Filtro de guías
+  // Filtro de guías / pedidos
   const [guiasSeleccionadas, setGuiasSeleccionadas] = useState<string>("todos");
-  const [customCantidad, setCustomCantidad] = useState<number>(1);
-  const [customPeso, setCustomPeso] = useState<string>("1.5");
+  const [customCantidad, setCustomCantidad] = useState<number | null>(null);
+  const [customPeso, setCustomPeso] = useState<string | null>(null);
 
   const [loading, setLoading] = useState<boolean>(false);
   const [confirmacionExitosa, setConfirmacionExitosa] = useState<{
@@ -60,41 +62,84 @@ export default function RecoleccionesModal({
     horario: string;
   } | null>(null);
 
-  // Todas las guías/pedidos de tipo envío disponibles para recolección
-  const guiasConTracking = useMemo(() => {
-    return pedidosList.filter((p) => p.numero_tracking && p.tipo_entrega !== "recoleccion");
-  }, [pedidosList]);
+  // Pedidos que están hechos y aún no se han entregado
+  const pedidosPendientes = useMemo(() => {
+    return pedidosList.filter((p) => {
+      // Excluir si el cliente recoge en tienda física
+      if (p.tipo_entrega === "recoleccion") return false;
 
-  // Pedidos de envío sin tracking (sin guía generada aún, pero listos para recoger)
-  const pedidosSinTracking = useMemo(() => {
-    return pedidosList.filter(
-      (p) => !p.numero_tracking && p.tipo_entrega === "envio"
-    );
-  }, [pedidosList]);
+      // Excluir pedidos ya entregados, completados o cancelados
+      const est = (p.estado || "").toLowerCase().trim();
+      if (
+        est === "entregado" ||
+        est === "completado" ||
+        est === "cancelado" ||
+        est === "pago_cancelado" ||
+        est === "pago_rechazado"
+      ) {
+        return false;
+      }
 
-  // Total de paquetes a recoger (guías + pedidos sin guía)
-  const todosLosEnvios = useMemo(() => {
-    return [...guiasConTracking, ...pedidosSinTracking];
-  }, [guiasConTracking, pedidosSinTracking]);
+      // Si el pedido ya tiene una transportadora asignada diferente a la seleccionada
+      if (carrierSeleccionado && carrierSeleccionado !== "todas" && p.empresa_envio) {
+        const emp = p.empresa_envio.toLowerCase().trim();
+        const carr = carrierSeleccionado.toLowerCase().trim();
+        if (emp !== carr) {
+          return false;
+        }
+      }
 
-  const cantidadCalculada = todosLosEnvios.length > 0 ? todosLosEnvios.length : customCantidad;
-  const pesoCalculado = todosLosEnvios.length > 0 ? (todosLosEnvios.length * 0.8).toFixed(1) : customPeso;
+      return true;
+    });
+  }, [pedidosList, carrierSeleccionado]);
+
+  // Cantidad y peso calculados según la selección
+  const cantidadCalculada = useMemo(() => {
+    if (customCantidad !== null && customCantidad > 0) return customCantidad;
+    if (guiasSeleccionadas === "todos") {
+      return pedidosPendientes.length > 0 ? pedidosPendientes.length : 1;
+    }
+    return 1;
+  }, [customCantidad, guiasSeleccionadas, pedidosPendientes.length]);
+
+  const pesoCalculado = useMemo(() => {
+    if (customPeso !== null && customPeso !== "") return customPeso;
+    if (guiasSeleccionadas === "todos") {
+      return pedidosPendientes.length > 0
+        ? (pedidosPendientes.length * 0.8).toFixed(1)
+        : "1.5";
+    }
+    return "0.8";
+  }, [customPeso, guiasSeleccionadas, pedidosPendientes.length]);
 
   const handleConfirmarRecoleccion = async () => {
     setLoading(true);
     try {
+      const selectedCarrier = carrierSeleccionado === "todas" ? "coordinadora" : carrierSeleccionado;
+
+      // Determinar los IDs de los pedidos a recolectar
+      let pedidosIdsParaEnviar: number[] = [];
+      if (guiasSeleccionadas === "todos") {
+        pedidosIdsParaEnviar = pedidosPendientes.map((p) => p.id);
+      } else {
+        const idNum = Number(guiasSeleccionadas);
+        if (!isNaN(idNum)) {
+          pedidosIdsParaEnviar = [idNum];
+        }
+      }
+
       const res = await fetch("/api/envios/recogidas", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          carrier: carrierSeleccionado,
+          carrier: selectedCarrier,
           pickupDate: fechaRecoleccion,
           pickupTimeFrom: horaInicial,
           pickupTimeTo: horaFinal,
           totalPackages: cantidadCalculada,
           totalWeight: parseFloat(pesoCalculado) || 1.5,
           instructions: `Recolección en ${ORIGEN_DEFECTO.street}, ${ORIGEN_DEFECTO.number}, ${ORIGEN_DEFECTO.city}. Taller Thiart 3D.`,
-          pedidosIds: todosLosEnvios.map((p) => p.id),
+          pedidosIds: pedidosIdsParaEnviar,
         }),
       });
 
@@ -108,7 +153,7 @@ export default function RecoleccionesModal({
       if (data.success && data.recogida) {
         setConfirmacionExitosa({
           codigo: data.recogida.confirmation_number,
-          carrier: carrierSeleccionado,
+          carrier: selectedCarrier,
           fecha: fechaRecoleccion,
           horario: `${horaInicial} - ${horaFinal}`,
         });
@@ -131,11 +176,16 @@ export default function RecoleccionesModal({
 
   return (
     <Dialog open={open} onOpenChange={handleCerrar}>
-      <DialogContent className="max-w-md w-full bg-[#f4f7fb] p-0 rounded-2xl border border-slate-200/80 shadow-2xl overflow-hidden font-sans">
+      <DialogContent showCloseButton={false} className="max-w-md w-full bg-[#f4f7fb] p-0 rounded-2xl border border-slate-200/80 shadow-2xl overflow-hidden font-sans">
         
         {/* Header Principal */}
         <div className="bg-white px-5 py-4 flex items-center justify-between border-b border-slate-100">
-          <h2 className="text-lg font-bold text-slate-800 tracking-tight">Recolecciones</h2>
+          <div>
+            <DialogTitle className="text-lg font-bold text-slate-800 tracking-tight">Recolecciones</DialogTitle>
+            <DialogDescription className="sr-only">
+              Programación y gestión de recolecciones con transportadoras
+            </DialogDescription>
+          </div>
           <button
             onClick={handleCerrar}
             className="w-7 h-7 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-colors"
@@ -270,7 +320,12 @@ export default function RecoleccionesModal({
 
                   <select
                     value={carrierSeleccionado}
-                    onChange={(e) => setCarrierSeleccionado(e.target.value)}
+                    onChange={(e) => {
+                      setCarrierSeleccionado(e.target.value);
+                      setGuiasSeleccionadas("todos");
+                      setCustomCantidad(null);
+                      setCustomPeso(null);
+                    }}
                     className="text-[10px] font-bold text-slate-600 bg-slate-50 border border-slate-200 rounded-md px-1.5 py-0.5 outline-none"
                   >
                     <option value="coordinadora">coordinadora</option>
@@ -278,37 +333,33 @@ export default function RecoleccionesModal({
                     <option value="envia">envía</option>
                     <option value="tcc">tcc</option>
                     <option value="interrapidisimo">interrapidísimo</option>
+                    <option value="todas">todas</option>
                   </select>
                 </div>
 
-                {/* Seleccionar Guías */}
+                {/* Seleccionar Guías / Pedidos */}
                 <div className="space-y-1">
                   <label className="text-[11px] font-medium text-slate-600">Seleccionar guías</label>
                   <div className="relative">
                     <select
                       value={guiasSeleccionadas}
-                      onChange={(e) => setGuiasSeleccionadas(e.target.value)}
+                      onChange={(e) => {
+                        setGuiasSeleccionadas(e.target.value);
+                        setCustomCantidad(null);
+                        setCustomPeso(null);
+                      }}
                       className="w-full h-9 px-3 pr-8 bg-white border border-slate-300 rounded-lg text-xs font-medium text-slate-800 appearance-none outline-none focus:border-[#1877f2]"
                     >
-                      <option value="todos">Todos ({todosLosEnvios.length > 0 ? `${todosLosEnvios.length} paquetes` : "0 paquetes"})</option>
-                      {guiasConTracking.map((g) => (
+                      <option value="todos">
+                        Todos ({pedidosPendientes.length > 0 ? `${pedidosPendientes.length} pedidos listos / pendientes` : "Sin pedidos pendientes"})
+                      </option>
+                      {pedidosPendientes.map((g) => (
                         <option key={g.id} value={g.id}>
-                          Guía #{g.numero_tracking} (Pedido #{g.id} - {g.ciudad_envio})
+                          {g.numero_tracking
+                            ? `Guía #${g.numero_tracking} (Pedido #${g.id} - ${g.ciudad_envio || "Cali"}${g.empresa_envio ? ` - ${g.empresa_envio}` : ""})`
+                            : `Pedido #${g.id} - ${g.ciudad_envio || "Cali"} (Sin guía aún)`}
                         </option>
                       ))}
-                      {pedidosSinTracking.map((g) => {
-                        let nombre = "Cliente";
-                        try {
-                          const raw = typeof g.datos_contacto === "string" ? JSON.parse(g.datos_contacto) : g.datos_contacto;
-                          const dc = raw as { nombre?: string } | null | undefined;
-                          if (dc?.nombre) nombre = dc.nombre;
-                        } catch { /* ignore */ }
-                        return (
-                          <option key={g.id} value={g.id}>
-                            Pedido #{g.id} sin guía — {nombre} ({g.ciudad_envio ?? "Sin ciudad"})
-                          </option>
-                        );
-                      })}
                     </select>
                     <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none flex items-center gap-1 text-slate-500">
                       <span className="text-[10px] font-bold">×</span>
@@ -384,7 +435,10 @@ export default function RecoleccionesModal({
                       type="number"
                       min={1}
                       value={cantidadCalculada}
-                      onChange={(e) => setCustomCantidad(parseInt(e.target.value) || 1)}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value, 10);
+                        setCustomCantidad(isNaN(val) ? 1 : val);
+                      }}
                       className="w-full h-9 px-3 border border-emerald-500 bg-white rounded-lg text-xs font-bold text-slate-900 outline-none focus:ring-1 focus:ring-emerald-500"
                     />
                   </div>

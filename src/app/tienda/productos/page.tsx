@@ -3,11 +3,16 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardTitle, CardDescription } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
-import { ShoppingCart, X, Filter, Sparkles, Package, Tag, BadgeDollarSign, Heart } from "lucide-react";
+import { 
+  ShoppingCart, X, Filter, Sparkles, Package, Tag, 
+  BadgeDollarSign, Heart, Truck, Star, Zap, Check, 
+  ChevronLeft, ChevronRight, Play, Printer, Clock, AlertCircle
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { type AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
+import { supabase } from "~/lib/supabaseClient";
 
 const categorias = [
   "Figuras",
@@ -42,6 +47,8 @@ type Product = {
   producto_imagenes?: { image_url: string }[];
   details?: string;
   usuarios?: { nombre: string } | null;
+  precios_variantes?: Record<string, unknown> | string;
+  es_pod?: boolean;
 };
 
 import { useCarrito, type CarritoItem } from "~/components/providers/CarritoProvider";
@@ -90,6 +97,38 @@ function ProductosTiendaPageInner() {
 
   useEffect(() => {
     void fetchProductos();
+
+    // Sincronización en tiempo real del stock y catálogo con Supabase Realtime
+    const channel = supabase
+      .channel("tienda-productos-realtime-stock")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "productos" },
+        (payload) => {
+          if (payload.eventType === "UPDATE") {
+            const updated = payload.new as Partial<Product> & { id: string | number };
+            setProductos((prev) =>
+              prev.map((p) =>
+                String(p.id) === String(updated.id)
+                  ? {
+                      ...p,
+                      ...updated,
+                      stock: Number(updated.stock ?? p.stock),
+                    }
+                  : p
+              )
+            );
+          } else {
+            // Cuando se crea (INSERT) o elimina (DELETE) un producto: recargar catálogo
+            void fetchProductos();
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
   }, []);
 
   const handleCheckbox = (type: "categoria" | "tamano" | "precio", value: string) => {
@@ -277,7 +316,7 @@ function ProductosTiendaPageInner() {
                   <Button variant="outline" onClick={limpiarFiltros} className="rounded-2xl h-12 px-6 font-black uppercase text-[10px] tracking-widest border-2">Ver todo</Button>
                 </motion.div>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-4 md:gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-5 md:gap-6">
                   {productosFiltrados.map((producto, idx) => (
                     <ProductCardModern 
                       key={producto.id} 
@@ -345,24 +384,27 @@ function FilterCheckbox({ label, checked, onChange }: { label: string; checked: 
   );
 }
 
-// Sub-componente para la Card de Producto con Carrusel Interactivo de Imágenes y Videos
+// Sub-componente para la Card de Producto estilo Mercado Libre con Carrusel Automático de Imágenes y Videos
 function ProductCardModern({ producto, idx, router, addToCarrito, carrito }: {
-  producto: Product & { video_url?: string };
+  producto: Product & { video_url?: string; model_url?: string; imagen_url?: string };
   idx: number;
   router: AppRouterInstance;
   addToCarrito: (item: CarritoItem) => Promise<boolean>;
   carrito: CarritoItem[];
 }) {
   const [activeMediaIndex, setActiveMediaIndex] = useState(0);
+  const [isHovered, setIsHovered] = useState(false);
+  const [isFavorite, setIsFavorite] = useState(false);
 
   const data = {
     id: producto.id,
     nombre: producto.nombre ?? producto.name ?? "Producto Sin Nombre",
     precio: producto.precio ?? producto.price ?? 0,
     categoria: producto.categoria ?? producto.category ?? "General",
-    creador: producto.usuarios?.nombre ?? "Thiart",
+    creador: producto.usuarios?.nombre ?? "Thiart 3D",
     desc: producto.descripcion ?? producto.description ?? "Sin descripción",
     destacado: producto.destacado ?? producto.featured ?? false,
+    hasModel: Boolean(producto.model_url),
   };
 
   // Recopilar todos los medios disponibles (imágenes principales, secundarias y videos)
@@ -370,9 +412,12 @@ function ProductCardModern({ producto, idx, router, addToCarrito, carrito }: {
   if (producto.image_url) {
     mediaList.push({ type: "image", url: producto.image_url });
   }
+  if (producto.imagen_url && producto.imagen_url !== producto.image_url) {
+    mediaList.push({ type: "image", url: producto.imagen_url });
+  }
   if (producto.producto_imagenes && producto.producto_imagenes.length > 0) {
     producto.producto_imagenes.forEach((img) => {
-      if (img.image_url && img.image_url !== producto.image_url) {
+      if (img.image_url && !mediaList.some((m) => m.url === img.image_url)) {
         mediaList.push({ type: "image", url: img.image_url });
       }
     });
@@ -380,8 +425,40 @@ function ProductCardModern({ producto, idx, router, addToCarrito, carrito }: {
   if (producto.video_url) {
     mediaList.push({ type: "video", url: producto.video_url });
   }
+  if (mediaList.length === 0) {
+    mediaList.push({ type: "image", url: "/logo.png" });
+  }
 
-  const activeMedia = mediaList[activeMediaIndex] ?? mediaList[0];
+  // Paso Automático de Medios estilo Mercado Libre (Auto-slideshow al hacer hover)
+  useEffect(() => {
+    if (!isHovered || mediaList.length <= 1) return;
+    const interval = setInterval(() => {
+      setActiveMediaIndex((prev) => (prev + 1) % mediaList.length);
+    }, 2200);
+
+    return () => clearInterval(interval);
+  }, [isHovered, mediaList.length]);
+
+  const handleMouseEnter = () => {
+    setIsHovered(true);
+  };
+
+  const handleMouseLeave = () => {
+    setIsHovered(false);
+    setActiveMediaIndex(0); // Regresa a la portada principal al salir, igual que en Mercado Libre
+  };
+
+  // Deslizamiento horizontal interactivo por cursor (Scrubbing como Mercado Libre web)
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (mediaList.length <= 1) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const pct = Math.max(0, Math.min(0.999, x / rect.width));
+    const newIdx = Math.floor(pct * mediaList.length);
+    if (newIdx !== activeMediaIndex) {
+      setActiveMediaIndex(newIdx);
+    }
+  };
 
   const handlePrevMedia = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -393,42 +470,69 @@ function ProductCardModern({ producto, idx, router, addToCarrito, carrito }: {
     setActiveMediaIndex((prev) => (prev + 1) % mediaList.length);
   };
 
+  const activeMedia = mediaList[activeMediaIndex] ?? mediaList[0];
+
   const enCarrito = carrito.find((p) => String(p.id) === String(producto.id));
   const cantidadEnCarrito = enCarrito?.cantidad ?? 0;
-  const stockDisponible = (producto.stock ?? 1) - cantidadEnCarrito;
+  const stockActual = typeof producto.stock === "number" ? producto.stock : Number(producto.stock ?? 0);
+  const stockDisponible = Math.max(0, stockActual - cantidadEnCarrito);
+
+  const handleAddToCart = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (stockDisponible <= 0) {
+      toast.error(`"${data.nombre}" no tiene stock disponible`);
+      return;
+    }
+    const ok = await addToCarrito({
+      id: String(producto.id),
+      nombre: data.nombre,
+      precio: data.precio,
+      imagen: producto.image_url ?? "/logo.png",
+      cantidad: 1, 
+      stock: producto.stock,
+      categoria: data.categoria,
+      destacado: data.destacado,
+    });
+    if (ok) toast.success(`"${data.nombre}" agregado al carrito ✨`);
+  };
 
   return (
     <motion.div
       layout
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 15 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: idx * 0.01, duration: 0.4 }}
-      whileHover={{ y: -6 }}
+      transition={{ delay: idx * 0.02, duration: 0.3 }}
       className="h-full"
     >
-      <Card 
+      <div 
         onClick={() => router.push(`/tienda/productos/${producto.id}`)}
-        className="group cursor-pointer relative h-full bg-white border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-[#00a19a]/10 rounded-[2rem] overflow-hidden transition-all duration-500 flex flex-col"
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        className="group cursor-pointer relative h-full bg-white border border-slate-200/90 hover:border-slate-300 rounded-2xl shadow-sm hover:shadow-xl hover:shadow-slate-200/60 transition-all duration-300 flex flex-col overflow-hidden"
       >
-        {/* Visual Showcase con Carrusel Interactivo de Medios */}
-        <div className="h-44 sm:h-48 md:h-52 relative bg-slate-50/70 overflow-hidden flex items-center justify-center p-2 group/media">
+        {/* Contenedor Visual de Medios (Imágenes y Videos con Auto-play) */}
+        <div 
+          onMouseMove={handleMouseMove}
+          className="h-40 sm:h-44 md:h-48 w-full relative bg-white flex items-center justify-center p-2.5 overflow-hidden border-b border-slate-100 group/media select-none"
+        >
+          {/* Contenido Visual (Imagen o Video) */}
           <AnimatePresence mode="wait">
             {activeMedia?.type === "image" ? (
               <motion.div
                 key={activeMedia.url}
-                initial={{ opacity: 0 }}
+                initial={{ opacity: 0.6 }}
                 animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                className="relative w-full h-full transform transition-transform duration-500 group-hover:scale-105"
+                exit={{ opacity: 0.6 }}
+                transition={{ duration: 0.18 }}
+                className="relative w-full h-full flex items-center justify-center"
               >
                 <Image
                   src={activeMedia.url}
                   alt={data.nombre}
                   fill
-                  className="object-contain drop-shadow-[0_10px_15px_rgba(0,0,0,0.08)]"
+                  className="object-contain p-1 transition-transform duration-300 group-hover:scale-105"
                   sizes="(max-width: 768px) 50vw, 25vw"
-                  priority={idx < 6}
+                  priority={idx < 4}
                 />
               </motion.div>
             ) : activeMedia?.type === "video" ? (
@@ -437,7 +541,7 @@ function ProductCardModern({ producto, idx, router, addToCarrito, carrito }: {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="relative w-full h-full bg-slate-950 rounded-xl overflow-hidden flex items-center justify-center"
+                className="relative w-full h-full rounded-xl overflow-hidden flex items-center justify-center bg-black/90"
               >
                 <video
                   src={activeMedia.url}
@@ -445,148 +549,221 @@ function ProductCardModern({ producto, idx, router, addToCarrito, carrito }: {
                   muted
                   loop
                   playsInline
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-contain"
                 />
-                <div className="absolute bottom-2 left-2 bg-black/80 backdrop-blur-md px-2 py-0.5 rounded-md text-[8px] font-black text-teal-300 uppercase tracking-widest flex items-center gap-1">
-                  <span>▶</span> Video
+                <div className="absolute top-2.5 left-2.5 bg-black/80 backdrop-blur-md px-2 py-0.5 rounded text-[8px] font-black text-teal-300 uppercase tracking-widest flex items-center gap-1 z-10 shadow-sm">
+                  <Play className="w-2.5 h-2.5 fill-current" /> Video 3D
                 </div>
               </motion.div>
             ) : (
-              <Package className="w-8 h-8 text-slate-200 stroke-[1]" />
+              <Package className="w-12 h-12 text-slate-200 stroke-[1]" />
             )}
           </AnimatePresence>
 
-          {/* Flechas de Navegación Rápida en la Card */}
+          {/* Insignia Superior Izquierda (Mercado Libre Style: "MÁS VENDIDO" / "3D") */}
+          <div className="absolute top-2.5 left-2.5 z-20 flex flex-col gap-1 items-start pointer-events-none">
+            {data.destacado && (
+              <span className="bg-[#ff7733] text-white text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-sm shadow-sm">
+                MÁS VENDIDO
+              </span>
+            )}
+            {data.hasModel && !data.destacado && (
+              <span className="bg-[#00a19a] text-white text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-sm shadow-sm">
+                MODELO 3D
+              </span>
+            )}
+          </div>
+
+          {/* Botón de Favoritos (Corazón Mercado Libre) */}
+          <button 
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              const next = !isFavorite;
+              setIsFavorite(next);
+              toast.success(next ? "Guardado en tus favoritos ❤️" : "Eliminado de tus favoritos");
+            }}
+            className="absolute top-2.5 right-2.5 z-20 w-8 h-8 rounded-full bg-white/95 hover:bg-white border border-slate-200/80 shadow-sm flex items-center justify-center transition-all hover:scale-110 active:scale-95"
+            title="Favorito"
+          >
+            <Heart className={`w-4 h-4 transition-colors ${isFavorite ? "fill-rose-500 text-rose-500" : "text-slate-400 hover:text-rose-500"}`} />
+          </button>
+
+          {/* Flechas de Navegación Manual (Aparecen al pasar el cursor) */}
           {mediaList.length > 1 && (
             <>
               <button
                 type="button"
                 onClick={handlePrevMedia}
-                className="absolute left-2 top-1/2 -translate-y-1/2 w-7 h-7 bg-white/90 hover:bg-white text-slate-800 rounded-full shadow-md flex items-center justify-center opacity-0 group-hover/media:opacity-100 transition-opacity z-20 hover:scale-110 active:scale-95"
+                className="absolute left-1.5 top-1/2 -translate-y-1/2 w-7 h-7 bg-white/95 hover:bg-white text-slate-800 rounded-full shadow-md flex items-center justify-center opacity-0 group-hover/media:opacity-100 transition-opacity z-20 hover:scale-110 active:scale-95 border border-slate-200"
                 title="Foto anterior"
               >
-                ‹
+                <ChevronLeft className="w-4 h-4" />
               </button>
               <button
                 type="button"
                 onClick={handleNextMedia}
-                className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 bg-white/90 hover:bg-white text-slate-800 rounded-full shadow-md flex items-center justify-center opacity-0 group-hover/media:opacity-100 transition-opacity z-20 hover:scale-110 active:scale-95"
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 w-7 h-7 bg-white/95 hover:bg-white text-slate-800 rounded-full shadow-md flex items-center justify-center opacity-0 group-hover/media:opacity-100 transition-opacity z-20 hover:scale-110 active:scale-95 border border-slate-200"
                 title="Siguiente foto"
               >
-                ›
+                <ChevronRight className="w-4 h-4" />
               </button>
 
-              {/* Indicadores de Puntos / Segmentos estilo Mercado Libre */}
-              <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1 z-20 pointer-events-auto">
-                {mediaList.map((m, mIdx) => (
-                  <button
+              {/* Indicadores de Segmento estilo Mercado Libre (Barras delgadas horizontales) */}
+              <div className="absolute bottom-2 left-3 right-3 flex items-center gap-1 z-20 pointer-events-auto">
+                {mediaList.map((_, mIdx) => (
+                  <div
                     key={mIdx}
-                    type="button"
                     onClick={(e) => {
                       e.stopPropagation();
                       setActiveMediaIndex(mIdx);
                     }}
-                    className={`h-1.5 rounded-full transition-all duration-300 ${
+                    className={`h-1 flex-1 rounded-full cursor-pointer transition-all duration-300 ${
                       activeMediaIndex === mIdx
-                        ? "w-4 bg-[#00a19a] shadow-sm"
-                        : "w-1.5 bg-slate-300/80 hover:bg-slate-400"
+                        ? "bg-[#00a19a] shadow-sm"
+                        : "bg-slate-200/90 hover:bg-slate-300"
                     }`}
                   />
                 ))}
               </div>
             </>
           )}
-
-          {/* Discreet Badge */}
-          {data.destacado && (
-            <div className="absolute top-2.5 left-2.5 z-10">
-               <span className="bg-black/80 backdrop-blur-md text-white text-[7px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full shadow-lg">Premium</span>
-            </div>
-          )}
-          {producto.stock <= 0 && (
-            <div className="absolute top-2.5 left-2.5 z-10">
-               <span className="bg-red-500/90 backdrop-blur-md text-white text-[7px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full shadow-lg">Sin Stock</span>
-            </div>
-          )}
-
-          <div className="absolute top-2.5 right-2.5 z-20">
-             <button 
-               type="button"
-               onClick={(e) => {
-                 e.stopPropagation();
-                 toast.success("Guardado en favoritos");
-               }}
-               className="w-7 h-7 rounded-xl bg-white/90 backdrop-blur-md flex items-center justify-center text-slate-400 hover:text-rose-500 transition-all border border-slate-100 shadow-sm"
-             >
-                <Heart className="w-3.5 h-3.5 fill-current" />
-             </button>
-          </div>
         </div>
 
-        {/* Info Hub */}
-        <CardContent className="px-4 py-3 flex flex-col flex-1 bg-white">
-          <div className="mb-1">
-            <span className="text-[#00a19a] font-black text-[8px] uppercase tracking-[0.2em] mb-0.5 block opacity-80">
-              {data.categoria}
-            </span>
-            <CardTitle className="text-xs font-black text-slate-900 leading-tight line-clamp-1 uppercase tracking-tighter">
-              {data.nombre}
-            </CardTitle>
-          </div>
-          
-          <CardDescription className="text-slate-400 text-[10px] mb-3 line-clamp-1 h-3.5 leading-none font-medium italic overflow-hidden">
-            {data.desc}
-          </CardDescription>
-
-          <div className="mt-auto flex items-center justify-between pt-2.5 border-t border-slate-100">
-            <div className="flex flex-col">
-              <span className="text-[7px] font-black text-slate-400 uppercase tracking-widest leading-none mb-0.5">Precio</span>
-              <div className="flex items-baseline gap-0.5">
-                <span className="text-base font-black text-slate-950 tracking-tight group-hover:text-[#00a19a] transition-colors">
-                  <span className="text-[10px] font-bold mr-0.5">$</span>
-                  {data.precio.toLocaleString("es-CO")}
-                </span>
-                <span className="text-[7px] font-bold text-slate-400 uppercase">Cop</span>
+        {/* Información del Producto (Diseño Compacto y Balanceado) */}
+        <div className="p-3 sm:p-3.5 flex flex-col flex-1 justify-between bg-white">
+          <div>
+            {/* Categoría, Creador y Calificación en una sola línea limpia */}
+            <div className="flex items-center justify-between gap-1 mb-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#00a19a] truncate">
+                {data.categoria} <span className="text-slate-300 font-normal">•</span> <span className="text-slate-400">{data.creador}</span>
+              </span>
+              <div className="flex items-center gap-0.5 text-amber-400 shrink-0">
+                <Star className="w-3 h-3 fill-current" />
+                <span className="font-bold text-slate-700 text-[11px]">4.9</span>
+                <span className="text-slate-400 text-[10px]">(18)</span>
               </div>
             </div>
 
-            <div className="flex items-center gap-1.5">
-              {cantidadEnCarrito > 0 && (
-                <div className="w-6 h-6 flex items-center justify-center bg-teal-50 text-[#00a19a] rounded-lg font-black text-[9px] border border-teal-100">
-                  {cantidadEnCarrito}
-                </div>
-              )}
-              
-              {stockDisponible <= 0 ? (
-                <div className="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-100 border border-slate-200 text-slate-300 cursor-not-allowed" title="Sin stock disponible">
-                  <ShoppingCart className="w-4 h-4" />
-                </div>
-              ) : (
-                <motion.button
-                  whileTap={{ scale: 0.9 }}
-                  onClick={async (e) => {
-                    e.stopPropagation();
-                    const ok = await addToCarrito({
-                      id: String(producto.id),
-                      nombre: data.nombre,
-                      precio: data.precio,
-                      imagen: producto.image_url ?? "/logo.png",
-                      cantidad: 1, 
-                      stock: producto.stock,
-                      categoria: data.categoria,
-                      destacado: data.destacado,
-                    });
-                    if (ok) toast.success("Añadido al carrito");
-                  }}
-                  className="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-900 text-white hover:bg-[#00a19a] shadow-md hover:shadow-teal-500/30 transition-all duration-300"
-                >
-                  <ShoppingCart className="w-4 h-4" />
-                </motion.button>
-              )}
+            {/* Título conciso y elegante */}
+            <h3 className="text-sm sm:text-[15px] font-semibold text-slate-800 line-clamp-1 leading-snug group-hover:text-[#00a19a] transition-colors">
+              {data.nombre}
+            </h3>
+
+            {/* Precio y Stock en Tiempo Real (Sincronizado con POD y Stock físico) */}
+            <div className="mt-2 flex items-center justify-between">
+              <div className="flex items-baseline gap-1">
+                <span className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                  ${data.precio.toLocaleString("es-CO")}
+                </span>
+                <span className="text-[10px] font-bold text-slate-400 uppercase">
+                  COP
+                </span>
+              </div>
+
+              {/* Stock disponible / Print on Demand */}
+              <div>
+                {(() => {
+                  let isPOD = Boolean(producto.es_pod);
+                  if (producto.precios_variantes) {
+                    try {
+                      const pv = typeof producto.precios_variantes === "string" 
+                        ? JSON.parse(producto.precios_variantes) as Record<string, unknown>
+                        : producto.precios_variantes;
+                      if (typeof pv?.es_pod === "boolean") isPOD = pv.es_pod;
+                    } catch {}
+                  }
+
+                  if (isPOD) {
+                    return (
+                      <span className="text-[11px] font-bold text-teal-700 bg-teal-50 border border-teal-200 px-2 py-0.5 rounded-md flex items-center gap-1">
+                        <Printer className="w-3 h-3 text-[#00a19a]" /> Bajo pedido (POD)
+                      </span>
+                    );
+                  }
+                  if (stockDisponible > 3) {
+                    return (
+                      <span className="text-[11px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md">
+                        Stock: {stockDisponible} unid.
+                      </span>
+                    );
+                  }
+                  if (stockDisponible > 0) {
+                    return (
+                      <span className="text-[11px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
+                        ¡Últimas {stockDisponible} unid.!
+                      </span>
+                    );
+                  }
+                  return (
+                    <span className="text-[11px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-md">
+                      No disponible
+                    </span>
+                  );
+                })()}
+              </div>
             </div>
           </div>
-        </CardContent>
-      </Card>
+
+          {/* Botón de Acción / Carrito Compacto */}
+          <div className="mt-3 pt-2.5 border-t border-slate-100">
+            {(() => {
+              let isPOD = Boolean(producto.es_pod);
+              if (producto.precios_variantes) {
+                try {
+                  const pv = typeof producto.precios_variantes === "string" 
+                    ? JSON.parse(producto.precios_variantes) as Record<string, unknown>
+                    : producto.precios_variantes;
+                  if (typeof pv?.es_pod === "boolean") isPOD = pv.es_pod;
+                } catch {}
+              }
+
+              const estaAgotado = !isPOD && stockDisponible <= 0;
+
+              if (estaAgotado) {
+                return (
+                  <button
+                    type="button"
+                    disabled
+                    className="w-full h-8.5 rounded-xl bg-slate-100 border border-slate-200 text-slate-400 font-bold text-xs flex items-center justify-center gap-1.5 cursor-not-allowed select-none"
+                  >
+                    Producto no disponible
+                  </button>
+                );
+              }
+
+              if (cantidadEnCarrito > 0) {
+                return (
+                  <div className="w-full h-8.5 bg-teal-50 border border-teal-200 rounded-xl px-2.5 flex items-center justify-between text-xs font-bold text-[#00a19a]">
+                    <span className="flex items-center gap-1 text-[11px]">
+                      <Check className="w-3.5 h-3.5" /> En el carrito ({cantidadEnCarrito})
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleAddToCart}
+                      className="w-5 h-5 rounded bg-[#00a19a] text-white flex items-center justify-center font-bold text-[11px] hover:bg-[#007973] transition-colors"
+                      title="Agregar otra unidad"
+                    >
+                      +1
+                    </button>
+                  </div>
+                );
+              }
+
+              return (
+                <button
+                  type="button"
+                  onClick={handleAddToCart}
+                  className="w-full h-8.5 rounded-xl bg-slate-900 hover:bg-[#00a19a] text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm hover:shadow-teal-500/20 transition-all duration-300 active:scale-95"
+                >
+                  <ShoppingCart className="w-3.5 h-3.5" />
+                  {isPOD ? "Pedir (Print on Demand)" : "Agregar al carrito"}
+                </button>
+              );
+            })()}
+          </div>
+        </div>
+      </div>
     </motion.div>
   );
 }

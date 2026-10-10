@@ -55,7 +55,7 @@ export default function ClientChatWidgetWrapper() {
     return () => listener.subscription.unsubscribe();
   }, []);
 
-  if (!loaded && !guestId) return null;
+  if (!loaded || !guestId) return null;
 
   const emailFinal = clienteEmail || `invitado-${guestId.slice(0, 8)}@thiart3d.com`;
 

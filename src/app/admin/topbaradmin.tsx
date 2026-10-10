@@ -11,7 +11,9 @@ import {
   FiMenu,
   FiX,
   FiLogOut,
-  FiShoppingBag
+  FiShoppingBag,
+  FiChevronLeft,
+  FiChevronRight
 } from "react-icons/fi";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { usePathname, useRouter } from "next/navigation";
@@ -64,9 +66,9 @@ interface MensajeDb {
 }
 
 export default function AdminSidebar() {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isPinned, setIsPinned] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
-  const isSidebarExpanded = !isCollapsed || isHovered;
+  const isSidebarExpanded = isPinned || isHovered;
   const [menuOpen, setMenuOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
@@ -85,23 +87,28 @@ export default function AdminSidebar() {
   const notifRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
 
-  // Cargar estado de colapso desde localStorage al montar
+  // Cargar estado de fijado desde localStorage al montar
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("admin_sidebar_collapsed");
-      if (stored !== null) {
-        setIsCollapsed(stored === "true");
+      const stored = localStorage.getItem("admin_sidebar_pinned");
+      if (stored === "true") {
+        setIsPinned(true);
       }
     }
   }, []);
 
-
-  const handleToggleCollapse = () => {
-    const next = !isCollapsed;
-    setIsCollapsed(next);
-    localStorage.setItem("admin_sidebar_collapsed", String(next));
+  const handleTogglePin = () => {
+    const next = !isPinned;
+    setIsPinned(next);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("admin_sidebar_pinned", String(next));
+      window.dispatchEvent(
+        new CustomEvent("admin-sidebar-pinned-toggle", {
+          detail: { isPinned: next },
+        })
+      );
+    }
   };
-  void handleToggleCollapse; // reservado para el botón de colapso manual si se reactiva
 
   const fetchNotifications = useCallback(async () => {
     setLoadingNotif(true);
@@ -259,25 +266,23 @@ export default function AdminSidebar() {
           className="lg:hidden fixed inset-0 bg-black/40 z-40 backdrop-blur-sm"
           onClick={() => setMenuOpen(false)}
         />
-      )}
-
-      {/* 2. Sidebar Collapsible (Desktop) & Drawer (Mobile) */}
+      )}      {/* 2. Sidebar Collapsible (Desktop) & Drawer (Mobile) */}
       <aside
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         className={clsx(
-          "self-stretch bg-[#007973] border-r border-[#005f5a] text-white flex flex-col justify-between transition-all duration-300 z-50 shrink-0",
-          // Layout en desktop: sticky para que permanezca visible al hacer scroll pero se estire con el contenido
+          "self-stretch bg-[#007973] border-r border-[#005f5a] text-white flex flex-col justify-between transition-all duration-300 ease-in-out z-50 shrink-0 select-none",
+          // Layout en desktop: fixed para permanecer siempre visible con scroll
           "hidden lg:flex lg:fixed lg:left-0 lg:top-0 lg:h-screen",
-          isSidebarExpanded ? "lg:w-64" : "lg:w-20",
+          isSidebarExpanded ? "lg:w-64 shadow-2xl shadow-teal-950/40" : "lg:w-20 shadow-lg shadow-black/10",
           // Layout en móvil como drawer
-          menuOpen ? "fixed left-0 top-0 h-screen w-64 flex" : "fixed -left-64 lg:left-auto lg:top-auto"
+          menuOpen ? "fixed left-0 top-0 h-screen w-64 flex z-50 shadow-2xl" : "fixed -left-64 lg:left-auto lg:top-auto"
         )}
       >
         {/* Top Header / Logo */}
         <div className={clsx(
-          "flex items-center h-16 shrink-0 transition-all duration-300",
-          isSidebarExpanded ? "justify-between px-4 border-b border-[#005f5a]" : "justify-center"
+          "flex items-center h-16 shrink-0 transition-all duration-300 border-b border-[#005f5a]/60",
+          isSidebarExpanded || menuOpen ? "justify-between px-4" : "justify-center px-0"
         )}>
           <div className="flex items-center gap-3 overflow-hidden">
             <div className="relative p-1 bg-white/10 rounded-xl border border-white/20 shadow-md transition-transform duration-300 hover:scale-105 shrink-0">
@@ -289,18 +294,35 @@ export default function AdminSidebar() {
                 className="h-9 w-9 rounded-lg object-cover"
               />
             </div>
-            {isSidebarExpanded && (
-              <span className="font-black text-lg tracking-tight uppercase transition-all duration-300 bg-clip-text text-transparent bg-gradient-to-r from-white via-teal-100 to-teal-300 drop-shadow-sm select-none">
-                Thiart3D <span className="text-[#00ffd5] ml-0.5 font-black text-[9px] bg-white/10 px-1.5 py-0.5 rounded border border-white/10 tracking-widest align-middle">Admin</span>
-              </span>
-            )}
+            <span className={clsx(
+              "font-black text-lg tracking-tight uppercase whitespace-nowrap bg-clip-text text-transparent bg-gradient-to-r from-white via-teal-100 to-teal-300 drop-shadow-sm select-none transition-all duration-300 overflow-hidden",
+              isSidebarExpanded || menuOpen
+                ? "opacity-100 max-w-[150px] translate-x-0"
+                : "opacity-0 max-w-0 -translate-x-4 pointer-events-none"
+            )}>
+              Thiart3D <span className="text-[#00ffd5] ml-0.5 font-black text-[9px] bg-white/10 px-1.5 py-0.5 rounded border border-white/10 tracking-widest align-middle">Admin</span>
+            </span>
           </div>
+
+          {/* Botón para fijar/desanclar la barra lateral en desktop */}
+          <button
+            onClick={handleTogglePin}
+            className={clsx(
+              "hidden lg:flex p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/15 transition-all duration-300 shrink-0",
+              isSidebarExpanded
+                ? "opacity-100 scale-100 pointer-events-auto"
+                : "opacity-0 scale-75 pointer-events-none w-0 h-0 p-0 overflow-hidden"
+            )}
+            title={isPinned ? "Desanclar barra (auto-colapsar con hover)" : "Fijar barra lateral abierta"}
+          >
+            {isPinned ? <FiChevronLeft className="w-4 h-4" /> : <FiChevronRight className="w-4 h-4" />}
+          </button>
         </div>
 
         {/* Menu Navigation */}
         <nav className={clsx(
-          "flex-1 overflow-y-auto custom-scrollbar",
-          isSidebarExpanded || menuOpen ? "py-4 px-3 space-y-1" : "py-2 px-2 space-y-0.5 flex flex-col items-center"
+          "flex-1 overflow-y-auto custom-scrollbar transition-all duration-300",
+          isSidebarExpanded || menuOpen ? "py-4 px-3 space-y-1" : "py-4 px-2 space-y-1.5 flex flex-col items-center"
         )}>
           {MENU.map(({ href, label, icon: Icon }) => {
             const isActive = pathname === href;
@@ -312,17 +334,20 @@ export default function AdminSidebar() {
                 href={href}
                 onClick={() => setMenuOpen(false)}
                 className={clsx(
-                  "flex items-center font-bold transition-all text-sm group relative",
+                  "flex items-center font-bold transition-all duration-200 text-sm group relative h-11",
                   isSidebarExpanded || menuOpen
-                    ? "gap-3 p-3 w-full rounded-xl"
-                    : "justify-center w-10 h-10 rounded-xl",
+                    ? "px-3.5 w-full rounded-xl"
+                    : "justify-center w-11 mx-auto rounded-xl",
                   isActive
-                    ? "bg-white text-[#007973] shadow-md"
-                    : "text-white/70 hover:bg-white/10 hover:text-white"
+                    ? "bg-white text-[#007973] shadow-md shadow-black/10 scale-[1.02]"
+                    : "text-white/80 hover:bg-white/15 hover:text-white hover:translate-x-1"
                 )}
               >
-                <div className="relative flex items-center justify-center">
-                  <Icon className={clsx("w-[18px] h-[18px] shrink-0", isActive ? "text-[#007973]" : "text-white")} />
+                <div className="relative flex items-center justify-center shrink-0">
+                  <Icon className={clsx(
+                    "w-[18px] h-[18px] shrink-0 transition-transform duration-200 group-hover:scale-110",
+                    isActive ? "text-[#007973]" : "text-white"
+                  )} />
                   {/* Badge en icono cuando está colapsado (estilo WhatsApp) */}
                   {showBadge && !isSidebarExpanded && !menuOpen && (
                     <span className="absolute -top-2 -right-2 min-w-[16px] h-[16px] px-1 bg-[#25D366] text-white text-[9px] font-black rounded-full flex items-center justify-center border border-[#007973] shadow-sm animate-pulse">
@@ -331,13 +356,23 @@ export default function AdminSidebar() {
                   )}
                 </div>
 
-                {(isSidebarExpanded || menuOpen) && (
-                  <span className="transition-opacity duration-200">{label}</span>
-                )}
+                <span className={clsx(
+                  "whitespace-nowrap transition-all duration-300 overflow-hidden",
+                  isSidebarExpanded || menuOpen
+                    ? "opacity-100 max-w-[150px] translate-x-0 ml-3"
+                    : "opacity-0 max-w-0 -translate-x-2 pointer-events-none ml-0"
+                )}>
+                  {label}
+                </span>
 
                 {/* Badge en texto cuando está expandido (estilo WhatsApp) */}
-                {showBadge && (isSidebarExpanded || menuOpen) && (
-                  <span className="ml-auto bg-[#25D366] text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-sm">
+                {showBadge && (
+                  <span className={clsx(
+                    "ml-auto bg-[#25D366] text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-sm transition-all duration-300 overflow-hidden",
+                    isSidebarExpanded || menuOpen
+                      ? "opacity-100 max-w-[40px] scale-100"
+                      : "opacity-0 max-w-0 scale-50 pointer-events-none"
+                  )}>
                     {unreadMessagesCount > 99 ? "+99" : unreadMessagesCount}
                   </span>
                 )}
@@ -353,23 +388,27 @@ export default function AdminSidebar() {
           })}
 
           {/* Separador y botón Ir a la Tienda */}
-          <div className="pt-2 mt-1 border-t border-white/10">
+          <div className="pt-2 mt-1 border-t border-white/10 w-full">
             <Link
               href="/"
               onClick={() => setMenuOpen(false)}
               className={clsx(
-                "flex items-center font-bold transition-all text-sm group relative",
+                "flex items-center font-bold transition-all duration-200 text-sm group relative h-11",
                 isSidebarExpanded || menuOpen
-                  ? "gap-3 p-3 w-full rounded-xl"
-                  : "justify-center w-10 h-10 rounded-xl",
-                "text-white/70 hover:bg-white/10 hover:text-white"
+                  ? "px-3.5 w-full rounded-xl"
+                  : "justify-center w-11 mx-auto rounded-xl",
+                "text-white/80 hover:bg-white/15 hover:text-white hover:translate-x-1"
               )}
             >
-              <FiShoppingBag className="w-[18px] h-[18px] shrink-0 text-white" />
-              {(isSidebarExpanded || menuOpen) && (
-                <span className="transition-opacity duration-200">Ir a la Tienda</span>
-              )}
-              {/* Tooltip cuando está colapsado */}
+              <FiShoppingBag className="w-[18px] h-[18px] shrink-0 text-white transition-transform duration-200 group-hover:scale-110" />
+              <span className={clsx(
+                "whitespace-nowrap transition-all duration-300 overflow-hidden",
+                isSidebarExpanded || menuOpen
+                  ? "opacity-100 max-w-[150px] translate-x-0 ml-3"
+                  : "opacity-0 max-w-0 -translate-x-2 pointer-events-none ml-0"
+              )}>
+                Ir a la Tienda
+              </span>
               {!isSidebarExpanded && !menuOpen && (
                 <span className="absolute left-14 scale-0 transition-all rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-black uppercase tracking-wider text-white group-hover:scale-100 shadow-md whitespace-nowrap z-50 pointer-events-none">
                   Ir a la Tienda
@@ -381,28 +420,35 @@ export default function AdminSidebar() {
 
         {/* Botón de Notificaciones en Sidebar */}
         <div className={clsx(
-          "border-t border-[#005f5a] relative",
+          "border-t border-[#005f5a] relative transition-all duration-300",
           isSidebarExpanded || menuOpen ? "px-3 py-2" : "px-2 py-2 flex justify-center"
         )}>
           <button
             onClick={handleOpenNotif}
             className={clsx(
-              "flex items-center text-white/70 hover:bg-white/10 hover:text-white transition-all text-sm font-bold rounded-xl",
+              "flex items-center text-white/80 hover:bg-white/15 hover:text-white transition-all duration-200 text-sm font-bold rounded-xl h-11 group",
               isSidebarExpanded || menuOpen
-                ? "w-full gap-3 p-3"
-                : "w-10 h-10 justify-center"
+                ? "w-full px-3.5"
+                : "w-11 justify-center"
             )}
             title="Notificaciones"
           >
-            <div className="relative">
-              <FiBell className="w-5 h-5 text-white" />
+            <div className="relative shrink-0 flex items-center justify-center">
+              <FiBell className="w-5 h-5 text-white transition-transform duration-200 group-hover:scale-110" />
               {unread > 0 && (
                 <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-600 text-white text-[9px] font-black rounded-full flex items-center justify-center animate-pulse">
                   {unread > 9 ? "+9" : unread}
                 </span>
               )}
             </div>
-            {(isSidebarExpanded || menuOpen) && <span>Notificaciones</span>}
+            <span className={clsx(
+              "whitespace-nowrap transition-all duration-300 overflow-hidden",
+              isSidebarExpanded || menuOpen
+                ? "opacity-100 max-w-[150px] translate-x-0 ml-3"
+                : "opacity-0 max-w-0 -translate-x-2 pointer-events-none ml-0"
+            )}>
+              Notificaciones
+            </span>
           </button>
 
           {/* Notif Dropdown (arriba del botón en sidebar) */}
@@ -457,32 +503,43 @@ export default function AdminSidebar() {
           {!usuario ? (
             <Button 
               variant="outline" 
-              className={clsx("w-full border-white/20 text-white hover:bg-white/10 hover:text-white rounded-xl mx-auto", !isSidebarExpanded && "p-0 h-10 w-10 flex items-center justify-center")}
+              className={clsx(
+                "w-full border-white/20 text-white hover:bg-white/10 hover:text-white rounded-xl mx-auto transition-all duration-300",
+                !isSidebarExpanded && !menuOpen && "p-0 h-10 w-10 flex items-center justify-center"
+              )}
               onClick={() => setAuthModalOpen(true)}
             >
-              {!isSidebarExpanded ? <UserCircle className="w-5 h-5" /> : "Iniciar Sesión"}
+              {!isSidebarExpanded && !menuOpen ? <UserCircle className="w-5 h-5" /> : "Iniciar Sesión"}
             </Button>
           ) : (
-            <div className={clsx("flex flex-col", isSidebarExpanded || menuOpen ? "gap-2" : "gap-4 items-center")}>
-              <div className={clsx("flex items-center", isSidebarExpanded || menuOpen ? "gap-3" : "justify-center")}>
-                <div className="w-10 h-10 rounded-full overflow-hidden border border-white/20 bg-white flex items-center justify-center shrink-0">
+            <div className={clsx("flex flex-col transition-all duration-300 w-full", isSidebarExpanded || menuOpen ? "gap-2" : "gap-2 items-center")}>
+              <div className={clsx("flex items-center transition-all duration-300", isSidebarExpanded || menuOpen ? "gap-3" : "justify-center")}>
+                <div className="w-10 h-10 rounded-full overflow-hidden border border-white/20 bg-white flex items-center justify-center shrink-0 shadow-sm transition-transform hover:scale-105">
                   {usuario.avatar_url ? (
                     <Image src={usuario.avatar_url} alt="Perfil" width={40} height={40} className="object-cover w-full h-full" />
                   ) : (
                     <UserCircle className="w-8 h-8 text-[#00a19a]" />
                   )}
                 </div>
-                {(isSidebarExpanded || menuOpen) && (
-                  <div className="flex flex-col min-w-0">
-                    <span className="font-bold text-sm text-white truncate">{usuario.nombre}</span>
-                    <span className="text-[10px] text-white/60 truncate leading-none mt-0.5">{usuario.email}</span>
-                  </div>
-                )}
+                <div className={clsx(
+                  "flex flex-col min-w-0 overflow-hidden whitespace-nowrap transition-all duration-300",
+                  isSidebarExpanded || menuOpen
+                    ? "opacity-100 max-w-[150px] translate-x-0"
+                    : "opacity-0 max-w-0 -translate-x-2 pointer-events-none"
+                )}>
+                  <span className="font-bold text-sm text-white truncate">{usuario.nombre}</span>
+                  <span className="text-[10px] text-white/60 truncate leading-none mt-0.5">{usuario.email}</span>
+                </div>
               </div>
               
               {/* Etiqueta de administración al lado/debajo del usuario */}
-              {(isSidebarExpanded || menuOpen) && (
-                <div className="flex items-center justify-between gap-2 mt-1 bg-white/10 rounded-xl px-3 py-1.5 border border-white/10">
+              <div className={clsx(
+                "overflow-hidden transition-all duration-300 w-full",
+                isSidebarExpanded || menuOpen
+                  ? "max-h-16 opacity-100 mt-1"
+                  : "max-h-0 opacity-0 pointer-events-none"
+              )}>
+                <div className="flex items-center justify-between gap-2 bg-white/10 rounded-xl px-3 py-1.5 border border-white/10">
                   <span className="bg-[#00a19a] text-white text-[9px] font-black px-2 py-0.5 rounded-full tracking-wider uppercase shadow-sm">
                     Administración
                   </span>
@@ -494,9 +551,15 @@ export default function AdminSidebar() {
                     <FiLogOut className="w-4 h-4" />
                   </button>
                 </div>
-              )}
+              </div>
 
-              {!isSidebarExpanded && (
+              {/* Botón de logout icono cuando está colapsado */}
+              <div className={clsx(
+                "overflow-hidden transition-all duration-300",
+                !isSidebarExpanded && !menuOpen
+                  ? "max-h-10 opacity-100"
+                  : "max-h-0 opacity-0 pointer-events-none"
+              )}>
                 <button 
                   onClick={handleLogout}
                   className="p-2 hover:bg-white/10 text-white/80 hover:text-white rounded-xl transition-colors"
@@ -504,14 +567,14 @@ export default function AdminSidebar() {
                 >
                   <FiLogOut className="w-4 h-4" />
                 </button>
-              )}
+              </div>
             </div>
           )}
         </div>
 
         <SupabaseAuth 
           open={authModalOpen} 
-          onOpenChange={setAuthModalOpen}
+          onOpenChange={setAuthModalOpen} 
           onAuth={() => setAuthModalOpen(false)} 
         />
       </aside>

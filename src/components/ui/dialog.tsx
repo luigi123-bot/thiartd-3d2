@@ -65,6 +65,8 @@ function DialogContent({
         )}
         {...props}
       >
+        <DialogPrimitive.Title className="sr-only">Ventana de diálogo</DialogPrimitive.Title>
+        <DialogPrimitive.Description className="sr-only">Contenido interactivo</DialogPrimitive.Description>
         {children}
         {showCloseButton && (
           <DialogPrimitive.Close

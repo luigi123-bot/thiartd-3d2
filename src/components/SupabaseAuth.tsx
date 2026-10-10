@@ -5,7 +5,7 @@ import { Input } from "~/components/ui/input";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader } from "~/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
-import { Dialog, DialogContent, DialogTitle } from "~/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "~/components/ui/dialog";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Eye, EyeOff, Mail, Lock } from "lucide-react";
 import { FaGoogle } from "react-icons/fa";
@@ -495,6 +495,9 @@ export default function SupabaseAuth({ onAuth, open = false, onOpenChange, defau
                tab === "verify-code" ? "Verificar código" :
                "Nueva contraseña"}
             </DialogTitle>
+            <DialogDescription className="sr-only">
+              Ventana de autenticación y acceso a la plataforma Thiart 3D
+            </DialogDescription>
             {(tab === "login" || tab === "register") && (
                 <p className="text-center text-xs text-gray-500 font-medium mt-1">
                   {tab === "login" ? "Bienvenido a Thiart 3D" : "Crea tu cuenta gratis"}

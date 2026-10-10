@@ -1,4 +1,5 @@
 "use client";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import Image from "next/image";
 import { Button } from "~/components/ui/button";
@@ -15,10 +16,20 @@ import { FiSettings, FiBell, FiStar, FiPackage } from "react-icons/fi";
 import { useRouter, usePathname } from "next/navigation";
 import { supabase } from "~/lib/supabaseClient";
 import { useCarrito } from "~/components/providers/CarritoProvider";
-import SupabaseAuth from "~/components/SupabaseAuth";
-import BecomeCreatorModal from "~/components/BecomeCreatorModal";
-import CartPreviewDropdown from "~/components/CartPreviewDropdown";
-import CartDrawerModal from "~/components/CartDrawerModal";
+
+// Modales pesados (framer-motion, Radix Dialog/Tabs, sonner) — se descargan solo
+// cuando el usuario los abre por primera vez, fuera del bundle inicial.
+const SupabaseAuth = dynamic(() => import("~/components/SupabaseAuth"), { ssr: false });
+const BecomeCreatorModal = dynamic(() => import("~/components/BecomeCreatorModal"), { ssr: false });
+const CartPreviewDropdown = dynamic(() => import("~/components/CartPreviewDropdown"), { ssr: false });
+const CartDrawerModal = dynamic(() => import("~/components/CartDrawerModal"), { ssr: false });
+
+/** Devuelve true desde la primera vez que `value` es true (mantiene montado para animaciones de cierre). */
+function useMountOnFirstOpen(value: boolean) {
+  const [mounted, setMounted] = useState(value);
+  if (value && !mounted) setMounted(true);
+  return mounted;
+}
 
 interface UserNotification {
     id: string | number;
@@ -54,6 +65,11 @@ export default function TopbarTienda({ becomeCreatorOpen, setBecomeCreatorOpen }
   const isBecomeCreatorModalOpen = typeof becomeCreatorOpen === "boolean" ? becomeCreatorOpen : localBecomeCreatorModalOpen;
   const handleSetBecomeCreatorModalOpen = setBecomeCreatorOpen ?? setLocalBecomeCreatorModalOpen;
   const pathname = usePathname();
+
+  const authMounted = useMountOnFirstOpen(authModalOpen);
+  const becomeCreatorMounted = useMountOnFirstOpen(isBecomeCreatorModalOpen);
+  const cartPreviewMounted = useMountOnFirstOpen(cartPreviewOpen);
+  const cartModalMounted = useMountOnFirstOpen(cartModalOpen);
 
   const { carrito } = useCarrito();
   const cartCount = carrito.reduce((acc, item) => acc + (item.cantidad ?? 0), 0);
@@ -274,14 +290,16 @@ export default function TopbarTienda({ becomeCreatorOpen, setBecomeCreatorOpen }
                   )}
                 </Button>
 
-                <CartPreviewDropdown
-                  isOpen={cartPreviewOpen}
-                  onClose={() => setCartPreviewOpen(false)}
-                  onOpenFullModal={() => {
-                    setCartPreviewOpen(false);
-                    setCartModalOpen(true);
-                  }}
-                />
+                {cartPreviewMounted && (
+                  <CartPreviewDropdown
+                    isOpen={cartPreviewOpen}
+                    onClose={() => setCartPreviewOpen(false)}
+                    onOpenFullModal={() => {
+                      setCartPreviewOpen(false);
+                      setCartModalOpen(true);
+                    }}
+                  />
+                )}
               </div>
 
               <div className="relative" ref={notifRef}>
@@ -442,27 +460,33 @@ export default function TopbarTienda({ becomeCreatorOpen, setBecomeCreatorOpen }
         </div>
       </nav>
 
-      <SupabaseAuth 
-        open={authModalOpen} 
-        onOpenChange={setAuthModalOpen} 
-        onAuth={() => {
-          setAuthModalOpen(false);
-          // Immediately refresh topbar state after successful login,
-          // as a fallback in case the onAuthStateChange event is missed.
-          void syncUser();
-        }} 
-        defaultTab={authDefaultTab}
-      />
+      {authMounted && (
+        <SupabaseAuth 
+          open={authModalOpen} 
+          onOpenChange={setAuthModalOpen} 
+          onAuth={() => {
+            setAuthModalOpen(false);
+            // Immediately refresh topbar state after successful login,
+            // as a fallback in case the onAuthStateChange event is missed.
+            void syncUser();
+          }} 
+          defaultTab={authDefaultTab}
+        />
+      )}
 
-      <BecomeCreatorModal 
-        open={isBecomeCreatorModalOpen} 
-        onOpenChange={handleSetBecomeCreatorModalOpen} 
-      />
+      {becomeCreatorMounted && (
+        <BecomeCreatorModal 
+          open={isBecomeCreatorModalOpen} 
+          onOpenChange={handleSetBecomeCreatorModalOpen} 
+        />
+      )}
 
-      <CartDrawerModal
-        open={cartModalOpen}
-        onOpenChange={setCartModalOpen}
-      />
+      {cartModalMounted && (
+        <CartDrawerModal
+          open={cartModalOpen}
+          onOpenChange={setCartModalOpen}
+        />
+      )}
     </>
   );
 }

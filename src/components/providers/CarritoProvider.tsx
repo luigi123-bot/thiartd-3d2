@@ -1,6 +1,5 @@
 "use client";
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { supabase } from "~/lib/supabaseClient";
 
 export type CarritoItem = {
   id: string;
@@ -34,17 +33,29 @@ export function CarritoProvider({ children }: { children: React.ReactNode }) {
 
   const [userId, setUserId] = useState<string | null>(null);
 
-  // Obtener usuario de Supabase al montar
+  // Obtener usuario de Supabase al montar.
+  // El SDK se importa de forma diferida para sacarlo del bundle inicial de todas las páginas.
   useEffect(() => {
-    void supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) setUserId(user.id);
+    let unsubscribe: (() => void) | undefined;
+    let cancelled = false;
+
+    void import("~/lib/supabaseClient").then(({ supabase }) => {
+      if (cancelled) return;
+
+      void supabase.auth.getUser().then(({ data: { user } }) => {
+        if (!cancelled && user) setUserId(user.id);
+      });
+
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        setUserId(session?.user?.id ?? null);
+      });
+      unsubscribe = () => subscription.unsubscribe();
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUserId(session?.user?.id ?? null);
-    });
-
-    return () => subscription.unsubscribe();
+    return () => {
+      cancelled = true;
+      unsubscribe?.();
+    };
   }, []);
 
   // 1. Cargar desde localStorage al iniciar

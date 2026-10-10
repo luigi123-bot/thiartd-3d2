@@ -1,18 +1,19 @@
 "use client";
-import React, { useState, useEffect, useRef } from "react";
+
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, ChevronRight, Eye, Sparkles } from "lucide-react";
-import clsx from "clsx";
+import { ChevronLeft, ChevronRight, Eye, Sparkles, Play, Star } from "lucide-react";
 import { supabase } from "~/lib/supabaseClient";
 
 interface Producto {
-  id: number;
+  id: string;
   nombre: string;
   descripcion: string;
   categoria: string;
   precio: number;
+  stock?: number;
   destacado?: boolean;
   image_url?: string;
   video_url?: string;
@@ -24,205 +25,241 @@ interface ProductosCarruselProps {
   soloDestacados?: boolean;
 }
 
-const mockProductos: Producto[] = [
-  {
-    id: 1,
-    nombre: "Figura Dragón Místico",
-    descripcion: "Figura 3D de piezas ensambladas con acabado metálico.",
-    categoria: "Figuras",
-    precio: 85000,
-    destacado: true,
-    image_url: "/logo.png",
-  },
-  {
-    id: 2,
-    nombre: "Robot Articulado X-1",
-    descripcion: "Mini robot con 12 puntos de articulación.",
-    categoria: "Juguetes",
-    precio: 45000,
-    destacado: false,
-    image_url: "/logo.png",
-  },
-  {
-    id: 3,
-    nombre: "Jarrón Geométrico V2",
-    descripcion: "Decoración moderna con patrón de Voronoi.",
-    categoria: "Decoración",
-    precio: 65000,
-    destacado: false,
-    image_url: "/logo.png",
-  },
-  {
-    id: 4,
-    nombre: "Lámpara Lunar LED",
-    descripcion: "Textura realista de la luna con base de madera.",
-    categoria: "Personalizados",
-    precio: 120000,
-    destacado: true,
-    image_url: "/logo.png",
-  },
-];
-
 export default function ProductosCarrusel({ soloDestacados = false }: ProductosCarruselProps) {
   const router = useRouter();
   const [productos, setProductos] = useState<Producto[]>([]);
   const [loading, setLoading] = useState(true);
-  const [current, setCurrent] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isPaused, setIsPaused] = useState(false);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(true);
 
-  useEffect(() => {
-    const fetchProductos = async () => {
-      setLoading(true);
-      try {
-        const { data } = await supabase
-          .from("productos")
-          .select("id, nombre, descripcion, categoria, precio, destacado, image_url, video_url, usuarios:user_id(nombre), producto_imagenes(*)");
+  // Consulta directa de productos a Supabase
+  const fetchProductos = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("productos")
+        .select(`
+          id,
+          nombre,
+          descripcion,
+          categoria,
+          precio,
+          stock,
+          destacado,
+          image_url,
+          video_url,
+          usuarios:user_id(nombre),
+          producto_imagenes(*)
+        `)
+        .order("created_at", { ascending: false });
 
-        interface RawProducto {
-          id: number;
-          nombre: string;
-          descripcion: string;
-          categoria: string;
-          precio: number;
-          destacado: boolean | null;
-          image_url: string | null;
-          video_url?: string | null;
-          producto_imagenes?: { image_url: string }[];
-          usuarios: { nombre: string } | { nombre: string }[] | null;
-        }
-
-        const rawData = (data as unknown as RawProducto[]) ?? [];
-        let productosFiltrados = rawData.map((p) => ({
-          id: p.id,
-          nombre: p.nombre,
-          descripcion: p.descripcion,
-          categoria: p.categoria,
-          precio: p.precio,
-          destacado: p.destacado ?? false,
-          image_url: p.image_url ?? undefined,
-          video_url: p.video_url ?? undefined,
-          producto_imagenes: p.producto_imagenes ?? [],
-          usuarios: Array.isArray(p.usuarios) ? p.usuarios[0] : p.usuarios
-        })) as Producto[];
-
-        if (soloDestacados) {
-          productosFiltrados = productosFiltrados.filter((p: Producto) => p.destacado);
-        }
-        
-        if (!productosFiltrados.length) {
-          productosFiltrados = soloDestacados ? mockProductos.filter(p => p.destacado) : mockProductos;
-        }
-
-        setProductos(productosFiltrados);
-      } catch {
-        setProductos(soloDestacados ? mockProductos.filter(p => p.destacado) : mockProductos);
+      if (error) {
+        console.warn("[ProductosCarrusel] Error en consulta directa, usando fallback:", error.message);
+        throw error;
       }
+
+      const rawList = Array.isArray(data) ? data : [];
+      const listaMapeada: Producto[] = rawList.map((p) => {
+        let autor: { nombre: string } | null = null;
+        if (p.usuarios && typeof p.usuarios === "object") {
+          autor = Array.isArray(p.usuarios)
+            ? (p.usuarios[0] as { nombre: string })
+            : (p.usuarios as { nombre: string });
+        }
+
+        return {
+          id: String(p.id),
+          nombre: String(p.nombre ?? "Sin nombre"),
+          descripcion: String(p.descripcion ?? ""),
+          categoria: String(p.categoria ?? "General"),
+          precio: Number(p.precio ?? 0),
+          stock: Number(p.stock ?? 0),
+          destacado: Boolean(p.destacado),
+          image_url: p.image_url ? String(p.image_url) : undefined,
+          video_url: p.video_url ? String(p.video_url) : undefined,
+          producto_imagenes: Array.isArray(p.producto_imagenes)
+            ? (p.producto_imagenes as { image_url: string }[])
+            : [],
+          usuarios: autor,
+        };
+      });
+
+      if (soloDestacados) {
+        const destacados = listaMapeada.filter((p) => p.destacado);
+        setProductos(destacados.length > 0 ? destacados : listaMapeada);
+      } else {
+        setProductos(listaMapeada);
+      }
+    } catch (err) {
+      console.warn("[ProductosCarrusel] Fallback a /api/productos:", err);
+      try {
+        const res = await fetch("/api/productos", { cache: "no-store" });
+        const json = (await res.json()) as { productos?: Record<string, unknown>[] };
+        if (Array.isArray(json?.productos)) {
+          const list: Producto[] = json.productos.map((p) => ({
+            id: String(p.id),
+            nombre: String(p.nombre ?? "Sin nombre"),
+            descripcion: String(p.descripcion ?? ""),
+            categoria: String(p.categoria ?? "General"),
+            precio: Number(p.precio ?? 0),
+            stock: Number(p.stock ?? 0),
+            destacado: Boolean(p.destacado),
+            image_url: p.image_url ? String(p.image_url) : undefined,
+            video_url: p.video_url ? String(p.video_url) : undefined,
+            producto_imagenes: Array.isArray(p.producto_imagenes)
+              ? (p.producto_imagenes as { image_url: string }[])
+              : [],
+            usuarios: p.usuarios ? (p.usuarios as { nombre: string }) : null,
+          }));
+
+          if (soloDestacados) {
+            const dest = list.filter((p) => p.destacado);
+            setProductos(dest.length > 0 ? dest : list);
+          } else {
+            setProductos(list);
+          }
+        }
+      } catch {
+        setProductos([]);
+      }
+    } finally {
       setLoading(false);
-    };
-    void fetchProductos();
+    }
   }, [soloDestacados]);
 
-  const [cardsPerView, setCardsPerView] = useState(1);
-
-  // ResizeObserver — no fuerza reflow a diferencia de leer offsetWidth/innerWidth
+  // Carga inicial y suscripción Realtime a Supabase
   useEffect(() => {
-    const container = scrollRef.current;
-    if (!container) return;
+    void fetchProductos();
 
-    let debounceTimer: ReturnType<typeof setTimeout>;
-    const observer = new ResizeObserver((entries) => {
-      clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => {
-        const width = entries[0]?.contentRect.width ?? container.offsetWidth;
-        if (width < 640) setCardsPerView(1);
-        else if (width < 1024) setCardsPerView(2);
-        else if (width < 1280) setCardsPerView(3);
-        else setCardsPerView(4);
-      }, 150);
-    });
+    const channel = supabase
+      .channel("carrusel-productos-realtime-live")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "productos" },
+        () => {
+          void fetchProductos();
+        }
+      )
+      .subscribe();
 
-    observer.observe(container);
     return () => {
-      clearTimeout(debounceTimer);
-      observer.disconnect();
+      void supabase.removeChannel(channel);
     };
-  }, []);
+  }, [fetchProductos]);
 
-  useEffect(() => {
-    if (isPaused || productos.length <= cardsPerView) return;
-    const interval = setInterval(() => {
-      setCurrent((prev) => (prev + 1) % (productos.length - cardsPerView + 1));
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [isPaused, productos.length, cardsPerView]);
+  // Actualizar visibilidad de flechas al scrollear
+  const checkScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setCanScrollLeft(el.scrollLeft > 20);
+    setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 20);
+  }, []);
 
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    // Usar requestAnimationFrame para agrupar la lectura de offsetWidth
-    // con la escritura de scrollTo, evitando layout thrashing
-    const raf = requestAnimationFrame(() => {
-      const cardWidth = el.offsetWidth / cardsPerView;
-      el.scrollTo({ left: current * cardWidth, behavior: "smooth" });
-    });
-    return () => cancelAnimationFrame(raf);
-  }, [current, cardsPerView]);
+    el.addEventListener("scroll", checkScroll, { passive: true });
+    checkScroll();
+    return () => el.removeEventListener("scroll", checkScroll);
+  }, [productos, checkScroll]);
 
-  if (loading) return (
-    <div className="flex justify-center items-center py-20">
-      <div className="w-10 h-10 border-4 border-[#00a19a]/20 border-t-[#00a19a] rounded-full animate-spin" />
-    </div>
-  );
+  // Auto-scroll suave cada 5 segundos si no hay interacción
+  useEffect(() => {
+    if (isPaused || productos.length <= 3) return;
+    const interval = setInterval(() => {
+      const el = scrollRef.current;
+      if (!el) return;
+      if (el.scrollLeft >= el.scrollWidth - el.clientWidth - 30) {
+        el.scrollTo({ left: 0, behavior: "smooth" });
+      } else {
+        el.scrollBy({ left: 290, behavior: "smooth" });
+      }
+    }, 5500);
 
-  return (
-    <section className="relative w-full max-w-[1400px] mx-auto py-10 px-4 sm:px-8 overflow-hidden group">
-      {/* Botones de navegación del carrusel */}
-      <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 flex justify-between px-2 z-20 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+    return () => clearInterval(interval);
+  }, [isPaused, productos.length]);
+
+  const scrollLeft = () => {
+    scrollRef.current?.scrollBy({ left: -300, behavior: "smooth" });
+  };
+
+  const scrollRight = () => {
+    scrollRef.current?.scrollBy({ left: 300, behavior: "smooth" });
+  };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center py-20">
+        <div className="w-10 h-10 border-4 border-[#00a19a]/20 border-t-[#00a19a] rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (productos.length === 0) {
+    return (
+      <div className="text-center py-12 px-4 max-w-md mx-auto">
+        <div className="w-14 h-14 rounded-2xl bg-teal-50 border border-teal-100 text-[#00a19a] flex items-center justify-center mx-auto mb-3">
+          <Sparkles className="w-6 h-6" />
+        </div>
+        <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider mb-1">
+          Nuevas Obras en Fabricación
+        </h3>
+        <p className="text-xs text-slate-500 mb-5">
+          Estamos preparando nuevas esculturas y creaciones 3D sostenibles en el taller.
+        </p>
         <button
-          onClick={() => setCurrent(c => Math.max(0, c - 1))}
-          className="p-4 bg-white/90 backdrop-blur-md rounded-full shadow-2xl pointer-events-auto hover:bg-[#00a19a] hover:text-white transition-all transform hover:scale-110 active:scale-95 text-slate-800"
-          disabled={current === 0}
+          type="button"
+          onClick={() => router.push("/tienda/productos")}
+          className="px-5 py-2.5 rounded-xl bg-[#00a19a] hover:bg-[#007973] text-white text-xs font-black uppercase tracking-wider shadow-md shadow-[#00a19a]/20 transition-all"
         >
-          <ChevronLeft className="w-6 h-6" />
-        </button>
-        <button
-          onClick={() => setCurrent(c => Math.min(productos.length - cardsPerView, c + 1))}
-          className="p-4 bg-white/90 backdrop-blur-md rounded-full shadow-2xl pointer-events-auto hover:bg-[#00a19a] hover:text-white transition-all transform hover:scale-110 active:scale-95 text-slate-800"
-          disabled={current >= productos.length - cardsPerView}
-        >
-          <ChevronRight className="w-6 h-6" />
+          Ver Tienda Completa
         </button>
       </div>
+    );
+  }
 
-      {/* Carrusel */}
+  return (
+    <section className="relative w-full max-w-[1340px] mx-auto py-2 px-2 sm:px-6 group">
+      {/* Botón Flecha Izquierda */}
+      {canScrollLeft && (
+        <button
+          type="button"
+          onClick={scrollLeft}
+          className="absolute -left-2 sm:left-1 top-1/2 -translate-y-1/2 z-30 w-10 h-10 rounded-full bg-white/95 hover:bg-white text-slate-800 shadow-xl border border-slate-200/80 flex items-center justify-center transition-all hover:scale-110 active:scale-95"
+          aria-label="Ver productos anteriores"
+        >
+          <ChevronLeft className="w-5 h-5" />
+        </button>
+      )}
+
+      {/* Botón Flecha Derecha */}
+      {canScrollRight && (
+        <button
+          type="button"
+          onClick={scrollRight}
+          className="absolute -right-2 sm:right-1 top-1/2 -translate-y-1/2 z-30 w-10 h-10 rounded-full bg-white/95 hover:bg-white text-slate-800 shadow-xl border border-slate-200/80 flex items-center justify-center transition-all hover:scale-110 active:scale-95"
+          aria-label="Ver siguientes productos"
+        >
+          <ChevronRight className="w-5 h-5" />
+        </button>
+      )}
+
+      {/* Contenedor Carrusel Horizontal (Elegante, fluido y sin tarjetas gigantes) */}
       <div
         ref={scrollRef}
-        className="flex overflow-x-hidden transition-all duration-500 gap-6"
         onMouseEnter={() => setIsPaused(true)}
         onMouseLeave={() => setIsPaused(false)}
+        className="flex overflow-x-auto scroll-smooth gap-4 sm:gap-5 pb-4 pt-1 px-1 select-none"
+        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
       >
         {productos.map((prod, idx) => (
           <CarruselCardItem
             key={prod.id}
             prod={prod}
             idx={idx}
-            cardsPerView={cardsPerView}
             router={router}
-          />
-        ))}
-      </div>
-      
-      {/* Indicadores de progreso */}
-      <div className="flex justify-center gap-2 mt-12 pb-2">
-        {Array.from({ length: Math.max(0, productos.length - cardsPerView + 1) }).map((_, i) => (
-          <button
-            key={i}
-            onClick={() => setCurrent(i)}
-            className={clsx(
-              "h-1.5 transition-all duration-500 rounded-full",
-              current === i ? "w-10 bg-[#00a19a]" : "w-1.5 bg-slate-200"
-            )}
           />
         ))}
       </div>
@@ -233,16 +270,15 @@ export default function ProductosCarrusel({ soloDestacados = false }: ProductosC
 function CarruselCardItem({
   prod,
   idx,
-  cardsPerView,
   router,
 }: {
   prod: Producto;
   idx: number;
-  cardsPerView: number;
   router: ReturnType<typeof useRouter>;
 }) {
   const [activeMediaIndex, setActiveMediaIndex] = useState(0);
 
+  // Lista unificada de medios (portada + imágenes secundarias + video)
   const mediaList: { type: "image" | "video"; url: string }[] = [];
   if (prod.image_url) mediaList.push({ type: "image", url: prod.image_url });
   if (prod.producto_imagenes && prod.producto_imagenes.length > 0) {
@@ -256,47 +292,46 @@ function CarruselCardItem({
 
   const activeMedia = mediaList[activeMediaIndex] ?? mediaList[0];
 
-  const handlePrevMedia = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setActiveMediaIndex((p) => (p > 0 ? p - 1 : mediaList.length - 1));
-  };
-
-  const handleNextMedia = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setActiveMediaIndex((p) => (p + 1) % mediaList.length);
+  // Deslizamiento con cursor estilo Mercado Libre
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (mediaList.length <= 1) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const pct = Math.max(0, Math.min(0.999, x / rect.width));
+    const newIdx = Math.floor(pct * mediaList.length);
+    if (newIdx !== activeMediaIndex) setActiveMediaIndex(newIdx);
   };
 
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.9 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ delay: idx * 0.05 }}
-      className={clsx(
-        "flex-shrink-0 relative bg-white border border-slate-50 rounded-[2.5rem] p-5 shadow-[0_4px_25px_rgba(0,0,0,0.02)] hover:shadow-[0_25px_50px_rgba(0,161,154,0.12)] transition-all duration-700 group flex flex-col",
-        cardsPerView === 1 ? "w-full" : 
-        cardsPerView === 2 ? "w-[calc(50%-12px)]" :
-        cardsPerView === 3 ? "w-[calc(33.33%-16px)]" : "w-[calc(25%-18px)]"
-      )}
+      initial={{ opacity: 0, y: 15 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: idx * 0.04, duration: 0.3 }}
+      onClick={() => router.push(`/tienda/productos/${prod.id}`)}
+      className="w-[235px] sm:w-[255px] md:w-[270px] shrink-0 snap-start bg-white border border-slate-200/90 hover:border-slate-300 rounded-2xl p-3 sm:p-3.5 shadow-sm hover:shadow-xl hover:shadow-slate-200/60 transition-all duration-300 cursor-pointer flex flex-col group/card"
     >
-      {/* Image / Video Showcase with In-Card Slider */}
-      <div className="relative aspect-square rounded-[2rem] overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100 mb-6 group/img p-4 flex items-center justify-center">
+      {/* Contenedor Visual de Medios (Proporciones compactas idénticas a Mercado Libre) */}
+      <div
+        onMouseMove={handleMouseMove}
+        className="relative h-40 sm:h-44 md:h-48 w-full rounded-xl overflow-hidden bg-slate-50 mb-3 flex items-center justify-center border border-slate-100 group/media"
+      >
         <AnimatePresence mode="wait">
           {activeMedia?.type === "image" ? (
             <motion.div
               key={activeMedia.url}
-              initial={{ opacity: 0 }}
+              initial={{ opacity: 0.6 }}
               animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="relative w-full h-full"
+              exit={{ opacity: 0.6 }}
+              transition={{ duration: 0.18 }}
+              className="relative w-full h-full p-2"
             >
               <Image
                 src={activeMedia.url}
                 alt={prod.nombre}
                 fill
-                priority={idx === 0}
-                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-                className="object-contain transition-transform duration-700 group-hover/img:scale-105 drop-shadow-xl p-2"
+                priority={idx < 4}
+                sizes="(max-width: 640px) 240px, 270px"
+                className="object-contain transition-transform duration-300 group-hover/card:scale-105"
               />
             </motion.div>
           ) : activeMedia?.type === "video" ? (
@@ -305,7 +340,7 @@ function CarruselCardItem({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="relative w-full h-full bg-black rounded-2xl overflow-hidden flex items-center justify-center"
+              className="relative w-full h-full bg-black/90 rounded-xl overflow-hidden flex items-center justify-center"
             >
               <video
                 src={activeMedia.url}
@@ -313,105 +348,77 @@ function CarruselCardItem({
                 muted
                 loop
                 playsInline
-                className="w-full h-full object-cover"
+                className="w-full h-full object-contain"
               />
-              <div className="absolute bottom-2 left-2 bg-black/80 backdrop-blur-md px-2 py-0.5 rounded-md text-[8px] font-black text-teal-300 uppercase tracking-widest flex items-center gap-1">
-                <span>▶</span> Video
+              <div className="absolute top-2 left-2 bg-black/80 backdrop-blur-md px-1.5 py-0.5 rounded text-[8px] font-black text-teal-300 uppercase tracking-widest flex items-center gap-1 z-10">
+                <Play className="w-2.5 h-2.5 fill-current" /> Video 3D
               </div>
             </motion.div>
           ) : null}
         </AnimatePresence>
-        
+
+        {/* Insignia Superior de Destacado */}
         {prod.destacado && (
-          <div className="absolute top-4 left-4 z-10">
-            <span className="bg-black/80 backdrop-blur-md text-white text-[9px] font-black uppercase tracking-[0.15em] px-3.5 py-1.5 rounded-full shadow-xl flex items-center gap-1.5">
-              <Sparkles className="w-3 h-3 text-teal-400" />
-              Destacado
+          <div className="absolute top-2 left-2 z-20 pointer-events-none">
+            <span className="bg-[#00a19a] text-white text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded-sm shadow-sm flex items-center gap-1">
+              <Sparkles className="w-2.5 h-2.5 text-white" /> Destacado
             </span>
           </div>
         )}
 
-        {/* In-Card Media Controls */}
+        {/* Indicadores de segmentos estilo Mercado Libre */}
         {mediaList.length > 1 && (
-          <>
-            <button
-              type="button"
-              onClick={handlePrevMedia}
-              className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 bg-white/90 hover:bg-white text-slate-800 rounded-full shadow-lg flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity z-20 hover:scale-110 active:scale-95"
-            >
-              ‹
-            </button>
-            <button
-              type="button"
-              onClick={handleNextMedia}
-              className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 bg-white/90 hover:bg-white text-slate-800 rounded-full shadow-lg flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity z-20 hover:scale-110 active:scale-95"
-            >
-              ›
-            </button>
-
-            <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1 z-20">
-              {mediaList.map((m, mIdx) => (
-                <button
-                  key={mIdx}
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setActiveMediaIndex(mIdx);
-                  }}
-                  className={`h-1.5 rounded-full transition-all duration-300 ${
-                    activeMediaIndex === mIdx
-                      ? "w-4 bg-[#00a19a]"
-                      : "w-1.5 bg-slate-300/80 hover:bg-slate-400"
-                  }`}
-                />
-              ))}
-            </div>
-          </>
+          <div className="absolute bottom-1.5 left-2 right-2 flex items-center gap-1 z-20 pointer-events-none">
+            {mediaList.map((_, mIdx) => (
+              <div
+                key={mIdx}
+                className={`h-0.5 flex-1 rounded-full transition-all duration-300 ${
+                  activeMediaIndex === mIdx ? "bg-[#00a19a]" : "bg-slate-300/80"
+                }`}
+              />
+            ))}
+          </div>
         )}
-
-        <div className="absolute inset-0 bg-slate-900/10 opacity-0 group-hover/img:opacity-100 transition-opacity duration-300 flex items-center justify-center gap-3 pointer-events-none">
-          <motion.button 
-            whileHover={{ scale: 1.08 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => router.push(`/tienda/productos/${prod.id}`)}
-            className="h-10 px-4 bg-white rounded-xl flex items-center gap-2 text-slate-900 shadow-xl font-black text-xs uppercase pointer-events-auto"
-          >
-            <Eye className="w-4 h-4 text-[#00a19a]" />
-            Ver Opciones
-          </motion.button>
-        </div>
       </div>
 
-      {/* Content Details */}
-      <div 
-        onClick={() => router.push(`/tienda/productos/${prod.id}`)} 
-        className="space-y-3 flex-1 flex flex-col cursor-pointer"
-      >
-        <div className="flex items-center justify-between">
-          <span className="text-[10px] font-black text-[#00a19a] uppercase tracking-widest px-2.5 py-1 bg-teal-50 rounded-lg">
-            {prod.categoria}
-          </span>
-          <span className="text-[10px] text-emerald-700 font-bold uppercase tracking-tight bg-emerald-50 px-2 py-0.5 rounded-md">
-            Recogida Gratis
-          </span>
-        </div>
-        
-        <h3 className="text-base font-black text-slate-900 line-clamp-1 group-hover:text-[#00a19a] transition-colors leading-tight">
-          {prod.nombre}
-        </h3>
-        
-        <p className="text-[11px] text-slate-500 line-clamp-2 leading-relaxed font-medium mb-3">
-          {prod.descripcion}
-        </p>
+      {/* Información del Producto (Compacta y balanceada) */}
+      <div className="flex flex-col flex-1 justify-between">
+        <div>
+          {/* Categoría y Calificación */}
+          <div className="flex items-center justify-between gap-1 mb-1">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[#00a19a] truncate">
+              {prod.categoria}
+            </span>
+            <div className="flex items-center gap-0.5 text-amber-400 shrink-0">
+              <Star className="w-3 h-3 fill-current" />
+              <span className="font-bold text-slate-700 text-[10px]">4.9</span>
+            </div>
+          </div>
 
-        <div className="mt-auto pt-3 flex items-center justify-between border-t border-slate-100">
+          {/* Nombre */}
+          <h3 className="text-xs sm:text-sm font-semibold text-slate-800 line-clamp-1 leading-snug group-hover/card:text-[#00a19a] transition-colors">
+            {prod.nombre}
+          </h3>
+
+          {/* Descripción corta */}
+          <p className="text-[11px] text-slate-400 line-clamp-1 mt-0.5 font-medium">
+            {prod.descripcion}
+          </p>
+        </div>
+
+        {/* Precio y Botón Ver */}
+        <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between">
           <div className="flex items-baseline gap-1">
-            <span className="text-2xl font-black text-slate-900 tracking-tight">${prod.precio.toLocaleString("es-CO")}</span>
-            <span className="text-[9px] font-black text-slate-400">COP</span>
+            <span className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
+              ${prod.precio.toLocaleString("es-CO")}
+            </span>
+            <span className="text-[9px] font-bold text-slate-400 uppercase">
+              COP
+            </span>
           </div>
-          <div className="text-[10px] font-black text-[#00a19a] group-hover:translate-x-1 transition-transform">
-            Ver detalle →
-          </div>
+          <span className="text-[11px] font-bold text-[#00a19a] group-hover/card:translate-x-0.5 transition-transform flex items-center gap-0.5">
+            Ver obra →
+          </span>
         </div>
       </div>
     </motion.div>

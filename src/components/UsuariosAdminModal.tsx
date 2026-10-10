@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "~/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "~/components/ui/dialog";
 import { Button } from "~/components/ui/button";
 
 interface Usuario {
@@ -92,6 +92,9 @@ export default function UsuariosAdminModal({ open, onOpenChange }: { open: boole
       <DialogContent className="max-w-3xl w-full">
         <DialogHeader>
           <DialogTitle>Gestión de Usuarios y Roles</DialogTitle>
+          <DialogDescription className="sr-only">
+            Administración de usuarios y asignación de roles en la plataforma
+          </DialogDescription>
         </DialogHeader>
         {loading ? (
           <div className="text-center py-8">Cargando usuarios...</div>

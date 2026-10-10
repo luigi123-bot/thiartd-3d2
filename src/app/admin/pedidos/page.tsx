@@ -9,7 +9,7 @@ import {
   Download, Search,
   FileText, Settings2, Mail, CheckCircle2, AlertTriangle,
   Clock, Truck, MapPin, Check,
-  ChevronRight, ChevronLeft, ArrowRight
+  ChevronRight, ChevronLeft, ArrowRight, Printer, Cpu, Layers, Box
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter
@@ -32,7 +32,7 @@ interface Pedido {
   costo_envio?: number;
   tipo_entrega?: "envio" | "recoleccion";
   es_pod?: boolean;
-  etapa_kanban?: number; // 1: Por procesar, 2: Fabricación POD, 3: Listo, 4: Entregado
+  etapa_kanban?: number; // 1: Por procesar, 2: Fabricación POD, 3: Listo / Por recoger, 4: Entregado
   fecha_estimada_lista?: string;
   productos: string;
   datos_contacto?: string;
@@ -85,8 +85,8 @@ const ETAPAS = [
   },
   {
     id: 3,
-    titulo: "Listo Entrega / Envío",
-    subtitulo: "En estantería de empaque",
+    titulo: "Listo Entrega / Por Recoger",
+    subtitulo: "Stock físico o empaque listo",
     color: "border-purple-400 bg-purple-50/40 text-purple-900",
     badgeColor: "bg-purple-100 text-purple-800",
     dotColor: "bg-purple-500",
@@ -128,7 +128,7 @@ export default function AdminPedidosPage() {
       .order("created_at", { ascending: false });
 
     if (error) {
-      console.error("❌ Error fetching pedidos:", error);
+      console.error("Error fetching pedidos:", error);
     } else if (data) {
       setPedidos(data as Pedido[]);
     }
@@ -171,7 +171,7 @@ export default function AdminPedidosPage() {
       });
 
       if (res.ok) {
-        toast.success(`Pedido #${pedidoId} movido a Etapa ${nuevaEtapa}`);
+        toast.success(`Pedido #${pedidoId} movido a Etapa ${nuevaEtapa} (${ETAPAS.find(e => e.id === nuevaEtapa)?.titulo})`);
 
         // ── Regla POD: al llegar a etapa 3, notificar fecha/hora de recogida ──
         const pedido = pedidos.find((p) => p.id === pedidoId);
@@ -195,7 +195,6 @@ export default function AdminPedidosPage() {
             console.warn("No se pudo enviar notificación de recogida POD");
           }
         }
-
         void fetchPedidos();
       } else {
         toast.error("Error al actualizar la etapa");
@@ -211,20 +210,30 @@ export default function AdminPedidosPage() {
   const simularPagoAprobado = async (pedidoId: number) => {
     setProcesandoPago(pedidoId);
     try {
+      const pedidoObj = pedidos.find((p) => p.id === pedidoId);
+      const esPOD = Boolean(pedidoObj?.es_pod);
+      // Regla 1: Si tiene stock, no pasa por impresión -> directo a Etapa 3 (Listo / Por recoger)
+      // Si es POD, pasa a Etapa 2 (En Fabricación POD)
+      const etapaDestino = esPOD ? 2 : 3;
+
       const response = await fetch("/api/pedidos", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           pedidoId,
           estado: "pagado",
-          etapa_kanban: 2, // Si se paga, pasa automáticamente a revisión/fabricación
+          etapa_kanban: etapaDestino,
           payment_id: `ADMIN-MANUAL-${Date.now()}`,
           payment_method: "MANUAL_OFFLINE",
         }),
       });
 
       if (response.ok) {
-        toast.success(`Pago del pedido #${pedidoId} aprobado exitosamente`);
+        if (esPOD) {
+          toast.success(`Pedido #${pedidoId} aprobado: Modo POD en fabricación. Recolección Envía programada.`);
+        } else {
+          toast.success(`Pedido #${pedidoId} aprobado: Producto en stock, colocado en 'Por Recoger / Listo Entrega' (Etapa 3).`);
+        }
         await fetchPedidos();
         if (detallePedido?.id === pedidoId) {
           const { data } = await supabase.from("pedidos").select("*").eq("id", pedidoId).single();
@@ -332,14 +341,14 @@ export default function AdminPedidosPage() {
               />
             </div>
 
-            {/* Filtros tipo */}
+            {/* Filtros tipo (Sin emojis) */}
             <div className="flex gap-1.5 bg-slate-100 p-1 rounded-2xl">
               {(
                 [
                   { key: "todos", label: "Todos" },
                   { key: "envio", label: "Envíos" },
                   { key: "recoleccion", label: "Recogida" },
-                  { key: "pod", label: "POD" },
+                  { key: "pod", label: "Print on Demand" },
                 ] as const
               ).map((f) => (
                 <button
@@ -403,7 +412,7 @@ export default function AdminPedidosPage() {
           </div>
         </div>
 
-        {/* ── Tablero Kanban Drag & Drop de 4 Etapas ── */}
+        {/* ── Tablero Kanban Drag & Drop (Drop and Pull) de 4 Etapas ── */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 items-start">
           {ETAPAS.map((etapa) => {
             const lista = pedidosPorEtapa[etapa.id] ?? [];
@@ -414,19 +423,27 @@ export default function AdminPedidosPage() {
                 key={etapa.id}
                 onDragOver={(e) => {
                   e.preventDefault();
-                  setDragOverCol(etapa.id);
+                  e.dataTransfer.dropEffect = "move";
+                  if (dragOverCol !== etapa.id) {
+                    setDragOverCol(etapa.id);
+                  }
                 }}
-                onDragLeave={() => setDragOverCol(null)}
+                onDragLeave={(e) => {
+                  if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+                  setDragOverCol(null);
+                }}
                 onDrop={(e) => {
                   e.preventDefault();
                   setDragOverCol(null);
-                  if (draggedPedidoId !== null) {
-                    void moverEtapa(draggedPedidoId, etapa.id);
+                  const dataId = e.dataTransfer.getData("text/plain");
+                  const idToMove = draggedPedidoId ?? (dataId ? Number(dataId) : null);
+                  if (idToMove !== null && !isNaN(idToMove)) {
+                    void moverEtapa(idToMove, etapa.id);
                     setDraggedPedidoId(null);
                   }
                 }}
                 className={`bg-white rounded-3xl p-4 border-2 transition-all min-h-[680px] flex flex-col shadow-sm ${
-                  isOver ? "border-[#00a19a] ring-4 ring-[#00a19a]/15 bg-teal-50/30 scale-[1.01]" : "border-slate-100"
+                  isOver ? "border-[#00a19a] ring-4 ring-[#00a19a]/15 bg-teal-50/20 scale-[1.01]" : "border-slate-100"
                 }`}
               >
                 {/* Header de la columna */}
@@ -443,12 +460,19 @@ export default function AdminPedidosPage() {
                   </span>
                 </div>
 
-                {/* Lista de Tarjetas */}
+                {/* Zona de Drop Activa Visual */}
+                {isOver && draggedPedidoId && (
+                  <div className="mb-3 p-3.5 border-2 border-dashed border-[#00a19a] bg-teal-50/80 rounded-2xl text-center text-xs font-black text-[#00a19a] animate-pulse">
+                    Soltar Pedido #{draggedPedidoId} en &quot;{etapa.titulo}&quot;
+                  </div>
+                )}
+
+                {/* Lista de Tarjetas (Arrastrables con Drop and Pull) */}
                 <div className="space-y-3 flex-1 overflow-y-auto max-h-[750px] pr-1">
                   {lista.length === 0 ? (
                     <div className="h-40 border-2 border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center text-slate-400 p-4 text-center">
                       <p className="text-xs font-bold">Sin órdenes en esta etapa</p>
-                      <p className="text-[10px] mt-1">Arrastra una tarjeta aquí</p>
+                      <p className="text-[10px] mt-1 text-slate-400">Arrastra una tarjeta aquí</p>
                     </div>
                   ) : (
                     lista.map((p) => {
@@ -468,13 +492,26 @@ export default function AdminPedidosPage() {
 
                       const esRecogida = p.tipo_entrega === "recoleccion";
                       const esPOD = Boolean(p.es_pod);
+                      const isBeingDragged = draggedPedidoId === p.id;
 
                       return (
                         <div
                           key={p.id}
                           draggable
-                          onDragStart={() => setDraggedPedidoId(p.id)}
-                          className="bg-slate-50 hover:bg-white p-4 rounded-2xl border border-slate-200 hover:border-slate-900 shadow-sm transition-all cursor-grab active:cursor-grabbing group select-none space-y-3"
+                          onDragStart={(e) => {
+                            setDraggedPedidoId(p.id);
+                            e.dataTransfer.setData("text/plain", String(p.id));
+                            e.dataTransfer.effectAllowed = "move";
+                          }}
+                          onDragEnd={() => {
+                            setDraggedPedidoId(null);
+                            setDragOverCol(null);
+                          }}
+                          className={`bg-slate-50 hover:bg-white p-4 rounded-2xl border transition-all cursor-grab active:cursor-grabbing group select-none space-y-3 shadow-sm ${
+                            isBeingDragged
+                              ? "opacity-30 scale-95 border-dashed border-[#00a19a] bg-teal-50/40"
+                              : "border-slate-200 hover:border-slate-900"
+                          }`}
                         >
                           {/* Top Card Info */}
                           <div className="flex items-center justify-between">
@@ -497,7 +534,7 @@ export default function AdminPedidosPage() {
                             </p>
                           </div>
 
-                          {/* Badges de Tipo & POD */}
+                          {/* Badges de Tipo & POD (Sin emojis) */}
                           <div className="flex flex-wrap gap-1.5">
                             {esRecogida ? (
                               <span className="inline-flex items-center gap-1 bg-amber-100/80 text-amber-800 text-[10px] font-black px-2 py-0.5 rounded-md">
@@ -509,16 +546,20 @@ export default function AdminPedidosPage() {
                               </span>
                             )}
 
-                            {esPOD ? (
+                            {esPOD && (
                               <span className="inline-flex items-center gap-1 bg-purple-100 text-purple-800 text-[10px] font-black px-2 py-0.5 rounded-md">
-                                <Clock className="w-3 h-3" /> Print on Demand
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-800 text-[10px] font-black px-2 py-0.5 rounded-md">
-                                <Check className="w-3 h-3" /> Por Recoger / Despachar
+                                <Printer className="w-3 h-3" /> Print on Demand
                               </span>
                             )}
                           </div>
+
+                          {/* Fecha estimada de lista / Recolección POD */}
+                          {esPOD && p.fecha_estimada_lista && (
+                            <div className="flex items-center gap-1.5 text-[10px] font-bold text-teal-800 bg-teal-50/80 px-2 py-1 rounded-lg border border-teal-100">
+                              <Clock className="w-3 h-3 text-[#00a19a]" />
+                              <span>Envía Recolección: {new Date(p.fecha_estimada_lista).toLocaleDateString("es-CO", { day: "2-digit", month: "short" })} (09:00 - 17:00)</span>
+                            </div>
+                          )}
 
                           {/* Resumen productos */}
                           <div className="text-[11px] text-slate-500 font-medium line-clamp-2 border-t border-slate-200/60 pt-2">

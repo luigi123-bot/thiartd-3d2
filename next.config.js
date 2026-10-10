@@ -8,6 +8,15 @@ const config = {
 	compress: true,
 	poweredByHeader: false,
 	reactStrictMode: true,
+	serverExternalPackages: ["@supabase/supabase-js", "@supabase/realtime-js"],
+	webpack: (config) => {
+		config.ignoreWarnings = [
+			...(config.ignoreWarnings || []),
+			{ module: /@supabase\/realtime-js/ },
+			/Critical dependency: the request of a dependency is an expression/,
+		];
+		return config;
+	},
 	images: {
 		formats: ["image/avif", "image/webp"],
 		remotePatterns: [
@@ -44,8 +53,9 @@ const config = {
 		],
 	},
 	experimental: {
+		// Incrusta el CSS en el <head> para eliminar la petición que bloquea el render.
+		inlineCss: true,
 		optimizePackageImports: [
-			"framer-motion",
 			"lucide-react",
 			"react-icons",
 			"@radix-ui/react-accordion",

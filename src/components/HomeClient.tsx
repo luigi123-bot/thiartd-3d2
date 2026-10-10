@@ -16,6 +16,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { FiBriefcase, FiUser, FiCheck } from "react-icons/fi";
 import Footer from "~/components/Footer";
+import LazyOnVisible from "~/components/LazyOnVisible";
 
 // ── Componentes diferidos — fuera del critical rendering path ──────────────
 const TopbarTienda = dynamic(
@@ -231,18 +232,27 @@ export default function HomeClient() {
         />
 
         {/* ─── Productos Destacados ──────────────────────────── */}
-        <section className="py-20 md:py-32 bg-white rounded-t-[3rem] shadow-[0_-20px_40px_-15px_rgba(0,0,0,0.05)] relative z-20">
-          <div className="relative max-w-7xl mx-auto px-4">
-            <div className="text-center mb-16">
-              <span className="text-[#00a19a] font-bold tracking-[0.2em] uppercase text-xs mb-3 block">Los Más Buscados</span>
-              <h2 className="text-4xl sm:text-5xl md:text-6xl font-black mb-6 text-slate-800 tracking-tight">
+        <section className="py-12 md:py-16 bg-white rounded-t-[3rem] shadow-[0_-20px_40px_-15px_rgba(0,0,0,0.05)] relative z-20">
+          <div className="relative max-w-7xl mx-auto px-4 sm:px-6">
+            <div className="text-center mb-8">
+              <span className="text-[#00a19a] font-bold tracking-[0.2em] uppercase text-xs mb-2 block">Los Más Buscados</span>
+              <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-3 text-slate-800 tracking-tight">
                 Productos Destacados
               </h2>
-              <p className="text-lg md:text-xl text-slate-500 max-w-2xl mx-auto font-medium leading-relaxed">
+              <p className="text-sm sm:text-base text-slate-500 max-w-2xl mx-auto font-medium leading-relaxed">
                 Descubre nuestras creaciones en 3D más populares y valoradas, esculpidas con la más alta calidad.
               </p>
             </div>
-            <ProductosCarrusel soloDestacados />
+            <LazyOnVisible
+              minHeight={400}
+              fallback={
+                <div className="flex justify-center items-center py-20">
+                  <div className="w-10 h-10 border-4 border-[#00a19a]/20 border-t-[#00a19a] rounded-full animate-spin" />
+                </div>
+              }
+            >
+              <ProductosCarrusel soloDestacados />
+            </LazyOnVisible>
           </div>
         </section>
       </main>

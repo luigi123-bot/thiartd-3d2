@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "~/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "~/components/ui/dialog";
 import { Input } from "~/components/ui/input";
 import { Button } from "~/components/ui/button";
 import { useToast } from "~/components/ui/use-toast";
@@ -137,7 +137,7 @@ export function CreateUserModal({ open, onOpenChangeAction, onUserCreated }: Cre
           </div>
           <DialogHeader className="relative z-10">
             <DialogTitle className="text-3xl font-black tracking-tighter uppercase mb-2">Nuevo Usuario</DialogTitle>
-            <p className="text-slate-400 text-sm font-medium uppercase tracking-widest">Registrar acceso al sistema</p>
+            <DialogDescription className="text-slate-400 text-sm font-medium uppercase tracking-widest">Registrar acceso al sistema</DialogDescription>
           </DialogHeader>
         </div>
 
