@@ -149,10 +149,15 @@ export default function SupabaseAuth({ onAuth, open = false, onOpenChange, defau
       return;
     }
 
+    const origin = typeof window !== "undefined" && window.location.origin ? window.location.origin : "https://thiart.co";
+
     const { data, error: signUpError } = await supabase.auth.signUp({
       email: form.email,
       password: form.password,
-      options: { data: { nombre: form.nombre } }
+      options: { 
+        data: { nombre: form.nombre },
+        emailRedirectTo: `${origin}/auth/callback`,
+      }
     });
 
     if (signUpError) {
@@ -279,10 +284,11 @@ export default function SupabaseAuth({ onAuth, open = false, onOpenChange, defau
     setLoading(true);
     setError("");
     try {
+      const origin = typeof window !== "undefined" && window.location.origin ? window.location.origin : "https://thiart.co";
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: `${origin}/auth/callback`,
           queryParams: {
             prompt: 'select_account',
           },

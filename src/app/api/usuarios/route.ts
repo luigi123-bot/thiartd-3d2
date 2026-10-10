@@ -110,8 +110,12 @@ export async function POST(req: Request) {
       );
     }
     
-    // 1. Crear el usuario en la sección de Autenticación de Supabase
-    const { data: authData, error: authError } = await supabase.auth.signUp({ email, password });
+    const origin = req.headers.get("origin") ?? "https://thiart.co";
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { emailRedirectTo: `${origin}/auth/callback` },
+    });
     if (authError || !authData?.user) {
       return NextResponse.json({ error: "Error en Supabase Auth: " + authError?.message }, { status: 500 });
     }

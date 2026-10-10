@@ -16,11 +16,13 @@ export default supabase;
 
 export async function signUpWithEmail(email: string, password: string) {
   // Esta función enviará automáticamente un email de confirmación si está habilitado en Supabase
+  const origin = typeof window !== "undefined" && window.location.origin ? window.location.origin : "https://thiart.co";
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    // Puedes agregar aquí redirectTo si quieres redirigir después de la confirmación
-    // options: { emailRedirectTo: 'https://tusitio.com/confirmacion' }
+    options: {
+      emailRedirectTo: `${origin}/auth/callback`,
+    },
   });
   return { data, error };
 }
