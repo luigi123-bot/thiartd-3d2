@@ -16,6 +16,7 @@ interface GuiaItem {
   id: number;
   numero_tracking?: string;
   empresa_envio?: string;
+  tipo_entrega?: "envio" | "recoleccion";
   total: number;
   created_at: string;
   ciudad_envio?: string;
@@ -59,13 +60,25 @@ export default function RecoleccionesModal({
     horario: string;
   } | null>(null);
 
-  // Guías disponibles que tienen tracking
+  // Todas las guías/pedidos de tipo envío disponibles para recolección
   const guiasConTracking = useMemo(() => {
-    return pedidosList.filter((p) => p.numero_tracking);
+    return pedidosList.filter((p) => p.numero_tracking && p.tipo_entrega !== "recoleccion");
   }, [pedidosList]);
 
-  const cantidadCalculada = guiasConTracking.length > 0 ? guiasConTracking.length : customCantidad;
-  const pesoCalculado = guiasConTracking.length > 0 ? (guiasConTracking.length * 0.8).toFixed(1) : customPeso;
+  // Pedidos de envío sin tracking (sin guía generada aún, pero listos para recoger)
+  const pedidosSinTracking = useMemo(() => {
+    return pedidosList.filter(
+      (p) => !p.numero_tracking && p.tipo_entrega === "envio"
+    );
+  }, [pedidosList]);
+
+  // Total de paquetes a recoger (guías + pedidos sin guía)
+  const todosLosEnvios = useMemo(() => {
+    return [...guiasConTracking, ...pedidosSinTracking];
+  }, [guiasConTracking, pedidosSinTracking]);
+
+  const cantidadCalculada = todosLosEnvios.length > 0 ? todosLosEnvios.length : customCantidad;
+  const pesoCalculado = todosLosEnvios.length > 0 ? (todosLosEnvios.length * 0.8).toFixed(1) : customPeso;
 
   const handleConfirmarRecoleccion = async () => {
     setLoading(true);
@@ -81,7 +94,7 @@ export default function RecoleccionesModal({
           totalPackages: cantidadCalculada,
           totalWeight: parseFloat(pesoCalculado) || 1.5,
           instructions: `Recolección en ${ORIGEN_DEFECTO.street}, ${ORIGEN_DEFECTO.number}, ${ORIGEN_DEFECTO.city}. Taller Thiart 3D.`,
-          pedidosIds: guiasConTracking.map((p) => p.id),
+          pedidosIds: todosLosEnvios.map((p) => p.id),
         }),
       });
 
@@ -277,12 +290,25 @@ export default function RecoleccionesModal({
                       onChange={(e) => setGuiasSeleccionadas(e.target.value)}
                       className="w-full h-9 px-3 pr-8 bg-white border border-slate-300 rounded-lg text-xs font-medium text-slate-800 appearance-none outline-none focus:border-[#1877f2]"
                     >
-                      <option value="todos">Todos ({guiasConTracking.length > 0 ? `${guiasConTracking.length} guías listas` : "1 paquete"})</option>
+                      <option value="todos">Todos ({todosLosEnvios.length > 0 ? `${todosLosEnvios.length} paquetes` : "0 paquetes"})</option>
                       {guiasConTracking.map((g) => (
                         <option key={g.id} value={g.id}>
                           Guía #{g.numero_tracking} (Pedido #{g.id} - {g.ciudad_envio})
                         </option>
                       ))}
+                      {pedidosSinTracking.map((g) => {
+                        let nombre = "Cliente";
+                        try {
+                          const raw = typeof g.datos_contacto === "string" ? JSON.parse(g.datos_contacto) : g.datos_contacto;
+                          const dc = raw as { nombre?: string } | null | undefined;
+                          if (dc?.nombre) nombre = dc.nombre;
+                        } catch { /* ignore */ }
+                        return (
+                          <option key={g.id} value={g.id}>
+                            Pedido #{g.id} sin guía — {nombre} ({g.ciudad_envio ?? "Sin ciudad"})
+                          </option>
+                        );
+                      })}
                     </select>
                     <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none flex items-center gap-1 text-slate-500">
                       <span className="text-[10px] font-bold">×</span>

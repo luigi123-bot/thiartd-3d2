@@ -172,6 +172,30 @@ export default function AdminPedidosPage() {
 
       if (res.ok) {
         toast.success(`Pedido #${pedidoId} movido a Etapa ${nuevaEtapa}`);
+
+        // ── Regla POD: al llegar a etapa 3, notificar fecha/hora de recogida ──
+        const pedido = pedidos.find((p) => p.id === pedidoId);
+        if (pedido?.es_pod && nuevaEtapa === 3) {
+          // Enviar notificación de recogida al cliente
+          try {
+            const notifRes = await fetch("/api/envios/recogidas", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                pedidoId,
+                tipo: "notificacion_pod_listo",
+                mensaje: "Tu pedido Print on Demand está listo. Puedes recogerlo en nuestro taller en horario de lunes a viernes de 9am a 6pm.",
+              }),
+            });
+            if (notifRes.ok) {
+              toast.success(`Notificación de recogida enviada al cliente del pedido #${pedidoId}`);
+            }
+          } catch {
+            // No interrumpir el flujo si falla la notificación
+            console.warn("No se pudo enviar notificación de recogida POD");
+          }
+        }
+
         void fetchPedidos();
       } else {
         toast.error("Error al actualizar la etapa");
@@ -313,9 +337,9 @@ export default function AdminPedidosPage() {
               {(
                 [
                   { key: "todos", label: "Todos" },
-                  { key: "envio", label: "🚚 Envíos" },
-                  { key: "recoleccion", label: "📍 Recogida" },
-                  { key: "pod", label: "🔧 POD" },
+                  { key: "envio", label: "Envíos" },
+                  { key: "recoleccion", label: "Recogida" },
+                  { key: "pod", label: "POD" },
                 ] as const
               ).map((f) => (
                 <button
@@ -485,9 +509,13 @@ export default function AdminPedidosPage() {
                               </span>
                             )}
 
-                            {esPOD && (
+                            {esPOD ? (
                               <span className="inline-flex items-center gap-1 bg-purple-100 text-purple-800 text-[10px] font-black px-2 py-0.5 rounded-md">
-                                🔧 Print on Demand
+                                <Clock className="w-3 h-3" /> Print on Demand
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-800 text-[10px] font-black px-2 py-0.5 rounded-md">
+                                <Check className="w-3 h-3" /> Por Recoger / Despachar
                               </span>
                             )}
                           </div>

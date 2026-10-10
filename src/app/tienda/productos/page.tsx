@@ -503,6 +503,11 @@ function ProductCardModern({ producto, idx, router, addToCarrito, carrito }: {
                <span className="bg-black/80 backdrop-blur-md text-white text-[7px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full shadow-lg">Premium</span>
             </div>
           )}
+          {producto.stock <= 0 && (
+            <div className="absolute top-2.5 left-2.5 z-10">
+               <span className="bg-red-500/90 backdrop-blur-md text-white text-[7px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full shadow-lg">Sin Stock</span>
+            </div>
+          )}
 
           <div className="absolute top-2.5 right-2.5 z-20">
              <button 
@@ -552,26 +557,32 @@ function ProductCardModern({ producto, idx, router, addToCarrito, carrito }: {
                 </div>
               )}
               
-              <motion.button
-                whileTap={{ scale: 0.9 }}
-                onClick={async (e) => {
-                  e.stopPropagation();
-                  const ok = await addToCarrito({
-                    id: String(producto.id),
-                    nombre: data.nombre,
-                    precio: data.precio,
-                    imagen: producto.image_url ?? "/logo.png",
-                    cantidad: 1, 
-                    stock: producto.stock,
-                    categoria: data.categoria,
-                    destacado: data.destacado,
-                  });
-                  if (ok) toast.success("Añadido ✨");
-                }}
-                className="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-900 text-white hover:bg-[#00a19a] shadow-md hover:shadow-teal-500/30 transition-all duration-300"
-              >
-                <ShoppingCart className="w-4 h-4" />
-              </motion.button>
+              {stockDisponible <= 0 ? (
+                <div className="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-100 border border-slate-200 text-slate-300 cursor-not-allowed" title="Sin stock disponible">
+                  <ShoppingCart className="w-4 h-4" />
+                </div>
+              ) : (
+                <motion.button
+                  whileTap={{ scale: 0.9 }}
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    const ok = await addToCarrito({
+                      id: String(producto.id),
+                      nombre: data.nombre,
+                      precio: data.precio,
+                      imagen: producto.image_url ?? "/logo.png",
+                      cantidad: 1, 
+                      stock: producto.stock,
+                      categoria: data.categoria,
+                      destacado: data.destacado,
+                    });
+                    if (ok) toast.success("Añadido al carrito");
+                  }}
+                  className="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-900 text-white hover:bg-[#00a19a] shadow-md hover:shadow-teal-500/30 transition-all duration-300"
+                >
+                  <ShoppingCart className="w-4 h-4" />
+                </motion.button>
+              )}
             </div>
           </div>
         </CardContent>

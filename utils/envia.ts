@@ -289,12 +289,14 @@ export const crearEnvioParaPedido = async (pedidoId: number) => {
 
     console.log("[ENVIA] Cotizando tarifa más óptima...");
     let carrierSeleccionado = "coordinadora";
-    let servicioSeleccionado = "standard";
+    let servicioSeleccionado = "ground";
 
-    const baseUrls = [
-      "https://api.envia.com",
-      "https://api-test.envia.com"
-    ];
+    const baseUrls = process.env.ENVIA_API_URL
+      ? [process.env.ENVIA_API_URL]
+      : [
+          "https://api-test.envia.com",
+          "https://api.envia.com"
+        ];
 
     for (const baseUrl of baseUrls) {
       try {
@@ -346,6 +348,7 @@ export const crearEnvioParaPedido = async (pedidoId: number) => {
     };
 
     let responseEnvio: any = null;
+    let lastGenError = "";
 
     for (const baseUrl of baseUrls) {
       try {
@@ -360,7 +363,17 @@ export const crearEnvioParaPedido = async (pedidoId: number) => {
           break;
         }
       } catch (genErr) {
-        console.warn(`[ENVIA] Generación en ${baseUrl} no disponible, intentando siguiente.`);
+        if (axios.isAxiosError(genErr)) {
+          if (genErr.response?.status === 401) {
+            lastGenError = "Error de autenticación con Envía (401): Tu clave ENVIA_API_KEY es de modo pruebas (Sandbox) o no tiene permisos en Producción. Configura el token de Producción de tu cuenta en el archivo .env para que aparezca en tu panel oficial.";
+          } else {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+            const d = genErr.response?.data;
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+            lastGenError = String(d?.error?.message || d?.message || d?.error?.description || genErr.message);
+          }
+        }
+        console.warn(`[ENVIA] Generación en ${baseUrl} no disponible: ${lastGenError}`);
       }
     }
 
@@ -457,7 +470,7 @@ export const crearEnvioParaPedido = async (pedidoId: number) => {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-return
       return pedidoActualizado;
     } else {
-      throw new Error("Respuesta de API de Envía vacía o inesperada.");
+      throw new Error(lastGenError || "Respuesta de API de Envía vacía o fallida.");
     }
 
   } catch (err: unknown) {
@@ -506,69 +519,94 @@ export const programarRecogidaEnvia = async (params: ProgramarRecogidaParams): P
     }
   }
 
-  let confirmationNumber = `PK-${params.carrier.substring(0, 3).toUpperCase()}-${Date.now().toString().slice(-6)}`;
-  let rawResponse = "";
+  let confirmationNumber = "";
+  let lastPickupError = "";
 
-  if (ENVIA_API_KEY) {
-    const payloadPickup = {
-      carrier: params.carrier.toLowerCase(),
-      origin: ORIGEN_DEFECTO,
-      pickupDate: params.pickupDate,
-      pickupTime: {
-        from: params.pickupTimeFrom,
-        to: params.pickupTimeTo
-      },
-      trackingNumbers: trackingNumbers.length > 0 ? trackingNumbers : undefined,
-      packages: [
-        {
-          content: "Paquetes y piezas 3D Thiart",
-          amount: totalPackages,
-          weight: totalWeight,
-          weightUnit: "KG",
-          dimensions: { length: 20, width: 20, height: 20 }
+  if (!ENVIA_API_KEY) {
+    throw new Error("ENVIA_API_KEY no está configurada en las variables de entorno.");
+  }
+
+  const payloadPickup = {
+    carrier: params.carrier.toLowerCase(),
+    origin: ORIGEN_DEFECTO,
+    pickupDate: params.pickupDate,
+    pickupTime: {
+      from: params.pickupTimeFrom,
+      to: params.pickupTimeTo
+    },
+    trackingNumbers: trackingNumbers.length > 0 ? trackingNumbers : undefined,
+    packages: [
+      {
+        content: "Paquetes y piezas 3D Thiart",
+        amount: totalPackages,
+        weight: totalWeight,
+        weightUnit: "KG",
+        dimensions: { length: 20, width: 20, height: 20 }
+      }
+    ],
+    totalPackages: totalPackages,
+    totalWeight: totalWeight,
+    instructions: params.instructions || "Taller Thiart 3D, favor timbrar."
+  };
+
+  console.log("[ENVIA-PICKUP] Payload enviado a Envia:", JSON.stringify(payloadPickup));
+
+  const endpoints = process.env.ENVIA_API_URL
+    ? [`${process.env.ENVIA_API_URL.replace(/\/+$/, "")}/ship/pickup/`]
+    : [
+        "https://api-test.envia.com/ship/pickup/",
+        "https://api.envia.com/ship/pickup/"
+      ];
+
+  let apiSuccess = false;
+
+  for (const url of endpoints) {
+    if (apiSuccess) break;
+    try {
+      const resp = await axios.post(url, payloadPickup, {
+        headers: {
+          Authorization: `Bearer ${ENVIA_API_KEY}`,
+          "Content-Type": "application/json",
         }
-      ],
-      totalPackages: totalPackages,
-      totalWeight: totalWeight,
-      instructions: params.instructions || "Taller Thiart 3D, favor timbrar."
-    };
+      });
 
-    console.log("[ENVIA-PICKUP] Payload enviado a Envia:", JSON.stringify(payloadPickup));
-
-    const endpoints = [
-      "https://api.envia.com/ship/pickup/",
-      "https://api-test.envia.com/ship/pickup/"
-    ];
-
-    let apiSuccess = false;
-
-    for (const url of endpoints) {
-      if (apiSuccess) break;
-      try {
-        const resp = await axios.post(url, payloadPickup, {
-          headers: {
-            Authorization: `Bearer ${ENVIA_API_KEY}`,
-            "Content-Type": "application/json",
-          }
-        });
-
-        console.log(`[ENVIA-PICKUP] Respuesta exitosa de (${url}):`, JSON.stringify(resp.data));
-        rawResponse = JSON.stringify(resp.data);
+      console.log(`[ENVIA-PICKUP] Respuesta exitosa de (${url}):`, JSON.stringify(resp.data));
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      if (resp.data) {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-        if (resp.data && (resp.data.data || resp.data.confirmationNumber || resp.data.pickupId)) {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-          confirmationNumber = String(resp.data.confirmationNumber || resp.data.pickupId || resp.data.data?.[0]?.confirmationNumber || confirmationNumber);
-        }
-        console.log(`[ENVIA-PICKUP] Confirmación de recogida oficial en Envía: ${confirmationNumber}`);
-        apiSuccess = true;
-      } catch (apiErr) {
-        if (axios.isAxiosError(apiErr)) {
-          console.warn(`[ENVIA-PICKUP] Intento fallido en ${url}:`, apiErr.response?.data || apiErr.message);
+        const item = Array.isArray(resp.data.data) ? resp.data.data[0] : resp.data.data;
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        confirmationNumber = String(
+          item?.pickupNumber ||
+          item?.confirmationNumber ||
+          resp.data.pickupNumber ||
+          resp.data.confirmationNumber ||
+          resp.data.pickupId ||
+          `PK-${params.carrier.substring(0, 3).toUpperCase()}-${Date.now().toString().slice(-6)}`
+        );
+      }
+      console.log(`[ENVIA-PICKUP] Confirmación de recogida oficial en Envía: ${confirmationNumber}`);
+      apiSuccess = true;
+    } catch (apiErr) {
+      if (axios.isAxiosError(apiErr)) {
+        if (apiErr.response?.status === 401) {
+          lastPickupError = "Error de autenticación con Envía (401): Tu clave ENVIA_API_KEY pertenece a Modo Pruebas (Sandbox) o no tiene permisos en Producción. Para que la recolección se vea reflejada en tu panel oficial de Envia.com (Empresa #5729), debes copiar el Token de Producción desde Envia.com y configurarlo en el archivo .env.";
         } else {
-          console.warn(`[ENVIA-PICKUP] Intento fallido en ${url}:`, apiErr);
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+          const errData = apiErr.response?.data;
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+          lastPickupError = String(errData?.error?.message || errData?.message || errData?.error?.description || apiErr.message);
         }
+        console.warn(`[ENVIA-PICKUP] Intento fallido en ${url}:`, lastPickupError);
+      } else if (apiErr instanceof Error) {
+        lastPickupError = apiErr.message;
+        console.warn(`[ENVIA-PICKUP] Intento fallido en ${url}:`, apiErr.message);
       }
     }
+  }
+
+  if (!apiSuccess) {
+    throw new Error(lastPickupError || "No fue posible programar la recogida con Envía.");
   }
 
   // Cache en memoria para resiliencia si la tabla de Supabase aún no ha sido migrada físicamente

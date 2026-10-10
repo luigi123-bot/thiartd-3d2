@@ -26,7 +26,8 @@ import {
   Building2,
   Phone,
   User,
-  ShieldCheck
+  ShieldCheck,
+  AlertTriangle
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -102,6 +103,28 @@ export default function EnviosAdminPage() {
   });
   const [programandoRecogida, setProgramandoRecogida] = useState(false);
 
+  const [conexionStatus, setConexionStatus] = useState<{
+    configured: boolean;
+    environment: string;
+    isProduction: boolean;
+    message: string;
+  } | null>(null);
+
+  const fetchConexion = useCallback(async () => {
+    try {
+      const res = await fetch("/api/envios/conexion");
+      const data = (await res.json()) as {
+        configured: boolean;
+        environment: string;
+        isProduction: boolean;
+        message: string;
+      };
+      setConexionStatus(data);
+    } catch (e) {
+      console.error("Error verificando conexión Envía:", e);
+    }
+  }, []);
+
   const fetchPedidos = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase
@@ -132,7 +155,8 @@ export default function EnviosAdminPage() {
   useEffect(() => {
     void fetchPedidos();
     void fetchRecogidas();
-  }, [fetchPedidos, fetchRecogidas]);
+    void fetchConexion();
+  }, [fetchPedidos, fetchRecogidas, fetchConexion]);
 
   const handleGenerarGuia = async (pedidoId: number) => {
     setGenerandoGuiaId(pedidoId);
@@ -249,6 +273,57 @@ export default function EnviosAdminPage() {
             </div>
           </div>
         </div>
+
+        {/* ── Banner Estado Conexión Envía.com ── */}
+        {conexionStatus && !conexionStatus.isProduction && (
+          <div className="bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-300/80 rounded-3xl p-5 text-amber-950 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-amber-200/80 text-amber-700 flex items-center justify-center flex-shrink-0 shadow-inner">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <h4 className="font-black text-sm text-amber-950">
+                    {conexionStatus.environment === "sandbox"
+                      ? "Modo Pruebas (Sandbox) Activo — Seguro para Testing"
+                      : "Conexión con Envía.com Requiere Atención"}
+                  </h4>
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-200 text-amber-900 border border-amber-300">
+                    {conexionStatus.environment.toUpperCase()}
+                  </span>
+                </div>
+                <p className="text-xs text-amber-900/90 leading-relaxed max-w-3xl">
+                  {conexionStatus.environment === "sandbox"
+                    ? "Excelente para realizar todas las pruebas sin descontar saldo de tu cuenta ($3.703.630). Los envíos y recolecciones generados se verán en el panel de pruebas oficial de Envía (ship-test.envia.com)."
+                    : conexionStatus.message}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 self-end md:self-center flex-shrink-0">
+              <a
+                href="https://ship-test.envia.com"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-[#1877f2] hover:bg-[#1565c0] text-white shadow-sm transition-all"
+              >
+                <span>Abrir Panel de Pruebas</span>
+                <ArrowUpRight className="w-3.5 h-3.5" />
+              </a>
+            </div>
+          </div>
+        )}
+
+        {conexionStatus?.isProduction && (
+          <div className="bg-emerald-50/80 border border-emerald-200 rounded-2xl px-4 py-2.5 flex items-center justify-between gap-2 shadow-xs">
+            <div className="flex items-center gap-2 text-emerald-800 text-xs font-bold">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span>Conectado en Vivo a Envia.com (Producción) — Las guías y recolecciones se reflejan en tu cuenta oficial.</span>
+            </div>
+            <span className="text-[10px] font-black uppercase px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-md">
+              En Vivo
+            </span>
+          </div>
+        )}
 
         {/* ── KPIs Rápidos ── */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

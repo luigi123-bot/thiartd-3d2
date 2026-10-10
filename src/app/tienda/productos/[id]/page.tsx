@@ -67,9 +67,25 @@ export default function ProductoDetallePage() {
   const [error, setError] = useState("");
   const [cantidad, setCantidad] = useState(1);
 
-  // Opciones seleccionadas
-  const [selectedEscala, setSelectedEscala] = useState<string>(ESCALAS_DEFAULT[1]!);
-  const [selectedEstilo, setSelectedEstilo] = useState<string>(ESTILOS_DEFAULT[0]!.nombre);
+  // Opciones seleccionadas — multi-selección
+  const [selectedEscalas, setSelectedEscalas] = useState<string[]>([ESCALAS_DEFAULT[1]!]);
+  const [selectedEstilos, setSelectedEstilos] = useState<string[]>([ESTILOS_DEFAULT[0]!.nombre]);
+
+  // Compatibilidad: primera selección activa para cálculos
+  const selectedEscala = selectedEscalas[0] ?? ESCALAS_DEFAULT[1]!;
+  const selectedEstilo = selectedEstilos[0] ?? ESTILOS_DEFAULT[0]!.nombre;
+
+  const toggleEscala = (esc: string) => {
+    setSelectedEscalas(prev =>
+      prev.includes(esc) ? (prev.length > 1 ? prev.filter(e => e !== esc) : prev) : [...prev, esc]
+    );
+  };
+
+  const toggleEstilo = (est: string) => {
+    setSelectedEstilos(prev =>
+      prev.includes(est) ? (prev.length > 1 ? prev.filter(e => e !== est) : prev) : [...prev, est]
+    );
+  };
 
   const fetchProducto = useCallback(async () => {
     if (!params.id) return;
@@ -176,18 +192,34 @@ export default function ProductoDetallePage() {
 
   const handleAddToCart = async () => {
     if (!producto) return;
-    const ok = await addToCarrito({
-      id: String(producto.id),
-      nombre: `${producto.nombre} (${selectedEscala} - ${selectedEstilo})`,
-      precio: precioCalculado,
-      imagen: producto.image_url,
-      cantidad: cantidad,
-      stock: stockActual,
-      categoria: producto.categoria,
-      destacado: producto.destacado,
-    });
-    if (ok) {
-      toast.success("Añadido al carrito con tus especificaciones");
+    // Agregar una combinación por cada escala × estilo seleccionado
+    let alguno = false;
+    for (const esc of selectedEscalas) {
+      for (const est of selectedEstilos) {
+        const varEncontrada = variantes.find(v => v.escala === esc && v.estilo === est);
+        const estiloInfo = ESTILOS_DEFAULT.find(e => e.nombre === est);
+        const escalaExtra = esc.includes("35 cm") ? 1.5 : esc.includes("15 cm") ? 0.8 : 1;
+        const precio = varEncontrada
+          ? Number(varEncontrada.precio)
+          : Math.round(producto.precio * (estiloInfo?.multiplicador ?? 1) * escalaExtra);
+        const stock = varEncontrada ? varEncontrada.stock : (producto.stock ?? 0);
+
+        const ok = await addToCarrito({
+          id: `${producto.id}-${esc}-${est}`.replace(/\s/g, "_"),
+          nombre: `${producto.nombre} (${esc} — ${est})`,
+          precio,
+          imagen: producto.image_url,
+          cantidad,
+          stock,
+          categoria: producto.categoria,
+          destacado: producto.destacado,
+        });
+        if (ok) alguno = true;
+      }
+    }
+    if (alguno) {
+      const count = selectedEscalas.length * selectedEstilos.length;
+      toast.success(count > 1 ? `${count} variantes añadidas al carrito` : "Añadido al carrito con tus especificaciones");
     }
   };
 
@@ -323,8 +355,24 @@ export default function ProductoDetallePage() {
               </div>
 
               {/* ── Badge de Disponibilidad y Fabricación ── */}
-              <div className="p-4 rounded-2xl border text-xs font-semibold flex items-start gap-3 bg-slate-50 border-slate-200">
-                {!esPOD ? (
+              <div className={`p-4 rounded-2xl border text-xs font-semibold flex items-start gap-3 ${
+                !esPOD && stockActual <= 0
+                  ? "bg-red-50 border-red-200"
+                  : esPOD
+                  ? "bg-blue-50 border-blue-200"
+                  : "bg-slate-50 border-slate-200"
+              }`}>
+                {!esPOD && stockActual <= 0 ? (
+                  <>
+                    <div className="w-2.5 h-2.5 rounded-full bg-red-500 mt-1 flex-shrink-0" />
+                    <div>
+                      <p className="font-black text-red-800 uppercase tracking-wider">
+                        Sin Stock — No disponible
+                      </p>
+                      <p className="text-slate-500 mt-0.5">Este producto no está disponible actualmente.</p>
+                    </div>
+                  </>
+                ) : !esPOD ? (
                   <>
                     <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 mt-1 animate-pulse" />
                     <div>
@@ -339,57 +387,71 @@ export default function ProductoDetallePage() {
                     <Clock className="w-5 h-5 text-blue-600 flex-shrink-0" />
                     <div>
                       <p className="font-black text-blue-800 uppercase tracking-wider">
-                        Fabricación Print-on-Demand (POD)
+                        Print-on-Demand — Se fabrica al comprar
                       </p>
                       <p className="text-slate-500 mt-0.5">
-                        Impresión 3D + acabado personalizado sobre pedido. Listo en aprox. <strong>{diasFabricacion} días hábiles</strong>.
+                        Tu pedido se imprime y personaliza cuando lo compras. Listo en aprox. <strong>{diasFabricacion} días hábiles</strong>.
                       </p>
                     </div>
                   </>
                 )}
               </div>
 
-              {/* ── 1. Selector de Escala ── */}
+              {/* ── 1. Selector de Escala (Multi-selección) ── */}
               <div className="space-y-2.5">
                 <label className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center justify-between">
-                  <span>1. Selecciona la Escala</span>
-                  <span className="text-[10px] text-teal-600 font-bold">Tamaño de la obra</span>
+                  <span>1. Escala de la Obra</span>
+                  <span className="text-[10px] text-teal-600 font-bold">
+                    {selectedEscalas.length > 1 ? `${selectedEscalas.length} seleccionadas` : "Tamaño de la obra"}
+                  </span>
                 </label>
                 <div className="grid grid-cols-3 gap-2">
                   {ESCALAS_DEFAULT.map((esc) => {
-                    const isSelected = selectedEscala === esc;
+                    const isSelected = selectedEscalas.includes(esc);
                     return (
                       <button
                         key={esc}
                         type="button"
-                        onClick={() => setSelectedEscala(esc)}
-                        className={`p-3 rounded-xl text-xs font-black text-center transition-all border ${
+                        onClick={() => toggleEscala(esc)}
+                        className={`p-3 rounded-xl text-xs font-black text-center transition-all border relative ${
                           isSelected
                             ? "bg-slate-900 text-white border-slate-900 shadow-md scale-105"
                             : "bg-white text-slate-600 border-slate-200 hover:border-slate-400"
                         }`}
                       >
                         {esc}
+                        {isSelected && (
+                          <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-[#00a19a] rounded-full flex items-center justify-center">
+                            <Check className="w-2.5 h-2.5 text-white" />
+                          </span>
+                        )}
                       </button>
                     );
                   })}
                 </div>
+                {selectedEscalas.length > 1 && (
+                  <p className="text-[10px] text-teal-700 font-bold bg-teal-50 px-3 py-1.5 rounded-lg border border-teal-100">
+                    Se agregarán {selectedEscalas.length} escalas al carrito
+                  </p>
+                )}
               </div>
 
-              {/* ── 2. Selector de Estilo de Obra ── */}
+              {/* ── 2. Selector de Estilo de Obra (Multi-selección) ── */}
               <div className="space-y-2.5">
                 <label className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center justify-between">
-                  <span>2. Selecciona el Estilo / Acabado</span>
-                  <span className="text-[10px] text-teal-600 font-bold">Pintura & Material</span>
+                  <span>2. Estilo / Acabado</span>
+                  <span className="text-[10px] text-teal-600 font-bold">
+                    {selectedEstilos.length > 1 ? `${selectedEstilos.length} seleccionados` : "Pintura & Material"}
+                  </span>
                 </label>
                 <div className="space-y-2">
                   {ESTILOS_DEFAULT.map((est) => {
-                    const isSelected = selectedEstilo === est.nombre;
+                    const isSelected = selectedEstilos.includes(est.nombre);
                     return (
                       <button
                         key={est.nombre}
                         type="button"
-                        onClick={() => setSelectedEstilo(est.nombre)}
+                        onClick={() => toggleEstilo(est.nombre)}
                         className={`w-full p-3.5 rounded-xl text-xs font-bold text-left transition-all border flex items-center justify-between ${
                           isSelected
                             ? "bg-teal-50/70 border-[#00a19a] text-teal-950 ring-1 ring-[#00a19a]"
@@ -397,11 +459,25 @@ export default function ProductoDetallePage() {
                         }`}
                       >
                         <span>{est.nombre}</span>
-                        {isSelected && <Check className="w-4 h-4 text-[#00a19a]" />}
+                        <div className="flex items-center gap-2">
+                          {est.multiplicador !== 1 && (
+                            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${
+                              isSelected ? "bg-teal-200 text-teal-900" : "bg-slate-100 text-slate-500"
+                            }`}>
+                              x{est.multiplicador}
+                            </span>
+                          )}
+                          {isSelected && <Check className="w-4 h-4 text-[#00a19a]" />}
+                        </div>
                       </button>
                     );
                   })}
                 </div>
+                {selectedEstilos.length > 1 && (
+                  <p className="text-[10px] text-teal-700 font-bold bg-teal-50 px-3 py-1.5 rounded-lg border border-teal-100">
+                    Se agregarán {selectedEstilos.length} estilos al carrito
+                  </p>
+                )}
               </div>
 
               {/* Cantidad */}
@@ -430,19 +506,29 @@ export default function ProductoDetallePage() {
 
               {/* Botones de Compra */}
               <div className="grid gap-3">
-                <Button
-                  onClick={handleBuyNow}
-                  className="h-14 bg-[#00a19a] hover:bg-[#007973] text-white rounded-2xl text-sm font-black tracking-wider uppercase shadow-xl shadow-[#00a19a]/25 active:scale-95 transition-all"
-                >
-                  Comprar Ahora
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={handleAddToCart}
-                  className="h-14 border-2 border-slate-200 hover:border-slate-900 text-slate-800 rounded-2xl text-sm font-black uppercase active:scale-95 transition-all"
-                >
-                  Agregar al Carrito
-                </Button>
+                {!esPOD && stockActual <= 0 ? (
+                  <div className="h-14 bg-slate-100 border-2 border-slate-200 rounded-2xl flex items-center justify-center text-sm font-black text-slate-400 uppercase tracking-wider">
+                    Sin Stock — No disponible
+                  </div>
+                ) : (
+                  <>
+                    <Button
+                      onClick={handleBuyNow}
+                      className="h-14 bg-[#00a19a] hover:bg-[#007973] text-white rounded-2xl text-sm font-black tracking-wider uppercase shadow-xl shadow-[#00a19a]/25 active:scale-95 transition-all"
+                    >
+                      {esPOD ? "Pedir — Se fabrica al comprar" : "Comprar Ahora"}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={handleAddToCart}
+                      className="h-14 border-2 border-slate-200 hover:border-slate-900 text-slate-800 rounded-2xl text-sm font-black uppercase active:scale-95 transition-all"
+                    >
+                      {selectedEscalas.length * selectedEstilos.length > 1
+                        ? `Agregar ${selectedEscalas.length * selectedEstilos.length} variantes al Carrito`
+                        : "Agregar al Carrito"}
+                    </Button>
+                  </>
+                )}
               </div>
             </Card>
 

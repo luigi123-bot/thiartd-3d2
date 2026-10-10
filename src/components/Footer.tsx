@@ -33,8 +33,8 @@ export default function Footer() {
             </Link>
 
             <h2 className="text-white font-black text-xl leading-snug mb-3">
-              Imprimiendo tus Ideas con un<br/>
-              <span className="text-[#00a19a]">impacto sostenible.</span>
+              Arte 3D con propósito<br/>
+              <span className="text-[#00a19a]">e impacto sostenible.</span>
             </h2>
             <p className="text-sm text-slate-400 leading-relaxed max-w-sm mb-6 font-medium">
               En THIART 3D transformamos botellas plásticas recicladas en piezas 3D únicas para marcas y personas que quieren diseño con propósito.

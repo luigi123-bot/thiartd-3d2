@@ -103,9 +103,9 @@ export default function HomeClient() {
                 Bienvenidos al futuro
               </span>
               <h1 className="text-4xl sm:text-6xl md:text-7xl lg:text-[5rem] font-black text-white leading-[1.05] tracking-tight mb-6 drop-shadow-xl">
-                Imprimiendo <br />
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-200 to-[#00a19a] filter brightness-125 saturate-150">tus ideas</span> <br />
-                <span className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-teal-100 block mt-2 opacity-95">con un impacto sostenible.</span>
+                Arte en 3D <br />
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-200 to-[#00a19a] filter brightness-125 saturate-150">hecho a medida</span> <br />
+                <span className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-teal-100 block mt-2 opacity-95">con impacto sostenible.</span>
               </h1>
               <p className="text-base sm:text-lg md:text-xl text-teal-50/90 mb-10 max-w-xl mx-auto lg:mx-0 font-medium leading-relaxed">
                 En THIART 3D transformamos botellas plásticas recicladas en piezas 3D únicas para marcas y personas que quieren diseño con propósito.
