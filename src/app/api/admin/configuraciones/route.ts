@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { verifyAdminSession } from "~/lib/auth-server";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -15,7 +16,10 @@ const getAdminClient = () => {
 };
 
 // GET: Recuperar todas las configuraciones
-export async function GET() {
+export async function GET(req: Request) {
+  const auth = await verifyAdminSession(req);
+  if (!auth.authorized) return auth.errorResponse!;
+
   try {
     const supabase = getAdminClient();
     const { data, error } = await supabase
@@ -48,6 +52,9 @@ export async function GET() {
 
 // POST: Guardar o actualizar una configuración
 export async function POST(req: Request) {
+  const auth = await verifyAdminSession(req);
+  if (!auth.authorized) return auth.errorResponse!;
+
   try {
     const body = (await req.json()) as { clave?: string; valor: unknown };
     let { clave } = body;

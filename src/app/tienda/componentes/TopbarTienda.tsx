@@ -384,7 +384,7 @@ export default function TopbarTienda({ becomeCreatorOpen, setBecomeCreatorOpen }
 
                       {isAdmin && <button className="w-full text-left px-4 py-2 hover:bg-slate-50 flex items-center gap-3 text-sm text-[#00a19a] font-bold" onClick={() => { setAvatarMenuOpen(false); router.push("/admin"); }}><FiSettings /> Admin</button>}
                       <hr className="my-1" />
-                      <button className="w-full text-left px-4 py-2 hover:bg-red-50 text-red-600 flex items-center gap-3 text-sm" onClick={async () => { await supabase.auth.signOut(); router.push("/"); window.location.reload(); }}><IoMdLogOut /> Salir</button>
+                      <button className="w-full text-left px-4 py-2 hover:bg-red-50 text-red-600 flex items-center gap-3 text-sm" onClick={async () => { if (typeof document !== "undefined") document.cookie = "sb-access-token=; path=/; max-age=0; SameSite=Lax"; await supabase.auth.signOut(); router.push("/"); window.location.reload(); }}><IoMdLogOut /> Salir</button>
                     </div>
                   )}
                 </div>

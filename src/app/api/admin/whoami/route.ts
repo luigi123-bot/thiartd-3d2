@@ -1,43 +1,20 @@
 import { NextResponse } from "next/server";
-import { getSupabaseServer } from "~/lib/supabaseServer";
+import { verifyAdminSession } from "~/lib/auth-server";
 
 export async function POST(req: Request) {
-  const supabase = getSupabaseServer();
   try {
-    const body = await req.json() as { auth_id?: unknown };
-    const authId = typeof body?.auth_id === "string" ? body.auth_id : null;
-    if (!authId) return NextResponse.json({ isAdmin: false });
-
-    const tables = ["usuarios", "usuario", "users"];
-    for (const t of tables) {
-      try {
-        const { data, error } = await supabase
-          .from(t)
-          .select("role,rol,nombre,email,auth_id")
-          .or(`auth_id.eq.${authId},email.eq.${authId}`)
-          .limit(1)
-          .maybeSingle();
-
-        if (error) {
-          const msg = String(error.message ?? "").toLowerCase();
-          if (msg.includes("does not exist") || msg.includes("relation")) continue;
-          console.error("Error querying table", t, error.message);
-          continue;
-        }
-
-        if (data && (data.role || data.rol)) {
-          const role = (data.role ?? data.rol) as string;
-          return NextResponse.json({ isAdmin: String(role).toLowerCase() === "admin", role });
-        }
-      } catch (err) {
-        console.warn("Ignoring error checking table", t, err);
-        continue;
-      }
+    const auth = await verifyAdminSession(req);
+    if (!auth.authorized) {
+      return NextResponse.json({ isAdmin: false, role: "cliente" });
     }
-
-    return NextResponse.json({ isAdmin: false });
+    return NextResponse.json({ isAdmin: true, role: auth.role ?? "admin" });
   } catch (err) {
     console.error("Error in /api/admin/whoami:", err);
     return NextResponse.json({ isAdmin: false });
   }
 }
+
+export async function GET(req: Request) {
+  return POST(req);
+}
+

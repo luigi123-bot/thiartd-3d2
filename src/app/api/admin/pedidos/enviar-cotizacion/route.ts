@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServer } from "~/lib/supabaseServer";
 import { sendQuotationEmail } from "~/lib/email-service";
+import { verifyAdminSession } from "~/lib/auth-server";
 
 
 export async function POST(req: Request) {
+  const auth = await verifyAdminSession(req);
+  if (!auth.authorized) return auth.errorResponse!;
+
   const supabase = getSupabaseServer();
   try {
     const { pedidoId, total, pagoUrl, items, to, nombreCliente } = await req.json() as {

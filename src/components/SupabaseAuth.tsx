@@ -268,6 +268,11 @@ export default function SupabaseAuth({ onAuth, open = false, onOpenChange, defau
     }
     setLoading(false);
     
+    // Aseguramos la cookie de sesión inmediatamente antes de redirigir
+    if (data.session?.access_token) {
+      document.cookie = `sb-access-token=${data.session.access_token}; path=/; max-age=604800; SameSite=Lax`;
+    }
+
     // Logueo exitoso: notificamos y cerramos modal
     if (onAuth) onAuth(usuarioData);
     if (onOpenChange) onOpenChange(false);

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { type Metadata } from "next";
+import Script from "next/script";
 import "../styles/globals.css";
 
 import { ToastProvider } from "~/components/ui/use-toast";
@@ -51,6 +52,24 @@ export default function RootLayout({
   return (
     <html lang="es" suppressHydrationWarning>
       <head>
+        {/* Google tag (gtag.js) */}
+        <Script
+          src="https://www.googletagmanager.com/gtag/js?id=G-T3RXBYMG5P"
+          strategy="afterInteractive"
+        />
+        <Script
+          id="google-tag-init"
+          strategy="afterInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `
+              window.dataLayer = window.dataLayer || [];
+              function gtag(){dataLayer.push(arguments);}
+              gtag('js', new Date());
+              gtag('config', 'G-T3RXBYMG5P');
+            `,
+          }}
+        />
+
         {/* Supabase — used on every page for auth */}
         <link
           rel="preconnect"

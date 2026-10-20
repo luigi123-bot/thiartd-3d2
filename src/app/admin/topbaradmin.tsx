@@ -229,6 +229,9 @@ export default function AdminSidebar() {
   }, [authModalOpen, checkUser]);
 
   const handleLogout = async () => {
+    if (typeof document !== "undefined") {
+      document.cookie = "sb-access-token=; path=/; max-age=0; SameSite=Lax";
+    }
     await supabase.auth.signOut();
     void checkUser();
     router.push("/");

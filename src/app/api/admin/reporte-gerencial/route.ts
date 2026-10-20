@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServer } from "~/lib/supabaseServer";
 import { sendManagerReportEmail } from "~/lib/email-service";
+import { verifyAdminSession } from "~/lib/auth-server";
 
 
 interface PedidoRow {
@@ -37,6 +38,9 @@ interface MessageRow {
 }
 
 export async function POST(req: Request) {
+  const auth = await verifyAdminSession(req);
+  if (!auth.authorized) return auth.errorResponse!;
+
   const supabase = getSupabaseServer();
   try {
     const body = (await req.json().catch(() => ({}))) as { managerEmail?: string };

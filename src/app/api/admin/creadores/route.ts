@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServer } from "~/lib/supabaseServer";
+import { verifyAdminSession } from "~/lib/auth-server";
 
 
-export async function GET() {
+export async function GET(req: Request) {
+  const auth = await verifyAdminSession(req);
+  if (!auth.authorized) return auth.errorResponse!;
+
   const supabase = getSupabaseServer();
   const tables = ["usuarios", "usuario", "users"];
   for (const table of tables) {

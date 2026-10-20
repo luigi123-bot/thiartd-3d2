@@ -34,5 +34,10 @@ Añade lo siguiente a tu `vercel.json`:
 #### 2. Manualmente o con un Servicio Externo (Cron-job.org)
 Simplemente configura el servicio para que haga una petición GET a la URL de la API una vez al día.
 
+### Seguridad (Opcional pero Recomendado)
+Puedes definir la variable de entorno `CRON_SECRET` en tu `.env` o en Vercel. Si está definida, la API exigirá el header:
+`Authorization: Bearer <CRON_SECRET>`
+evitando ejecuciones no autorizadas o spam.
+
 ## Personalización del Correo
 El diseño del correo se encuentra en `src/lib/email-service.ts` bajo la función `sendAbandonedCartReminder`. Utiliza un estilo premium con degradados y botones interactivos.

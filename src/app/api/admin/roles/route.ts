@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServer } from "~/lib/supabaseServer";
+import { verifyAdminSession } from "~/lib/auth-server";
 
 // Configuración de Supabase
 
@@ -7,7 +8,10 @@ import { getSupabaseServer } from "~/lib/supabaseServer";
  * Endpoint de API para obtener la lista de roles disponibles.
  * Esta API es crítica porque provee los identificadores (ids) que se guardan en el perfil del usuario.
  */
-export async function GET() {
+export async function GET(req: Request) {
+  const auth = await verifyAdminSession(req);
+  if (!auth.authorized) return auth.errorResponse!;
+
   const supabase = getSupabaseServer();
   try {
     // Intentar buscar en tablas comunes de roles (esquema flexible)

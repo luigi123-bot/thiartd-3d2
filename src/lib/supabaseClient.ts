@@ -12,6 +12,24 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+// Sincronización automática del token de sesión en la cookie 'sb-access-token'
+// para permitir validación en middleware y API routes del servidor.
+if (typeof window !== "undefined") {
+  void supabase.auth.getSession().then(({ data: { session } }) => {
+    if (session?.access_token) {
+      document.cookie = `sb-access-token=${session.access_token}; path=/; max-age=604800; SameSite=Lax`;
+    }
+  });
+
+  supabase.auth.onAuthStateChange((event, session) => {
+    if (session?.access_token) {
+      document.cookie = `sb-access-token=${session.access_token}; path=/; max-age=604800; SameSite=Lax`;
+    } else if (event === "SIGNED_OUT") {
+      document.cookie = "sb-access-token=; path=/; max-age=0; SameSite=Lax";
+    }
+  });
+}
+
 export default supabase;
 
 export async function signUpWithEmail(email: string, password: string) {

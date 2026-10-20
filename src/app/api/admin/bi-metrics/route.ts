@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServer } from "~/lib/supabaseServer";
+import { verifyAdminSession } from "~/lib/auth-server";
 
 export const dynamic = "force-dynamic";
 
@@ -45,6 +46,9 @@ function formatMesLabel(mesKey: string): string {
 }
 
 export async function GET(req: Request) {
+  const auth = await verifyAdminSession(req);
+  if (!auth.authorized) return auth.errorResponse!;
+
   try {
     const supabase = getSupabaseServer();
     const url = new URL(req.url);

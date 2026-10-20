@@ -3,7 +3,16 @@ import { getSupabaseServer } from "~/lib/supabaseServer";
 import { sendAbandonedCartReminder } from '~/lib/email-service';
 
 
-export async function GET() {
+export async function GET(req: Request) {
+  // Validación de seguridad para Cron Jobs si la variable está configurada
+  const cronSecret = process.env.CRON_SECRET;
+  if (cronSecret) {
+    const authHeader = req.headers.get("authorization");
+    if (authHeader !== `Bearer ${cronSecret}`) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    }
+  }
+
   const supabase = getSupabaseServer();
   try {
     const twoDaysAgo = new Date();
